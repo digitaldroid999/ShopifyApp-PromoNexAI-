@@ -28,6 +28,151 @@ const twoPartLayout = {
   minHeight: "280px",
 };
 
+const FETCH_SLOT_COUNT = 8;
+
+const stepDescriptionStyle = {
+  margin: 0,
+  marginTop: "4px",
+  fontSize: "14px",
+  color: "var(--p-color-text-subdued, #6d7175)",
+  lineHeight: 1.4,
+} as const;
+
+function StepDescription({ step, total, title, description }: { step: number; total: number; title: string; description: string }) {
+  return (
+    <div style={{ marginBottom: "8px" }}>
+      <p style={{ margin: 0, fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-primary, #202223)", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+        Step {step} of {total}
+      </p>
+      <p style={{ ...stepDescriptionStyle, fontWeight: 600, color: "var(--p-color-text-primary, #202223)", marginTop: "2px" }}>
+        {title}
+      </p>
+      <p style={stepDescriptionStyle}>
+        {description}
+      </p>
+    </div>
+  );
+}
+
+function FetchBackgroundModal({
+  open,
+  onClose,
+  onSelect,
+  mockImageUrl,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSelect: (url: string) => void;
+  mockImageUrl: string;
+}) {
+  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
+
+  if (!open) return null;
+
+  const handleSlotClick = (index: number) => {
+    setSelectedSlot(index);
+    onSelect(mockImageUrl);
+    setTimeout(() => onClose(), 400);
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1100,
+        background: "rgba(0,0,0,0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px",
+      }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        style={{
+          background: "var(--p-color-bg-surface, #fff)",
+          borderRadius: "16px",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+          maxWidth: "480px",
+          width: "100%",
+          maxHeight: "85vh",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          style={{
+            padding: "16px 20px",
+            borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 600 }}>Fetch background</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              padding: "8px",
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
+              fontSize: "20px",
+              lineHeight: 1,
+              color: "#5c5f62",
+            }}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+        <p style={{ margin: 0, padding: "12px 20px", fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>
+          Select a background from third-party platforms (mockup: empty slots; click a slot to use sample image).
+        </p>
+        <div
+          style={{
+            padding: "0 20px 20px",
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: "12px",
+            overflow: "auto",
+          }}
+        >
+          {Array.from({ length: FETCH_SLOT_COUNT }, (_, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => handleSlotClick(i)}
+              style={{
+                aspectRatio: "1",
+                padding: 0,
+                border: selectedSlot === i ? "2px solid var(--p-color-border-info, #2c6ecb)" : "2px solid var(--p-color-border-secondary, #e1e3e5)",
+                borderRadius: "8px",
+                overflow: "hidden",
+                cursor: "pointer",
+                background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {selectedSlot === i ? (
+                <img src={mockImageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+              ) : (
+                <span style={{ fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)" }}>Empty slot</span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function WorkflowModal({
   onClose,
   onDone,
@@ -309,6 +454,7 @@ function Scene1Content({ onComplete }: { onComplete?: () => void }) {
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
   const [bgImage, setBgImage] = useState<string | null>(null);
   const [bgLoading, setBgLoading] = useState(false);
+  const [fetchModalOpen, setFetchModalOpen] = useState(false);
   const [composited, setComposited] = useState<string | null>(null);
   const [compositeLoading, setCompositeLoading] = useState(false);
   const [sceneVideo, setSceneVideo] = useState<string | null>(null);
@@ -351,9 +497,12 @@ function Scene1Content({ onComplete }: { onComplete?: () => void }) {
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
       {step === 1 && (
         <>
-          <p style={{ margin: 0, fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>
-            Select an image and remove its background.
-          </p>
+          <StepDescription
+            step={1}
+            total={3}
+            title="Select image & remove background"
+            description="Choose one of the product images below, then click Remove BG to strip the background. The result will be used as the subject for this scene."
+          />
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
             {productImages.map((img) => (
               <button
@@ -420,9 +569,12 @@ function Scene1Content({ onComplete }: { onComplete?: () => void }) {
 
       {step === 2 && (
         <>
-          <p style={{ margin: 0, fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>
-            Composite the subject with a generated or fetched background.
-          </p>
+          <StepDescription
+            step={2}
+            total={3}
+            title="Add a background"
+            description="Generate a new background with AI or fetch one from the library. Then click Composite to combine the subject with the chosen background."
+          />
           <div style={twoPartLayout}>
             <div style={{ ...boxStyle, borderRight: "none", borderTopRightRadius: 0, borderBottomRightRadius: 0 }}>
               {bgRemoved ? (
@@ -438,23 +590,46 @@ function Scene1Content({ onComplete }: { onComplete?: () => void }) {
               ) : bgImage ? (
                 <img src={bgImage} alt="Background" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
               ) : (
-                <button
-                  type="button"
-                  onClick={handleGenerateBg}
-                  style={{
-                    padding: "12px 24px",
-                    borderRadius: "8px",
-                    border: "1px dashed #8c9196",
-                    background: "transparent",
-                    cursor: "pointer",
-                    fontWeight: 600,
-                    color: "#2c6ecb",
-                  }}
-                >
-                  Generate / Fetch background
-                </button>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", justifyContent: "center" }}>
+                  <button
+                    type="button"
+                    onClick={handleGenerateBg}
+                    style={{
+                      padding: "12px 24px",
+                      borderRadius: "8px",
+                      border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                      background: "var(--p-color-bg-fill-info, #2c6ecb)",
+                      color: "#fff",
+                      cursor: "pointer",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Generate background
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFetchModalOpen(true)}
+                    style={{
+                      padding: "12px 24px",
+                      borderRadius: "8px",
+                      border: "1px dashed #8c9196",
+                      background: "transparent",
+                      cursor: "pointer",
+                      fontWeight: 600,
+                      color: "#2c6ecb",
+                    }}
+                  >
+                    Fetch background
+                  </button>
+                </div>
               )}
             </div>
+            <FetchBackgroundModal
+              open={fetchModalOpen}
+              onClose={() => setFetchModalOpen(false)}
+              onSelect={(url) => setBgImage(url)}
+              mockImageUrl={`${BASE}/scene1-bg.png`}
+            />
             <div
               style={{
                 position: "absolute",
@@ -514,9 +689,12 @@ function Scene1Content({ onComplete }: { onComplete?: () => void }) {
 
       {step === 3 && (
         <>
-          <p style={{ margin: 0, fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>
-            Generate the scene video from the composited image.
-          </p>
+          <StepDescription
+            step={3}
+            total={3}
+            title="Generate scene video"
+            description="Create the final ~8 second video for this scene from the composited image using Remotion. Click Generate scene to start."
+          />
           <div style={twoPartLayout}>
             <div style={{ ...boxStyle, borderRight: "none", borderTopRightRadius: 0, borderBottomRightRadius: 0 }}>
               {composited ? (
@@ -590,9 +768,12 @@ function Scene2Content({ onComplete }: { onComplete?: () => void }) {
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
       {step === 1 && (
         <>
-          <p style={{ margin: 0, fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>
-            Select an image and remove its background.
-          </p>
+          <StepDescription
+            step={1}
+            total={2}
+            title="Select image & remove background"
+            description="Choose a product image and remove its background. The result will be composited onto a stock video in the next step."
+          />
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
             {productImages.map((img) => (
               <button
@@ -655,9 +836,12 @@ function Scene2Content({ onComplete }: { onComplete?: () => void }) {
 
       {step === 2 && (
         <>
-          <p style={{ margin: 0, fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>
-            Fetch and select a stock video (Pexels / Pixabay / Coverr). No videos fetched yet — select a slot to enable Generate video.
-          </p>
+          <StepDescription
+            step={2}
+            total={2}
+            title="Select stock video & generate scene"
+            description="Pick a stock video from Pexels, Pixabay, or Coverr as the background. Then click Generate video to composite your subject onto it and create the scene (~8s)."
+          />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
             {videoSlots.map((slot) => (
               <button
@@ -716,6 +900,7 @@ function Scene3Content({ onComplete }: { onComplete?: () => void }) {
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
   const [bgImage, setBgImage] = useState<string | null>(null);
   const [bgLoading, setBgLoading] = useState(false);
+  const [fetchModalOpen, setFetchModalOpen] = useState(false);
   const [composited, setComposited] = useState<string | null>(null);
   const [compositeLoading, setCompositeLoading] = useState(false);
   const [sceneVideo, setSceneVideo] = useState<string | null>(null);
@@ -758,9 +943,12 @@ function Scene3Content({ onComplete }: { onComplete?: () => void }) {
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
       {step === 1 && (
         <>
-          <p style={{ margin: 0, fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>
-            Select an image and remove its background.
-          </p>
+          <StepDescription
+            step={1}
+            total={3}
+            title="Select image & remove background"
+            description="Choose one of the product images, then click Remove BG. The result will be used as the subject for this scene (same flow as Scene 1)."
+          />
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
             {productImages.map((img) => (
               <button
@@ -823,9 +1011,12 @@ function Scene3Content({ onComplete }: { onComplete?: () => void }) {
 
       {step === 2 && (
         <>
-          <p style={{ margin: 0, fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>
-            Composite the subject with a generated or fetched background (Scene 3 style).
-          </p>
+          <StepDescription
+            step={2}
+            total={3}
+            title="Add a background (Scene 3 style)"
+            description="Generate a new background or fetch one from the library. Then click Composite to combine the subject with the chosen background. A different Remotion style will be applied in the next step."
+          />
           <div style={twoPartLayout}>
             <div style={{ ...boxStyle, borderRight: "none", borderTopRightRadius: 0, borderBottomRightRadius: 0 }}>
               {bgRemoved ? (
@@ -841,23 +1032,46 @@ function Scene3Content({ onComplete }: { onComplete?: () => void }) {
               ) : bgImage ? (
                 <img src={bgImage} alt="Background" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
               ) : (
-                <button
-                  type="button"
-                  onClick={handleGenerateBg}
-                  style={{
-                    padding: "12px 24px",
-                    borderRadius: "8px",
-                    border: "1px dashed #8c9196",
-                    background: "transparent",
-                    cursor: "pointer",
-                    fontWeight: 600,
-                    color: "#2c6ecb",
-                  }}
-                >
-                  Generate / Fetch background
-                </button>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", justifyContent: "center" }}>
+                  <button
+                    type="button"
+                    onClick={handleGenerateBg}
+                    style={{
+                      padding: "12px 24px",
+                      borderRadius: "8px",
+                      border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                      background: "var(--p-color-bg-fill-info, #2c6ecb)",
+                      color: "#fff",
+                      cursor: "pointer",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Generate background
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFetchModalOpen(true)}
+                    style={{
+                      padding: "12px 24px",
+                      borderRadius: "8px",
+                      border: "1px dashed #8c9196",
+                      background: "transparent",
+                      cursor: "pointer",
+                      fontWeight: 600,
+                      color: "#2c6ecb",
+                    }}
+                  >
+                    Fetch background
+                  </button>
+                </div>
               )}
             </div>
+            <FetchBackgroundModal
+              open={fetchModalOpen}
+              onClose={() => setFetchModalOpen(false)}
+              onSelect={(url) => setBgImage(url)}
+              mockImageUrl={`${BASE}/scene3-bg.png`}
+            />
             <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", zIndex: 2 }}>
               <button
                 type="button"
@@ -909,9 +1123,12 @@ function Scene3Content({ onComplete }: { onComplete?: () => void }) {
 
       {step === 3 && (
         <>
-          <p style={{ margin: 0, fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>
-            Generate the scene video (different Remotion style).
-          </p>
+          <StepDescription
+            step={3}
+            total={3}
+            title="Generate scene video (different style)"
+            description="Create the ~8 second video for this scene from the composited image using Remotion with a different style than Scene 1. Click Generate scene to start."
+          />
           <div style={twoPartLayout}>
             <div style={{ ...boxStyle, borderRight: "none", borderTopRightRadius: 0, borderBottomRightRadius: 0 }}>
               {composited ? (
