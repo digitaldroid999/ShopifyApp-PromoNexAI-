@@ -224,6 +224,14 @@ type ProductNode = {
   };
 };
 
+const SAMPLE_PRODUCT: ProductNode = {
+  id: "sample",
+  title: "Sample product (video mockup)",
+  handle: "sample-product-mockup",
+  status: "ACTIVE",
+  variants: { edges: [] },
+};
+
 export default function Index() {
   const fetcher = useFetcher<typeof action>();
   const loadMoreFetcher = useFetcher<{ products: ProductNode[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } }>();
@@ -391,39 +399,41 @@ export default function Index() {
           <s-paragraph tone="subdued">No products match. Use “Generate a product” to create one.</s-paragraph>
           ) : (
           <s-stack direction="block" gap="base">
-            {products.map((product) => (
-              <s-box
-                key={product.id}
-                padding="base"
-                borderWidth="base"
-                borderRadius="base"
-                background="subdued"
-              >
-                <s-stack direction="block" gap="tight">
-                  <s-text fontWeight="bold">{product.title}</s-text>
-                  <s-text tone="subdued">Handle: {product.handle} · Status: {product.status}</s-text>
-                  {product.variants?.edges?.length > 0 && (
-                    <s-text tone="subdued">
-                      Variants: {product.variants.edges.map((e) => `${e.node.title} – ${e.node.price}`).join(", ")}
-                    </s-text>
-                  )}
-                  <s-stack direction="inline" gap="tight">
-                    <s-button variant="tertiary" onClick={() => setEditingProduct(product)}>
-                      Edit
-                    </s-button>
-                    <s-button
-                      variant="tertiary"
-                      onClick={() => shopify.intents.invoke?.("edit:shopify/Product", { value: product.id })}
-                    >
-                      Edit in Shopify
-                    </s-button>
-                    <Link to={`/app/mockup?productId=${encodeURIComponent(product.id)}`}>
-                      <s-button variant="tertiary">Promo video</s-button>
-                    </Link>
+            {[SAMPLE_PRODUCT, ...products].map((product) => {
+              const productIdSegment = product.id === "sample" ? "sample" : product.id.split("/").pop();
+              return (
+                <s-box
+                  key={product.id}
+                  padding="base"
+                  borderWidth="base"
+                  borderRadius="base"
+                  background="subdued"
+                >
+                  <s-stack direction="block" gap="tight">
+                    <s-text fontWeight="bold">{product.title}</s-text>
+                    <s-text tone="subdued">Handle: {product.handle} · Status: {product.status}</s-text>
+                    {product.variants?.edges?.length > 0 && (
+                      <s-text tone="subdued">
+                        Variants: {product.variants.edges.map((e) => `${e.node.title} – ${e.node.price}`).join(", ")}
+                      </s-text>
+                    )}
+                    <s-stack direction="inline" gap="tight">
+                      <Link to={`/app/products/${productIdSegment}`}>
+                        <s-button variant="tertiary">Edit</s-button>
+                      </Link>
+                      {product.id !== "sample" && (
+                        <s-button
+                          variant="tertiary"
+                          onClick={() => shopify.intents.invoke?.("edit:shopify/Product", { value: product.id })}
+                        >
+                          Edit in Shopify
+                        </s-button>
+                      )}
+                    </s-stack>
                   </s-stack>
-                </s-stack>
-              </s-box>
-            ))}
+                </s-box>
+              );
+            })}
           </s-stack>
         )}
           {pageInfo.hasNextPage && pageInfo.endCursor ? (
