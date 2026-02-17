@@ -587,21 +587,21 @@ function Scene1Content({ onComplete }: { onComplete?: () => void }) {
                   <span className="spinner" style={{ width: 32, height: 32, border: "3px solid #e1e3e5", borderTopColor: "#2c6ecb", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
                   <span style={{ fontSize: "14px", color: "#6d7175" }}>Generating background…</span>
                 </div>
-              ) : bgImage ? (
-                <img src={bgImage} alt="Background" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
-              ) : (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", justifyContent: "center" }}>
+              ) : null}
+              {!bgImage && !bgLoading && (
+                <div style={{ position: "absolute", top: "8px", right: "8px", display: "flex", gap: "6px", zIndex: 1 }}>
                   <button
                     type="button"
                     onClick={handleGenerateBg}
                     style={{
-                      padding: "12px 24px",
-                      borderRadius: "8px",
-                      border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                      background: "var(--p-color-bg-fill-info, #2c6ecb)",
-                      color: "#fff",
+                      padding: "6px 12px",
+                      borderRadius: "6px",
+                      border: "1px solid rgba(44, 110, 203, 0.5)",
+                      background: "rgba(44, 110, 203, 0.3)",
+                      color: "#2c6ecb",
                       cursor: "pointer",
                       fontWeight: 600,
+                      fontSize: "12px",
                     }}
                   >
                     Generate background
@@ -610,12 +610,13 @@ function Scene1Content({ onComplete }: { onComplete?: () => void }) {
                     type="button"
                     onClick={() => setFetchModalOpen(true)}
                     style={{
-                      padding: "12px 24px",
-                      borderRadius: "8px",
-                      border: "1px dashed #8c9196",
-                      background: "transparent",
+                      padding: "6px 12px",
+                      borderRadius: "6px",
+                      border: "1px dashed rgba(44, 110, 203, 0.5)",
+                      background: "rgba(44, 110, 203, 0.3)",
                       cursor: "pointer",
                       fontWeight: 600,
+                      fontSize: "12px",
                       color: "#2c6ecb",
                     }}
                   >
@@ -623,6 +624,9 @@ function Scene1Content({ onComplete }: { onComplete?: () => void }) {
                   </button>
                 </div>
               )}
+              {bgImage ? (
+                <img src={bgImage} alt="Background" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
+              ) : null}
             </div>
             <FetchBackgroundModal
               open={fetchModalOpen}
@@ -1029,21 +1033,21 @@ function Scene3Content({ onComplete }: { onComplete?: () => void }) {
                   <span className="spinner" style={{ width: 32, height: 32, border: "3px solid #e1e3e5", borderTopColor: "#2c6ecb", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
                   <span style={{ fontSize: "14px", color: "#6d7175" }}>Generating background…</span>
                 </div>
-              ) : bgImage ? (
-                <img src={bgImage} alt="Background" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
-              ) : (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", justifyContent: "center" }}>
+              ) : null}
+              {!bgImage && !bgLoading && (
+                <div style={{ position: "absolute", top: "8px", right: "8px", display: "flex", gap: "6px", zIndex: 1 }}>
                   <button
                     type="button"
                     onClick={handleGenerateBg}
                     style={{
-                      padding: "12px 24px",
-                      borderRadius: "8px",
-                      border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                      background: "var(--p-color-bg-fill-info, #2c6ecb)",
-                      color: "#fff",
+                      padding: "6px 12px",
+                      borderRadius: "6px",
+                      border: "1px solid rgba(44, 110, 203, 0.5)",
+                      background: "rgba(44, 110, 203, 0.3)",
+                      color: "#2c6ecb",
                       cursor: "pointer",
                       fontWeight: 600,
+                      fontSize: "12px",
                     }}
                   >
                     Generate background
@@ -1052,12 +1056,13 @@ function Scene3Content({ onComplete }: { onComplete?: () => void }) {
                     type="button"
                     onClick={() => setFetchModalOpen(true)}
                     style={{
-                      padding: "12px 24px",
-                      borderRadius: "8px",
-                      border: "1px dashed #8c9196",
-                      background: "transparent",
+                      padding: "6px 12px",
+                      borderRadius: "6px",
+                      border: "1px dashed rgba(44, 110, 203, 0.5)",
+                      background: "rgba(44, 110, 203, 0.3)",
                       cursor: "pointer",
                       fontWeight: 600,
+                      fontSize: "12px",
                       color: "#2c6ecb",
                     }}
                   >
@@ -1065,6 +1070,9 @@ function Scene3Content({ onComplete }: { onComplete?: () => void }) {
                   </button>
                 </div>
               )}
+              {bgImage ? (
+                <img src={bgImage} alt="Background" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
+              ) : null}
             </div>
             <FetchBackgroundModal
               open={fetchModalOpen}
