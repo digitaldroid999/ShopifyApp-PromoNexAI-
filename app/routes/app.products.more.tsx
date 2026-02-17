@@ -10,6 +10,18 @@ const PRODUCTS_QUERY = `#graphql
           title
           handle
           status
+          featuredImage {
+            url
+            altText
+          }
+          images(first: 1) {
+            edges {
+              node {
+                url
+                altText
+              }
+            }
+          }
           variants(first: 10) {
             edges {
               node {

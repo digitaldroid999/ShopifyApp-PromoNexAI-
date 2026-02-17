@@ -19,6 +19,18 @@ const PRODUCTS_QUERY = `#graphql
           title
           handle
           status
+          featuredImage {
+            url
+            altText
+          }
+          images(first: 1) {
+            edges {
+              node {
+                url
+                altText
+              }
+            }
+          }
           variants(first: 10) {
             edges {
               node {
@@ -217,6 +229,10 @@ type ProductNode = {
   title: string;
   handle: string;
   status: string;
+  featuredImage?: { url: string; altText: string | null } | null;
+  images?: {
+    edges: Array<{ node: { url: string; altText: string | null } }>;
+  };
   variants: {
     edges: Array<{
       node: { id: string; price: string; title: string };
@@ -229,6 +245,8 @@ const SAMPLE_PRODUCT: ProductNode = {
   title: "Sample product (video mockup)",
   handle: "sample-product-mockup",
   status: "ACTIVE",
+  featuredImage: { url: "/mockup/scene1-original.jpg", altText: "Sample" },
+  images: { edges: [{ node: { url: "/mockup/scene1-original.jpg", altText: "Sample" } }] },
   variants: { edges: [] },
 };
 
@@ -401,6 +419,11 @@ export default function Index() {
           <s-stack direction="block" gap="base">
             {[SAMPLE_PRODUCT, ...products].map((product) => {
               const productIdSegment = product.id === "sample" ? "sample" : product.id.split("/").pop();
+              const imageUrl =
+                product.featuredImage?.url ??
+                product.images?.edges?.[0]?.node?.url ??
+                null;
+              const imageAlt = product.featuredImage?.altText ?? product.images?.edges?.[0]?.node?.altText ?? product.title;
               return (
                 <s-box
                   key={product.id}
@@ -409,28 +432,62 @@ export default function Index() {
                   borderRadius="base"
                   background="subdued"
                 >
-                  <s-stack direction="block" gap="tight">
-                    <s-text fontWeight="bold">{product.title}</s-text>
-                    <s-text tone="subdued">Handle: {product.handle} · Status: {product.status}</s-text>
-                    {product.variants?.edges?.length > 0 && (
-                      <s-text tone="subdued">
-                        Variants: {product.variants.edges.map((e) => `${e.node.title} – ${e.node.price}`).join(", ")}
-                      </s-text>
-                    )}
-                    <s-stack direction="inline" gap="tight">
-                      <Link to={`/app/products/${productIdSegment}`}>
-                        <s-button variant="tertiary">Edit</s-button>
-                      </Link>
-                      {product.id !== "sample" && (
-                        <s-button
-                          variant="tertiary"
-                          onClick={() => shopify.intents.invoke?.("edit:shopify/Product", { value: product.id })}
+                  <div style={{ display: "flex", gap: "16px", alignItems: "flex-start", flexWrap: "wrap" }}>
+                    <div
+                      style={{
+                        width: "80px",
+                        height: "80px",
+                        flexShrink: 0,
+                        borderRadius: "8px",
+                        overflow: "hidden",
+                        background: "var(--p-color-bg-surface-secondary, #e1e3e5)",
+                      }}
+                    >
+                      {imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={imageAlt ?? ""}
+                          style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                        />
+                      ) : (
+                        <div
+                          style={{
+                            width: "100%",
+                            height: "100%",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "12px",
+                            color: "var(--p-color-text-subdued, #6d7175)",
+                          }}
                         >
-                          Edit in Shopify
-                        </s-button>
+                          No image
+                        </div>
                       )}
+                    </div>
+                    <s-stack direction="block" gap="tight" style={{ flex: "1", minWidth: 0 }}>
+                      <s-text fontWeight="bold">{product.title}</s-text>
+                      <s-text tone="subdued">Handle: {product.handle} · Status: {product.status}</s-text>
+                      {product.variants?.edges?.length > 0 && (
+                        <s-text tone="subdued">
+                          Variants: {product.variants.edges.map((e) => `${e.node.title} – ${e.node.price}`).join(", ")}
+                        </s-text>
+                      )}
+                      <s-stack direction="inline" gap="tight">
+                        <Link to={`/app/products/${productIdSegment}`}>
+                          <s-button variant="primary">Generate video</s-button>
+                        </Link>
+                        {product.id !== "sample" && (
+                          <s-button
+                            variant="tertiary"
+                            onClick={() => shopify.intents.invoke?.("edit:shopify/Product", { value: product.id })}
+                          >
+                            Edit in Shopify
+                          </s-button>
+                        )}
+                      </s-stack>
                     </s-stack>
-                  </s-stack>
+                  </div>
                 </s-box>
               );
             })}
