@@ -36,6 +36,16 @@ export function WorkflowModal({
   isSample: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<"scene1" | "scene2" | "scene3">("scene1");
+  const [scene1Complete, setScene1Complete] = useState(false);
+  const [scene2Complete, setScene2Complete] = useState(false);
+  const [scene3Complete, setScene3Complete] = useState(false);
+  const [showingFinal, setShowingFinal] = useState(false);
+
+  const allScenesComplete = scene1Complete && scene2Complete && scene3Complete;
+
+  const [scriptGenerated, setScriptGenerated] = useState(false);
+  const [audioGenerated, setAudioGenerated] = useState(false);
+  const [audioLoading, setAudioLoading] = useState(false);
 
   return (
     <div
@@ -74,7 +84,9 @@ export function WorkflowModal({
             alignItems: "center",
           }}
         >
-          <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 600 }}>Create promo video</h2>
+          <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 600 }}>
+            {showingFinal ? "Final promo video" : "Create promo video"}
+          </h2>
           <button
             type="button"
             onClick={onClose}
@@ -93,46 +105,198 @@ export function WorkflowModal({
           </button>
         </div>
 
-        <div
-          style={{
-            display: "flex",
-            borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-            padding: "0 20px",
-          }}
-        >
-          {(["scene1", "scene2", "scene3"] as const).map((tab) => (
+        {showingFinal ? (
+          <div style={{ padding: "24px", display: "flex", flexDirection: "column", alignItems: "center", gap: "16px", flex: 1 }}>
+            <video
+              src={`${BASE}/final.mp4`}
+              controls
+              style={{ maxWidth: "100%", maxHeight: "60vh", borderRadius: "12px", border: "1px solid #e1e3e5" }}
+            />
             <button
-              key={tab}
               type="button"
-              onClick={() => setActiveTab(tab)}
+              onClick={onClose}
               style={{
-                padding: "14px 20px",
+                padding: "12px 24px",
+                borderRadius: "8px",
                 border: "none",
-                background: "none",
-                cursor: "pointer",
-                fontSize: "14px",
+                background: "var(--p-color-bg-fill-info, #2c6ecb)",
+                color: "#fff",
                 fontWeight: 600,
-                color: activeTab === tab ? "var(--p-color-text-primary, #202223)" : "var(--p-color-text-subdued, #6d7175)",
-                borderBottom: activeTab === tab ? "2px solid var(--p-color-border-info, #2c6ecb)" : "2px solid transparent",
-                marginBottom: "-1px",
+                cursor: "pointer",
               }}
             >
-              {tab === "scene1" ? "Scene 1" : tab === "scene2" ? "Scene 2" : "Scene 3"}
+              Done
             </button>
-          ))}
-        </div>
+          </div>
+        ) : (
+          <>
+            <div
+              style={{
+                display: "flex",
+                borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                padding: "0 20px",
+              }}
+            >
+              {(["scene1", "scene2", "scene3"] as const).map((tab) => {
+                const complete = tab === "scene1" ? scene1Complete : tab === "scene2" ? scene2Complete : scene3Complete;
+                const label = tab === "scene1" ? "Scene 1" : tab === "scene2" ? "Scene 2" : "Scene 3";
+                return (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setActiveTab(tab)}
+                    style={{
+                      padding: "14px 20px",
+                      border: "none",
+                      background: "none",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      color: activeTab === tab ? "var(--p-color-text-primary, #202223)" : "var(--p-color-text-subdued, #6d7175)",
+                      borderBottom: activeTab === tab ? "2px solid var(--p-color-border-info, #2c6ecb)" : "2px solid transparent",
+                      marginBottom: "-1px",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                    }}
+                  >
+                    {label}
+                    {complete && (
+                      <span style={{ color: "var(--p-color-text-success, #008060)", fontSize: "16px" }} title="Complete">
+                        ✓
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
 
-        <div style={{ padding: "20px", overflow: "auto", flex: 1 }}>
-          {activeTab === "scene1" && <Scene1Content />}
-          {activeTab === "scene2" && <Scene2Content />}
-          {activeTab === "scene3" && <Scene3Content />}
-        </div>
+            {allScenesComplete && (
+              <div
+                style={{
+                  padding: "16px 20px",
+                  background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+                  borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                }}
+              >
+                <p style={{ margin: "0 0 12px", fontSize: "14px", fontWeight: 600 }}>Audio script & voiceover (optional)</p>
+                {!scriptGenerated ? (
+                  <button
+                    type="button"
+                    onClick={() => setScriptGenerated(true)}
+                    style={{
+                      padding: "10px 20px",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: "var(--p-color-bg-fill-info, #2c6ecb)",
+                      color: "#fff",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      fontSize: "14px",
+                    }}
+                  >
+                    Generate script
+                  </button>
+                ) : (
+                  <>
+                    <div
+                      style={{
+                        padding: "12px",
+                        borderRadius: "8px",
+                        background: "#fff",
+                        border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                        marginBottom: "12px",
+                        fontSize: "14px",
+                        lineHeight: 1.5,
+                        color: "var(--p-color-text-primary, #202223)",
+                      }}
+                    >
+                      Ready to take your snow game to the next level? Meet the Agog Sports SLOPEDECK! This isn&apos;t just a snowskate; it&apos;s your ticket to carving turns like a pro, whether you&apos;re a beginner or an expert. Perfect for kids and adults alike, it makes snowy adventures more thrilling and fun. Grab yours today and feel the excitement!
+                    </div>
+                    {!audioGenerated ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAudioLoading(true);
+                          setTimeout(() => {
+                            setAudioGenerated(true);
+                            setAudioLoading(false);
+                          }, 1500);
+                        }}
+                        disabled={audioLoading}
+                        style={{
+                          padding: "10px 20px",
+                          borderRadius: "8px",
+                          border: "none",
+                          background: audioLoading ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
+                          color: "#fff",
+                          fontWeight: 600,
+                          cursor: audioLoading ? "wait" : "pointer",
+                          fontSize: "14px",
+                        }}
+                      >
+                        {audioLoading ? "Generating…" : "Generate audio"}
+                      </button>
+                    ) : (
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                        <audio src={`${BASE}/audio.mp3`} controls style={{ maxWidth: "100%" }} />
+                        <span style={{ fontSize: "14px", color: "var(--p-color-text-success, #008060)", fontWeight: 600 }}>✓ Audio ready</span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            {allScenesComplete && (
+              <div
+                style={{
+                  padding: "12px 20px",
+                  background: "var(--p-color-bg-fill-success-secondary, #e3f1df)",
+                  borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setShowingFinal(true)}
+                  style={{
+                    padding: "12px 24px",
+                    borderRadius: "8px",
+                    border: "none",
+                    background: "var(--p-color-bg-fill-success, #008060)",
+                    color: "#fff",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    fontSize: "14px",
+                  }}
+                >
+                  Finalize
+                </button>
+              </div>
+            )}
+
+            <div style={{ padding: "20px", overflow: "auto", flex: 1 }}>
+              <div style={{ display: activeTab === "scene1" ? "block" : "none" }}>
+                <Scene1Content onComplete={() => setScene1Complete(true)} />
+              </div>
+              <div style={{ display: activeTab === "scene2" ? "block" : "none" }}>
+                <Scene2Content onComplete={() => setScene2Complete(true)} />
+              </div>
+              <div style={{ display: activeTab === "scene3" ? "block" : "none" }}>
+                <Scene3Content onComplete={() => setScene3Complete(true)} />
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
 }
 
-function Scene1Content() {
+function Scene1Content({ onComplete }: { onComplete?: () => void }) {
   const [step, setStep] = useState(1);
   const [selectedImage, setSelectedImage] = useState<string | null>("s1");
   const [bgRemoved, setBgRemoved] = useState<string | null>(null);
@@ -173,6 +337,7 @@ function Scene1Content() {
     setTimeout(() => {
       setSceneVideo(`${BASE}/scene1-video.mp4`);
       setSceneLoading(false);
+      onComplete?.();
     }, 2000);
   };
 
@@ -387,7 +552,7 @@ function Scene1Content() {
   );
 }
 
-function Scene2Content() {
+function Scene2Content({ onComplete }: { onComplete?: () => void }) {
   const [step, setStep] = useState(1);
   const [selectedImage, setSelectedImage] = useState<string | null>("s1");
   const [bgRemoved, setBgRemoved] = useState<string | null>(null);
@@ -411,6 +576,7 @@ function Scene2Content() {
     setTimeout(() => {
       setSceneVideo(`${BASE}/scene2-video.mp4`);
       setSceneLoading(false);
+      onComplete?.();
     }, 2000);
   };
 
@@ -537,7 +703,7 @@ function Scene2Content() {
   );
 }
 
-function Scene3Content() {
+function Scene3Content({ onComplete }: { onComplete?: () => void }) {
   const [step, setStep] = useState(1);
   const [selectedImage, setSelectedImage] = useState<string | null>("s1");
   const [bgRemoved, setBgRemoved] = useState<string | null>(null);
@@ -578,6 +744,7 @@ function Scene3Content() {
     setTimeout(() => {
       setSceneVideo(`${BASE}/scene3-video.mp4`);
       setSceneLoading(false);
+      onComplete?.();
     }, 2000);
   };
 
