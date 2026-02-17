@@ -65,6 +65,11 @@ export default function ProductDetail() {
   const [productVideoUrl, setProductVideoUrl] = useState<string | null>(null);
 
   const images = product.images?.edges?.map((e: { node: { id: string; url: string; altText: string | null } }) => e.node) ?? [];
+  const productImagesForWorkflow = images.map((img: { id: string; url: string; altText: string | null }, i: number) => ({
+    id: img.id,
+    src: img.url,
+    label: img.altText ?? `Image ${i + 1}`,
+  }));
 
   return (
     <>
@@ -123,6 +128,7 @@ export default function ProductDetail() {
       {workflowOpen && (
         <WorkflowModal
           isSample={isSample}
+          productImages={productImagesForWorkflow}
           onClose={() => setWorkflowOpen(false)}
           onDone={(videoUrl) => setProductVideoUrl(videoUrl)}
         />

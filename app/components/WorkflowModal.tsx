@@ -2,11 +2,13 @@ import { useState } from "react";
 
 const BASE = "/mockup";
 
-const productImages = [
+const defaultProductImages = [
   { id: "s1", src: `${BASE}/scene1-original.jpg`, label: "Image 1" },
   { id: "s2", src: `${BASE}/scene2-original.jpg`, label: "Image 2" },
   { id: "s3", src: `${BASE}/scene3-original.jpg`, label: "Image 3" },
 ];
+
+export type ProductImageItem = { id: string; src: string; label?: string };
 
 const boxStyle = {
   padding: "16px",
@@ -177,12 +179,16 @@ export function WorkflowModal({
   onClose,
   onDone,
   isSample,
+  productImages: productImagesProp,
 }: {
   onClose: () => void;
   /** Called when user clicks Done after viewing the final video; pass the final video URL to add to product */
   onDone?: (videoUrl: string) => void;
   isSample: boolean;
+  /** Product images from the store (real product). When empty or not provided, mockup images are used (e.g. sample product). */
+  productImages?: ProductImageItem[];
 }) {
+  const productImages = productImagesProp?.length ? productImagesProp : defaultProductImages;
   const [activeTab, setActiveTab] = useState<"scene1" | "scene2" | "scene3">("scene1");
   const [scene1Complete, setScene1Complete] = useState(false);
   const [scene2Complete, setScene2Complete] = useState(false);
@@ -431,13 +437,13 @@ export function WorkflowModal({
 
             <div style={{ padding: "20px", overflow: "auto", flex: 1 }}>
               <div style={{ display: activeTab === "scene1" ? "block" : "none" }}>
-                <Scene1Content onComplete={() => setScene1Complete(true)} />
+                <Scene1Content productImages={productImages} onComplete={() => setScene1Complete(true)} />
               </div>
               <div style={{ display: activeTab === "scene2" ? "block" : "none" }}>
-                <Scene2Content onComplete={() => setScene2Complete(true)} />
+                <Scene2Content productImages={productImages} onComplete={() => setScene2Complete(true)} />
               </div>
               <div style={{ display: activeTab === "scene3" ? "block" : "none" }}>
-                <Scene3Content onComplete={() => setScene3Complete(true)} />
+                <Scene3Content productImages={productImages} onComplete={() => setScene3Complete(true)} />
               </div>
             </div>
           </>
@@ -447,9 +453,9 @@ export function WorkflowModal({
   );
 }
 
-function Scene1Content({ onComplete }: { onComplete?: () => void }) {
+function Scene1Content({ productImages: productImagesProp, onComplete }: { productImages: ProductImageItem[]; onComplete?: () => void }) {
   const [step, setStep] = useState(1);
-  const [selectedImage, setSelectedImage] = useState<string | null>("s1");
+  const [selectedImage, setSelectedImage] = useState<string | null>(productImagesProp[0]?.id ?? "s1");
   const [bgRemoved, setBgRemoved] = useState<string | null>(null);
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
   const [bgImage, setBgImage] = useState<string | null>(null);
@@ -504,7 +510,7 @@ function Scene1Content({ onComplete }: { onComplete?: () => void }) {
             description="Choose one of the product images below, then click Remove BG to strip the background. The result will be used as the subject for this scene."
           />
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-            {productImages.map((img) => (
+            {productImagesProp.map((img) => (
               <button
                 key={img.id}
                 type="button"
@@ -518,7 +524,7 @@ function Scene1Content({ onComplete }: { onComplete?: () => void }) {
                   background: "none",
                 }}
               >
-                <img src={img.src} alt={img.label} style={{ width: "120px", height: "120px", objectFit: "cover", display: "block" }} />
+                <img src={img.src} alt={img.label ?? ""} style={{ width: "120px", height: "120px", objectFit: "cover", display: "block" }} />
               </button>
             ))}
           </div>
@@ -740,9 +746,9 @@ function Scene1Content({ onComplete }: { onComplete?: () => void }) {
   );
 }
 
-function Scene2Content({ onComplete }: { onComplete?: () => void }) {
+function Scene2Content({ productImages: productImagesProp, onComplete }: { productImages: ProductImageItem[]; onComplete?: () => void }) {
   const [step, setStep] = useState(1);
-  const [selectedImage, setSelectedImage] = useState<string | null>("s1");
+  const [selectedImage, setSelectedImage] = useState<string | null>(productImagesProp[0]?.id ?? "s1");
   const [bgRemoved, setBgRemoved] = useState<string | null>(null);
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
   const [selectedVideoSlot, setSelectedVideoSlot] = useState<number | null>(null);
@@ -779,7 +785,7 @@ function Scene2Content({ onComplete }: { onComplete?: () => void }) {
             description="Choose a product image and remove its background. The result will be composited onto a stock video in the next step."
           />
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-            {productImages.map((img) => (
+            {productImagesProp.map((img) => (
               <button
                 key={img.id}
                 type="button"
@@ -793,7 +799,7 @@ function Scene2Content({ onComplete }: { onComplete?: () => void }) {
                   background: "none",
                 }}
               >
-                <img src={img.src} alt={img.label} style={{ width: "120px", height: "120px", objectFit: "cover", display: "block" }} />
+                <img src={img.src} alt={img.label ?? ""} style={{ width: "120px", height: "120px", objectFit: "cover", display: "block" }} />
               </button>
             ))}
           </div>
@@ -897,9 +903,9 @@ function Scene2Content({ onComplete }: { onComplete?: () => void }) {
   );
 }
 
-function Scene3Content({ onComplete }: { onComplete?: () => void }) {
+function Scene3Content({ productImages: productImagesProp, onComplete }: { productImages: ProductImageItem[]; onComplete?: () => void }) {
   const [step, setStep] = useState(1);
-  const [selectedImage, setSelectedImage] = useState<string | null>("s1");
+  const [selectedImage, setSelectedImage] = useState<string | null>(productImagesProp[0]?.id ?? "s1");
   const [bgRemoved, setBgRemoved] = useState<string | null>(null);
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
   const [bgImage, setBgImage] = useState<string | null>(null);
@@ -954,7 +960,7 @@ function Scene3Content({ onComplete }: { onComplete?: () => void }) {
             description="Choose one of the product images, then click Remove BG. The result will be used as the subject for this scene (same flow as Scene 1)."
           />
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
-            {productImages.map((img) => (
+            {productImagesProp.map((img) => (
               <button
                 key={img.id}
                 type="button"
@@ -968,7 +974,7 @@ function Scene3Content({ onComplete }: { onComplete?: () => void }) {
                   background: "none",
                 }}
               >
-                <img src={img.src} alt={img.label} style={{ width: "120px", height: "120px", objectFit: "cover", display: "block" }} />
+                <img src={img.src} alt={img.label ?? ""} style={{ width: "120px", height: "120px", objectFit: "cover", display: "block" }} />
               </button>
             ))}
           </div>
