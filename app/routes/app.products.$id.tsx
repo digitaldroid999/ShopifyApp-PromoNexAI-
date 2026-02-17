@@ -62,6 +62,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 export default function ProductDetail() {
   const { product, isSample } = useLoaderData<typeof loader>();
   const [workflowOpen, setWorkflowOpen] = useState(false);
+  const [productVideoUrl, setProductVideoUrl] = useState<string | null>(null);
 
   const images = product.images?.edges?.map((e: { node: { id: string; url: string; altText: string | null } }) => e.node) ?? [];
 
@@ -91,6 +92,22 @@ export default function ProductDetail() {
                 ))}
               </div>
             ) : null}
+            {productVideoUrl ? (
+              <s-stack direction="block" gap="tight">
+                <s-text fontWeight="bold">Promo video</s-text>
+                <video
+                  src={productVideoUrl}
+                  controls
+                  style={{
+                    maxWidth: "100%",
+                    width: "400px",
+                    maxHeight: "280px",
+                    borderRadius: "12px",
+                    border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                  }}
+                />
+              </s-stack>
+            ) : null}
             <s-stack direction="inline" gap="base">
               <s-button variant="primary" onClick={() => setWorkflowOpen(true)}>
                 Generate video
@@ -107,6 +124,7 @@ export default function ProductDetail() {
         <WorkflowModal
           isSample={isSample}
           onClose={() => setWorkflowOpen(false)}
+          onDone={(videoUrl) => setProductVideoUrl(videoUrl)}
         />
       )}
     </>

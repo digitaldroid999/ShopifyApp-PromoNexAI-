@@ -30,9 +30,12 @@ const twoPartLayout = {
 
 export function WorkflowModal({
   onClose,
+  onDone,
   isSample,
 }: {
   onClose: () => void;
+  /** Called when user clicks Done after viewing the final video; pass the final video URL to add to product */
+  onDone?: (videoUrl: string) => void;
   isSample: boolean;
 }) {
   const [activeTab, setActiveTab] = useState<"scene1" | "scene2" | "scene3">("scene1");
@@ -114,7 +117,10 @@ export function WorkflowModal({
             />
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => {
+                onDone?.(`${BASE}/final.mp4`);
+                onClose();
+              }}
               style={{
                 padding: "12px 24px",
                 borderRadius: "8px",
