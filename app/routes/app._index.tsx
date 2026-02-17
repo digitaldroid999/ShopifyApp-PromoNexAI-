@@ -5,6 +5,7 @@ import type {
   LoaderFunctionArgs,
 } from "react-router";
 import { useFetcher, useLoaderData, useRevalidator, useSearchParams } from "react-router";
+import { Link } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
@@ -416,6 +417,9 @@ export default function Index() {
                     >
                       Edit in Shopify
                     </s-button>
+                    <Link to={`/app/mockup?productId=${encodeURIComponent(product.id)}`}>
+                      <s-button variant="tertiary">Promo video</s-button>
+                    </Link>
                   </s-stack>
                 </s-stack>
               </s-box>
