@@ -76,7 +76,7 @@ export default function ProductDetail() {
       <s-page heading={product.title}>
         <s-section heading="Product detail">
           <s-stack direction="block" gap="base">
-            <s-paragraph tone="subdued">
+            <s-paragraph color="subdued">
               Handle: {product.handle} · Status: {product.status}
             </s-paragraph>
             {images.length > 0 ? (
@@ -98,8 +98,8 @@ export default function ProductDetail() {
               </div>
             ) : null}
             {productVideoUrl ? (
-              <s-stack direction="block" gap="tight">
-                <s-text fontWeight="bold">Promo video</s-text>
+              <s-stack direction="block" gap="base">
+                <s-text type="strong">Promo video</s-text>
                 <video
                   src={productVideoUrl}
                   controls

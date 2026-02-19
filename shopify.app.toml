@@ -2,7 +2,7 @@
 
 client_id = "1165f928e69a1ff534eddf5024757853"
 name = "PromoNexAI"
-application_url = "https://example.com"
+application_url = "https://app.promonexai.com/shopify"
 embedded = true
 
 [build]

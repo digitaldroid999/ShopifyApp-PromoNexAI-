@@ -32,3 +32,60 @@ model Session {
   refreshToken        String?
   refreshTokenExpires DateTime?
 }
+
+// Final videos — row created when user starts the video generation workflow
+model Short {
+  id             String    @id @default(cuid())
+  userId         BigInt?   @map("user_id") // Shopify user ID (matches Session.userId)
+  title          String
+  status         String    @default("draft") // e.g. draft, generating, ready, failed
+  finalVideoUrl  String?   @map("final_video_url")
+  metadata       Json?     // flexible payload (e.g. dimensions, platform, options)
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  scenes   VideoScene[]
+  audioInfo AudioInfo?
+
+  @@map("shorts")
+}
+
+// Per-scene data for a short
+model VideoScene {
+  id                  String   @id @default(cuid())
+  shortId             String   @map("short_id")
+  sceneNumber         Int      @map("scene_number")
+  duration            Float    // seconds
+  imageUrl            String?  @map("image_url")
+  generatedVideoUrl   String?  @map("generated_video_url")
+  status              String   @default("pending") // e.g. pending, generating, ready, failed
+  metadata            Json?
+  generateVideoPrompt String?  @map("generate_video_prompt")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  short Short @relation(fields: [shortId], references: [id], onDelete: Cascade)
+
+  @@map("video_scenes")
+}
+
+// Audio data for a short (one per short)
+model AudioInfo {
+  id                 String   @id @default(cuid())
+  userId             BigInt?  @map("user_id") // Shopify user ID (matches Session.userId)
+  shortId            String   @unique @map("short_id")
+  voiceId            String?  @map("voice_id")
+  voiceName          String?  @map("voice_name")
+  speed              Float?   @default(1)
+  volume             Float?   @default(1)
+  generatedAudioUrl String?  @map("generated_audio_url")
+  subtitles          Json?    // e.g. [{ start, end, text }]
+  status             String   @default("pending") // e.g. pending, generating, ready, failed
+  audioScript        String?  @map("audio_script")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  short Short @relation(fields: [shortId], references: [id], onDelete: Cascade)
+
+  @@map("audio_info")
+}

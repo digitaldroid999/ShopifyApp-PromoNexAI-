@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useFetcher } from "react-router";
 
 const BASE = "/mockup";
 
@@ -453,11 +454,14 @@ export function WorkflowModal({
   );
 }
 
+const VIDEO_API = "/app/api/video";
+
 function Scene1Content({ productImages: productImagesProp, onComplete }: { productImages: ProductImageItem[]; onComplete?: () => void }) {
   const [step, setStep] = useState(1);
   const [selectedImage, setSelectedImage] = useState<string | null>(productImagesProp[0]?.id ?? "s1");
   const [bgRemoved, setBgRemoved] = useState<string | null>(null);
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
+  const [bgRemovedError, setBgRemovedError] = useState<string | null>(null);
   const [bgImage, setBgImage] = useState<string | null>(null);
   const [bgLoading, setBgLoading] = useState(false);
   const [fetchModalOpen, setFetchModalOpen] = useState(false);
@@ -466,12 +470,33 @@ function Scene1Content({ productImages: productImagesProp, onComplete }: { produ
   const [sceneVideo, setSceneVideo] = useState<string | null>(null);
   const [sceneLoading, setSceneLoading] = useState(false);
 
+  const removeBgFetcher = useFetcher<{ ok: boolean; url?: string; error?: string }>();
+
+  useEffect(() => {
+    if (removeBgFetcher.state !== "idle" || !removeBgFetcher.data) return;
+    setBgRemovedLoading(false);
+    const data = removeBgFetcher.data;
+    if (data.ok && data.url) {
+      setBgRemoved(data.url);
+      setBgRemovedError(null);
+    } else {
+      setBgRemovedError(data.error ?? "Remove BG failed");
+    }
+  }, [removeBgFetcher.state, removeBgFetcher.data]);
+
   const handleRemoveBg = () => {
+    const img = productImagesProp.find((i) => i.id === selectedImage);
+    const imageUrl = img?.src;
+    if (!imageUrl) {
+      setBgRemovedError("No image selected");
+      return;
+    }
+    setBgRemovedError(null);
     setBgRemovedLoading(true);
-    setTimeout(() => {
-      setBgRemoved(`${BASE}/scene1-bg removed.png`);
-      setBgRemovedLoading(false);
-    }, 1200);
+    removeBgFetcher.submit(
+      { step: "removeBg", imageUrl },
+      { method: "post", action: VIDEO_API, encType: "application/json" }
+    );
   };
 
   const handleGenerateBg = () => {
@@ -545,6 +570,9 @@ function Scene1Content({ productImages: productImagesProp, onComplete }: { produ
             >
               {bgRemovedLoading ? "Removing…" : "Remove BG"}
             </button>
+            {bgRemovedError && (
+              <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{bgRemovedError}</span>
+            )}
             {bgRemoved && (
               <>
                 <img
@@ -751,18 +779,40 @@ function Scene2Content({ productImages: productImagesProp, onComplete }: { produ
   const [selectedImage, setSelectedImage] = useState<string | null>(productImagesProp[0]?.id ?? "s1");
   const [bgRemoved, setBgRemoved] = useState<string | null>(null);
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
+  const [bgRemovedError, setBgRemovedError] = useState<string | null>(null);
   const [selectedVideoSlot, setSelectedVideoSlot] = useState<number | null>(null);
   const [sceneVideo, setSceneVideo] = useState<string | null>(null);
   const [sceneLoading, setSceneLoading] = useState(false);
 
   const videoSlots = [1, 2, 3, 4, 5, 6];
 
+  const removeBgFetcher = useFetcher<{ ok: boolean; url?: string; error?: string }>();
+
+  useEffect(() => {
+    if (removeBgFetcher.state !== "idle" || !removeBgFetcher.data) return;
+    setBgRemovedLoading(false);
+    const data = removeBgFetcher.data;
+    if (data.ok && data.url) {
+      setBgRemoved(data.url);
+      setBgRemovedError(null);
+    } else {
+      setBgRemovedError(data.error ?? "Remove BG failed");
+    }
+  }, [removeBgFetcher.state, removeBgFetcher.data]);
+
   const handleRemoveBg = () => {
+    const img = productImagesProp.find((i) => i.id === selectedImage);
+    const imageUrl = img?.src;
+    if (!imageUrl) {
+      setBgRemovedError("No image selected");
+      return;
+    }
+    setBgRemovedError(null);
     setBgRemovedLoading(true);
-    setTimeout(() => {
-      setBgRemoved(`${BASE}/scene2-bg removed.png`);
-      setBgRemovedLoading(false);
-    }, 1200);
+    removeBgFetcher.submit(
+      { step: "removeBg", imageUrl },
+      { method: "post", action: VIDEO_API, encType: "application/json" }
+    );
   };
 
   const handleGenerateVideo = () => {
@@ -820,6 +870,9 @@ function Scene2Content({ productImages: productImagesProp, onComplete }: { produ
             >
               {bgRemovedLoading ? "Removing…" : "Remove BG"}
             </button>
+            {bgRemovedError && (
+              <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{bgRemovedError}</span>
+            )}
             {bgRemoved && (
               <>
                 <img src={bgRemoved} alt="BG removed" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
@@ -908,6 +961,7 @@ function Scene3Content({ productImages: productImagesProp, onComplete }: { produ
   const [selectedImage, setSelectedImage] = useState<string | null>(productImagesProp[0]?.id ?? "s1");
   const [bgRemoved, setBgRemoved] = useState<string | null>(null);
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
+  const [bgRemovedError, setBgRemovedError] = useState<string | null>(null);
   const [bgImage, setBgImage] = useState<string | null>(null);
   const [bgLoading, setBgLoading] = useState(false);
   const [fetchModalOpen, setFetchModalOpen] = useState(false);
@@ -916,12 +970,33 @@ function Scene3Content({ productImages: productImagesProp, onComplete }: { produ
   const [sceneVideo, setSceneVideo] = useState<string | null>(null);
   const [sceneLoading, setSceneLoading] = useState(false);
 
+  const removeBgFetcher = useFetcher<{ ok: boolean; url?: string; error?: string }>();
+
+  useEffect(() => {
+    if (removeBgFetcher.state !== "idle" || !removeBgFetcher.data) return;
+    setBgRemovedLoading(false);
+    const data = removeBgFetcher.data;
+    if (data.ok && data.url) {
+      setBgRemoved(data.url);
+      setBgRemovedError(null);
+    } else {
+      setBgRemovedError(data.error ?? "Remove BG failed");
+    }
+  }, [removeBgFetcher.state, removeBgFetcher.data]);
+
   const handleRemoveBg = () => {
+    const img = productImagesProp.find((i) => i.id === selectedImage);
+    const imageUrl = img?.src;
+    if (!imageUrl) {
+      setBgRemovedError("No image selected");
+      return;
+    }
+    setBgRemovedError(null);
     setBgRemovedLoading(true);
-    setTimeout(() => {
-      setBgRemoved(`${BASE}/scene3-bg removed.png`);
-      setBgRemovedLoading(false);
-    }, 1200);
+    removeBgFetcher.submit(
+      { step: "removeBg", imageUrl },
+      { method: "post", action: VIDEO_API, encType: "application/json" }
+    );
   };
 
   const handleGenerateBg = () => {
@@ -995,6 +1070,9 @@ function Scene3Content({ productImages: productImagesProp, onComplete }: { produ
             >
               {bgRemovedLoading ? "Removing…" : "Remove BG"}
             </button>
+            {bgRemovedError && (
+              <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{bgRemovedError}</span>
+            )}
             {bgRemoved && (
               <>
                 <img src={bgRemoved} alt="BG removed" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
