@@ -31,8 +31,6 @@ const twoPartLayout = {
   minHeight: "280px",
 };
 
-const FETCH_SLOT_COUNT = 8;
-
 const stepDescriptionStyle = {
   margin: 0,
   marginTop: "4px",
@@ -61,22 +59,39 @@ function FetchBackgroundModal({
   open,
   onClose,
   onSelect,
-  mockImageUrl,
 }: {
   open: boolean;
   onClose: () => void;
   onSelect: (url: string) => void;
-  mockImageUrl: string;
 }) {
-  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
+  const [query, setQuery] = useState("");
+  const stockFetcher = useFetcher<StockImagesResponse>();
+
+  const isLoading = stockFetcher.state === "loading" || stockFetcher.state === "submitting";
+  const data = stockFetcher.data;
+  const images = data?.success ? data.images : [];
+  const isDemo = data?.source === "demo";
+  const sources = data?.sources;
+  const errors = data?.errors;
+  const apiError = data && !data.success && "error" in data ? (data as { error?: string }).error : null;
+
+  const handleSearch = () => {
+    const q = query.trim();
+    if (!q) return;
+    stockFetcher.load(
+      `${STOCK_IMAGES_API}?${new URLSearchParams({ query: q, page: "1", per_page: "12" }).toString()}`
+    );
+  };
+
+  const handleSelect = (img: (typeof images)[0]) => {
+    const url = img.preview_url || img.download_url;
+    if (url) {
+      onSelect(url);
+      onClose();
+    }
+  };
 
   if (!open) return null;
-
-  const handleSlotClick = (index: number) => {
-    setSelectedSlot(index);
-    onSelect(mockImageUrl);
-    setTimeout(() => onClose(), 400);
-  };
 
   return (
     <div
@@ -97,7 +112,7 @@ function FetchBackgroundModal({
           background: "var(--p-color-bg-surface, #fff)",
           borderRadius: "16px",
           boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-          maxWidth: "480px",
+          maxWidth: "520px",
           width: "100%",
           maxHeight: "85vh",
           overflow: "hidden",
@@ -133,27 +148,118 @@ function FetchBackgroundModal({
             ×
           </button>
         </div>
-        <p style={{ margin: 0, padding: "12px 20px", fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>
-          Select a background from third-party platforms (mockup: empty slots; click a slot to use sample image).
-        </p>
+
+        <div style={{ padding: "12px 20px", display: "flex", gap: "8px", alignItems: "center" }}>
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            placeholder="Search backgrounds (e.g. gradient, nature)"
+            style={{
+              flex: 1,
+              padding: "10px 12px",
+              borderRadius: "8px",
+              border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+              fontSize: "14px",
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleSearch}
+            disabled={!query.trim() || isLoading}
+            style={{
+              padding: "10px 20px",
+              borderRadius: "8px",
+              border: "none",
+              background: isLoading ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
+              color: "#fff",
+              fontWeight: 600,
+              cursor: !query.trim() || isLoading ? "not-allowed" : "pointer",
+            }}
+          >
+            {isLoading ? "Searching…" : "Search"}
+          </button>
+        </div>
+
+        {apiError && (
+          <div style={{ padding: "8px 20px", fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>
+            {apiError}
+          </div>
+        )}
+
+        {/* Per-source status: important when one or more APIs have no data or fail */}
+        {(sources || errors) && !apiError && (
+          <div
+            style={{
+              padding: "8px 20px",
+              fontSize: "12px",
+              color: "var(--p-color-text-subdued, #6d7175)",
+              borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "8px",
+            }}
+          >
+            {isDemo && (
+              <span style={{ color: "var(--p-color-text-caution, #b98900)" }}>
+                No API keys set. Showing demo images. Add PEXELS_API_KEY, PIXABAY_API_KEY, and/or UNSPLASH_ACCESS_KEY in .env for real search.
+              </span>
+            )}
+            {!isDemo && (
+              <>
+                {sources?.pexels != null && (
+                  <span>Pexels: {sources.pexels} image{sources.pexels !== 1 ? "s" : ""}</span>
+                )}
+                {sources?.pixabay != null && (
+                  <span>Pixabay: {sources.pixabay} image{sources.pixabay !== 1 ? "s" : ""}</span>
+                )}
+                {sources?.unsplash != null && (
+                  <span>Unsplash: {sources.unsplash} image{sources.unsplash !== 1 ? "s" : ""}</span>
+                )}
+                {errors?.pexels && (
+                  <span style={{ color: "var(--p-color-text-critical, #d72c0d)" }}>Pexels: {errors.pexels}</span>
+                )}
+                {errors?.pixabay && (
+                  <span style={{ color: "var(--p-color-text-critical, #d72c0d)" }}>Pixabay: {errors.pixabay}</span>
+                )}
+                {errors?.unsplash && (
+                  <span style={{ color: "var(--p-color-text-critical, #d72c0d)" }}>Unsplash: {errors.unsplash}</span>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
         <div
           style={{
-            padding: "0 20px 20px",
+            padding: "16px 20px",
             display: "grid",
             gridTemplateColumns: "repeat(4, 1fr)",
             gap: "12px",
             overflow: "auto",
+            minHeight: "120px",
           }}
         >
-          {Array.from({ length: FETCH_SLOT_COUNT }, (_, i) => (
+          {isLoading && images.length === 0 && (
+            <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "24px", color: "var(--p-color-text-subdued, #6d7175)" }}>
+              Searching…
+            </div>
+          )}
+          {!isLoading && images.length === 0 && data !== undefined && (
+            <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "24px", color: "var(--p-color-text-subdued, #6d7175)" }}>
+              No images found. Try another search or check API keys.
+            </div>
+          )}
+          {images.map((img) => (
             <button
-              key={i}
+              key={img.id}
               type="button"
-              onClick={() => handleSlotClick(i)}
+              onClick={() => handleSelect(img)}
               style={{
                 aspectRatio: "1",
                 padding: 0,
-                border: selectedSlot === i ? "2px solid var(--p-color-border-info, #2c6ecb)" : "2px solid var(--p-color-border-secondary, #e1e3e5)",
+                border: "2px solid var(--p-color-border-secondary, #e1e3e5)",
                 borderRadius: "8px",
                 overflow: "hidden",
                 cursor: "pointer",
@@ -163,11 +269,11 @@ function FetchBackgroundModal({
                 justifyContent: "center",
               }}
             >
-              {selectedSlot === i ? (
-                <img src={mockImageUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-              ) : (
-                <span style={{ fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)" }}>Empty slot</span>
-              )}
+              <img
+                src={img.thumbnail_url || img.preview_url || img.download_url}
+                alt={img.title}
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              />
             </button>
           ))}
         </div>
@@ -455,6 +561,26 @@ export function WorkflowModal({
 }
 
 const VIDEO_API = "/app/api/video";
+const STOCK_IMAGES_API = "/app/api/stock/images";
+
+/** Response shape from GET /app/api/stock/images (for FetchBackgroundModal) */
+interface StockImagesResponse {
+  success: boolean;
+  images: Array<{
+    id: string;
+    title: string;
+    thumbnail_url?: string;
+    preview_url?: string;
+    download_url?: string;
+    type?: string;
+  }>;
+  total: number;
+  page: number;
+  per_page: number;
+  source?: "demo";
+  sources?: { pexels?: number; pixabay?: number; unsplash?: number };
+  errors?: { pexels?: string; pixabay?: string; unsplash?: string };
+}
 
 function Scene1Content({ productImages: productImagesProp, onComplete }: { productImages: ProductImageItem[]; onComplete?: () => void }) {
   const [step, setStep] = useState(1);
@@ -666,7 +792,6 @@ function Scene1Content({ productImages: productImagesProp, onComplete }: { produ
               open={fetchModalOpen}
               onClose={() => setFetchModalOpen(false)}
               onSelect={(url) => setBgImage(url)}
-              mockImageUrl={`${BASE}/scene1-bg.png`}
             />
             <div
               style={{
@@ -1162,7 +1287,6 @@ function Scene3Content({ productImages: productImagesProp, onComplete }: { produ
               open={fetchModalOpen}
               onClose={() => setFetchModalOpen(false)}
               onSelect={(url) => setBgImage(url)}
-              mockImageUrl={`${BASE}/scene3-bg.png`}
             />
             <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", zIndex: 2 }}>
               <button
