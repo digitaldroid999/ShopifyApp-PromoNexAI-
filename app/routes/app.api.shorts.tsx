@@ -23,12 +23,24 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const shortDelegate = (prisma as any).short;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const videoScene = (prisma as any).videoScene;
+  const DEFAULT_DURATION_SEC = 8;
+
   if (productId) {
     const existing = await shortDelegate.findUnique({
       where: { productId },
+      include: { scenes: { orderBy: { sceneNumber: "asc" } } },
     });
     if (existing) {
-      return Response.json({ shortId: existing.id });
+      const [s1, s2, s3] = existing.scenes;
+      return Response.json({
+        shortId: existing.id,
+        userId: existing.userId ?? null,
+        scene1Id: s1?.id ?? null,
+        scene2Id: s2?.id ?? null,
+        scene3Id: s3?.id ?? null,
+      });
     }
   }
 
@@ -41,13 +53,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     },
   });
 
-  // Create 3 VideoScene rows (scene_number 1, 2, 3) for this short
+  const sceneIds: string[] = [];
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const videoScene = (prisma as any).videoScene;
-    const DEFAULT_DURATION_SEC = 8;
     for (let sceneNumber = 1; sceneNumber <= 3; sceneNumber++) {
-      await videoScene.create({
+      const scene = await videoScene.create({
         data: {
           shortId: short.id,
           sceneNumber,
@@ -55,13 +64,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           status: "pending",
         },
       });
+      sceneIds.push(scene.id);
     }
   } catch (err) {
     console.error("[app.api.shorts] VideoScene create failed:", err);
-    // still return shortId so the modal opens
   }
 
-  return Response.json({ shortId: short.id });
+  return Response.json({
+    shortId: short.id,
+    userId: short.userId ?? null,
+    scene1Id: sceneIds[0] ?? null,
+    scene2Id: sceneIds[1] ?? null,
+    scene3Id: sceneIds[2] ?? null,
+  });
 };
 
 export default function ApiShortsRoute() {

@@ -646,6 +646,10 @@ export function WorkflowModal({
   productImages: productImagesProp,
   productId,
   shortId,
+  shortUserId,
+  scene1Id,
+  scene2Id,
+  scene3Id,
 }: {
   onClose: () => void;
   /** Called when user clicks Done after viewing the final video; pass the final video URL to add to product */
@@ -655,8 +659,14 @@ export function WorkflowModal({
   productImages?: ProductImageItem[];
   /** Product ID for temp save/restore (e.g. product.id). When set, workflow state is loaded on open and saved while in progress; temp is deleted when Done. */
   productId?: string | null;
-  /** Short row ID; when set, first action in a scene tab creates the corresponding VideoScene row. */
+  /** Short row ID */
   shortId?: string | null;
+  /** Short.user_id (shop) for composite API */
+  shortUserId?: string | null;
+  /** VideoScene ids for composite API (scene_id) */
+  scene1Id?: string | null;
+  scene2Id?: string | null;
+  scene3Id?: string | null;
 }) {
   const productImages = productImagesProp?.length ? productImagesProp : defaultProductImages;
   const firstImageId = productImages[0]?.id ?? "s1";
@@ -985,6 +995,8 @@ export function WorkflowModal({
                 <Scene1Content
                   productImages={productImages}
                   productId={productId ?? undefined}
+                  sceneId={scene1Id ?? undefined}
+                  shortUserId={shortUserId ?? undefined}
                   initialScene1={restoredState?.scene1}
                   onScene1Change={setScene1Snapshot}
                   onComplete={() => setScene1Complete(true)}
@@ -1002,6 +1014,8 @@ export function WorkflowModal({
                 <Scene3Content
                   productImages={productImages}
                   productId={productId ?? undefined}
+                  sceneId={scene3Id ?? undefined}
+                  shortUserId={shortUserId ?? undefined}
                   initialScene3={restoredState?.scene3}
                   onScene3Change={setScene3Snapshot}
                   onComplete={() => setScene3Complete(true)}
@@ -1087,12 +1101,16 @@ type Scene1State = WorkflowTempState["scene1"];
 function Scene1Content({
   productImages: productImagesProp,
   productId,
+  sceneId: videoSceneId,
+  shortUserId,
   initialScene1,
   onScene1Change,
   onComplete,
 }: {
   productImages: ProductImageItem[];
   productId?: string | null;
+  sceneId?: string | null;
+  shortUserId?: string | null;
   initialScene1?: Scene1State | null;
   onScene1Change?: (s: Scene1State) => void;
   onComplete?: () => void;
@@ -1169,15 +1187,17 @@ function Scene1Content({
       const origin = typeof window !== "undefined" ? window.location.origin : "";
       const overlayUrl = bgRemoved.startsWith("http") ? bgRemoved : `${origin}${bgRemoved}`;
       const backgroundUrl = bgImage.startsWith("http") ? bgImage : `${origin}${bgImage}`;
-      const sceneId = productId ? `${productId}-scene1` : `scene1-${Date.now()}`;
+      const scene_id = videoSceneId ?? (productId ? `${productId}-scene1` : `scene1-${Date.now()}`);
+      const user_id = shortUserId ?? "anonymous";
       const payload = {
         background_url: backgroundUrl,
         overlay_url: overlayUrl,
-        scene_id: sceneId,
-        user_id: "anonymous",
+        scene_id,
+        user_id,
       };
       console.log(`[Composite] ${sceneLabel}: user clicked Composite → sending POST to ${COMPOSITE_API}`, {
-        scene_id: sceneId,
+        scene_id,
+        user_id,
         overlay_url: overlayUrl,
         background_url: backgroundUrl,
       });
@@ -1707,12 +1727,16 @@ type Scene3State = WorkflowTempState["scene3"];
 function Scene3Content({
   productImages: productImagesProp,
   productId,
+  sceneId: videoSceneId,
+  shortUserId,
   initialScene3,
   onScene3Change,
   onComplete,
 }: {
   productImages: ProductImageItem[];
   productId?: string | null;
+  sceneId?: string | null;
+  shortUserId?: string | null;
   initialScene3?: Scene3State | null;
   onScene3Change?: (s: Scene3State) => void;
   onComplete?: () => void;
@@ -1789,15 +1813,17 @@ function Scene3Content({
       const origin = typeof window !== "undefined" ? window.location.origin : "";
       const overlayUrl = bgRemoved.startsWith("http") ? bgRemoved : `${origin}${bgRemoved}`;
       const backgroundUrl = bgImage.startsWith("http") ? bgImage : `${origin}${bgImage}`;
-      const sceneId = productId ? `${productId}-scene3` : `scene3-${Date.now()}`;
+      const scene_id = videoSceneId ?? (productId ? `${productId}-scene3` : `scene3-${Date.now()}`);
+      const user_id = shortUserId ?? "anonymous";
       const payload = {
         background_url: backgroundUrl,
         overlay_url: overlayUrl,
-        scene_id: sceneId,
-        user_id: "anonymous",
+        scene_id,
+        user_id,
       };
       console.log(`[Composite] ${sceneLabel}: user clicked Composite → sending POST to ${COMPOSITE_API}`, {
-        scene_id: sceneId,
+        scene_id,
+        user_id,
         overlay_url: overlayUrl,
         background_url: backgroundUrl,
       });

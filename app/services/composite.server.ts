@@ -1,7 +1,7 @@
 /**
  * Image compositing via third-party backend API.
  * Calls BACKEND_URL to composite overlay (foreground) on background; no local sharp.
- * Matches backend contract: background_url, overlay_url, scene_id, user_id.
+ * Contract: scene_id = VideoScene.id, user_id = Short.user_id (shop, parent of the scene).
  */
 
 const LOG_PREFIX = "[Composite Service]";

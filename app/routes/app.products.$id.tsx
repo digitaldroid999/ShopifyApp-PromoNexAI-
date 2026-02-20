@@ -65,6 +65,10 @@ export default function ProductDetail() {
   const { product, isSample } = useLoaderData<typeof loader>();
   const [workflowOpen, setWorkflowOpen] = useState(false);
   const [shortId, setShortId] = useState<string | null>(null);
+  const [shortUserId, setShortUserId] = useState<string | null>(null);
+  const [scene1Id, setScene1Id] = useState<string | null>(null);
+  const [scene2Id, setScene2Id] = useState<string | null>(null);
+  const [scene3Id, setScene3Id] = useState<string | null>(null);
   const [productVideoUrl, setProductVideoUrl] = useState<string | null>(null);
 
   const handleGenerateVideoClick = async () => {
@@ -75,9 +79,11 @@ export default function ProductDetail() {
         body: JSON.stringify({ title: product.title ?? "Promo video", productId: product.id }),
       });
       const data = await res.json().catch(() => ({}));
-      if (data.shortId) {
-        setShortId(data.shortId);
-      }
+      if (data.shortId) setShortId(data.shortId);
+      if (data.userId != null) setShortUserId(data.userId);
+      if (data.scene1Id != null) setScene1Id(data.scene1Id);
+      if (data.scene2Id != null) setScene2Id(data.scene2Id);
+      if (data.scene3Id != null) setScene3Id(data.scene3Id);
     } catch {
       // continue to open modal
     }
@@ -150,6 +156,10 @@ export default function ProductDetail() {
           isSample={isSample}
           productId={product.id}
           shortId={shortId}
+          shortUserId={shortUserId}
+          scene1Id={scene1Id}
+          scene2Id={scene2Id}
+          scene3Id={scene3Id}
           productImages={productImagesForWorkflow}
           onClose={() => setWorkflowOpen(false)}
           onDone={(videoUrl) => setProductVideoUrl(videoUrl)}
