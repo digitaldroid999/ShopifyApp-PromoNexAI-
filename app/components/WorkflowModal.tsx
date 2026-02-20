@@ -1049,6 +1049,7 @@ const STOCK_VIDEOS_API = "/app/api/stock/videos";
 const WORKFLOW_TEMP_API = "/app/api/promo-workflow-temp";
 const COMPOSITE_API = "/app/api/image/composite";
 const SHORTS_API = "/app/api/shorts";
+const SHORTS_SCENES_API = "/app/api/shorts/scenes";
 const PER_PAGE = 12;
 
 /** Response shape from POST /app/api/image/composite (JSON only) */
@@ -1290,6 +1291,22 @@ function Scene1Content({
     }, 2000);
   };
 
+  const handleNextStepAfterComposite = async () => {
+    if (videoSceneId && composited) {
+      try {
+        await fetch(SHORTS_SCENES_API, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ sceneId: videoSceneId, imageUrl: composited }),
+        });
+      } catch (e) {
+        console.error("[Composite] Failed to save composited URL to scene:", e);
+      }
+    }
+    setStep(3);
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
       {step === 1 && (
@@ -1475,7 +1492,7 @@ function Scene1Content({
               <img src={composited} alt="Composited" style={{ width: "200px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
               <button
                 type="button"
-                onClick={() => setStep(3)}
+                onClick={handleNextStepAfterComposite}
                 style={{
                   padding: "10px 20px",
                   borderRadius: "8px",
@@ -1910,6 +1927,22 @@ function Scene3Content({
     }, 2000);
   };
 
+  const handleNextStepAfterComposite = async () => {
+    if (videoSceneId && composited) {
+      try {
+        await fetch(SHORTS_SCENES_API, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ sceneId: videoSceneId, imageUrl: composited }),
+        });
+      } catch (e) {
+        console.error("[Composite] Failed to save composited URL to scene:", e);
+      }
+    }
+    setStep(3);
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
       {step === 1 && (
@@ -2083,7 +2116,7 @@ function Scene3Content({
               <img src={composited} alt="Composited" style={{ width: "200px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
               <button
                 type="button"
-                onClick={() => setStep(3)}
+                onClick={handleNextStepAfterComposite}
                 style={{
                   padding: "10px 20px",
                   borderRadius: "8px",

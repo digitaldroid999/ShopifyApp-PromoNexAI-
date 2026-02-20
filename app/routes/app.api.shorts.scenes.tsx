@@ -7,6 +7,37 @@ const DEFAULT_DURATION_SEC = 8;
 export const action = async ({ request }: ActionFunctionArgs) => {
   await authenticate.admin(request);
 
+  // PATCH: update scene imageUrl (composited image URL)
+  if (request.method === "PATCH") {
+    let body: { sceneId?: string; imageUrl?: string };
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: "Invalid JSON" }, { status: 400 });
+    }
+    const sceneId = body.sceneId?.trim();
+    const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl.trim() : undefined;
+    if (!sceneId) {
+      return Response.json({ error: "sceneId required" }, { status: 400 });
+    }
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const videoScene = (prisma as any).videoScene;
+      // Schema: imageUrl maps to DB column "image_url"
+      await videoScene.update({
+        where: { id: sceneId },
+        data: { imageUrl: imageUrl ?? null },
+      });
+      return Response.json({ ok: true });
+    } catch (err) {
+      console.error("[app.api.shorts.scenes] VideoScene update failed:", err);
+      return Response.json(
+        { error: err instanceof Error ? err.message : "Failed to update scene" },
+        { status: 500 }
+      );
+    }
+  }
+
   if (request.method !== "POST") {
     return Response.json({ error: "Method not allowed" }, { status: 405 });
   }
@@ -80,6 +111,4 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 };
 
-export default function ApiShortsScenesRoute() {
-  return null;
-}
+// No default export = resource route (action response returned as JSON, not HTML document).
