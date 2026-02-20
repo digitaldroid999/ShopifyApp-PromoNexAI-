@@ -55,6 +55,10 @@ export default defineConfig({
   build: {
     assetsInlineLimit: 0,
   },
+  ssr: {
+    // sharp is a native addon; must be loaded at runtime, not bundled
+    external: ["sharp"],
+  },
   optimizeDeps: {
     include: ["@shopify/app-bridge-react"],
   },
