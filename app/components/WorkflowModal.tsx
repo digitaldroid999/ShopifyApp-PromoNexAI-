@@ -981,6 +981,7 @@ export function WorkflowModal({
               <div style={{ display: activeTab === "scene1" ? "block" : "none" }} key={`scene1-${restoredState?.scene1 ? "restored" : "default"}`}>
                 <Scene1Content
                   productImages={productImages}
+                  productId={productId ?? undefined}
                   initialScene1={restoredState?.scene1}
                   onScene1Change={setScene1Snapshot}
                   onComplete={() => setScene1Complete(true)}
@@ -997,6 +998,7 @@ export function WorkflowModal({
               <div style={{ display: activeTab === "scene3" ? "block" : "none" }} key={`scene3-${restoredState?.scene3 ? "restored" : "default"}`}>
                 <Scene3Content
                   productImages={productImages}
+                  productId={productId ?? undefined}
                   initialScene3={restoredState?.scene3}
                   onScene3Change={setScene3Snapshot}
                   onComplete={() => setScene3Complete(true)}
@@ -1014,6 +1016,7 @@ const VIDEO_API = "/app/api/video";
 const STOCK_IMAGES_API = "/app/api/stock/images";
 const STOCK_VIDEOS_API = "/app/api/stock/videos";
 const WORKFLOW_TEMP_API = "/app/api/promo-workflow-temp";
+const COMPOSITE_API = "/app/api/image/composite";
 const PER_PAGE = 12;
 
 /** Serializable workflow state for temp save/restore (matches server WorkflowTempState) */
@@ -1080,11 +1083,13 @@ type Scene1State = WorkflowTempState["scene1"];
 
 function Scene1Content({
   productImages: productImagesProp,
+  productId,
   initialScene1,
   onScene1Change,
   onComplete,
 }: {
   productImages: ProductImageItem[];
+  productId?: string | null;
   initialScene1?: Scene1State | null;
   onScene1Change?: (s: Scene1State) => void;
   onComplete?: () => void;
@@ -1100,6 +1105,7 @@ function Scene1Content({
   const [fetchModalOpen, setFetchModalOpen] = useState(false);
   const [composited, setComposited] = useState<string | null>(initialScene1?.composited ?? null);
   const [compositeLoading, setCompositeLoading] = useState(false);
+  const [compositeError, setCompositeError] = useState<string | null>(null);
   const [sceneVideo, setSceneVideo] = useState<string | null>(initialScene1?.sceneVideo ?? null);
   const [sceneLoading, setSceneLoading] = useState(false);
 
@@ -1151,12 +1157,36 @@ function Scene1Content({
     }, 1000);
   };
 
-  const handleComposite = () => {
+  const handleComposite = async () => {
+    if (!bgRemoved || !bgImage) return;
+    setCompositeError(null);
     setCompositeLoading(true);
-    setTimeout(() => {
-      setComposited(`${BASE}/scene1-composited.png`);
+    try {
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const overlayUrl = bgRemoved.startsWith("http") ? bgRemoved : `${origin}${bgRemoved}`;
+      const backgroundUrl = bgImage.startsWith("http") ? bgImage : `${origin}${bgImage}`;
+      const sceneId = productId ? `${productId}-scene1` : `scene1-${Date.now()}`;
+      const res = await fetch(COMPOSITE_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          background_url: backgroundUrl,
+          overlay_url: overlayUrl,
+          scene_id: sceneId,
+          user_id: "anonymous",
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.image_url) {
+        setComposited(data.image_url);
+      } else {
+        setCompositeError(data.error ?? data.message ?? "Compositing failed");
+      }
+    } catch (e) {
+      setCompositeError(e instanceof Error ? e.message : "Compositing failed");
+    } finally {
       setCompositeLoading(false);
-    }, 1500);
+    }
   };
 
   const handleGenerateScene = () => {
@@ -1344,6 +1374,9 @@ function Scene1Content({
               <span className="spinner" style={{ width: 24, height: 24, border: "2px solid #e1e3e5", borderTopColor: "#2c6ecb", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
               <span style={{ fontSize: "14px", color: "#6d7175" }}>Compositing…</span>
             </div>
+          )}
+          {compositeError && (
+            <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{compositeError}</span>
           )}
           {composited && (
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -1647,11 +1680,13 @@ type Scene3State = WorkflowTempState["scene3"];
 
 function Scene3Content({
   productImages: productImagesProp,
+  productId,
   initialScene3,
   onScene3Change,
   onComplete,
 }: {
   productImages: ProductImageItem[];
+  productId?: string | null;
   initialScene3?: Scene3State | null;
   onScene3Change?: (s: Scene3State) => void;
   onComplete?: () => void;
@@ -1667,6 +1702,7 @@ function Scene3Content({
   const [fetchModalOpen, setFetchModalOpen] = useState(false);
   const [composited, setComposited] = useState<string | null>(initialScene3?.composited ?? null);
   const [compositeLoading, setCompositeLoading] = useState(false);
+  const [compositeError, setCompositeError] = useState<string | null>(null);
   const [sceneVideo, setSceneVideo] = useState<string | null>(initialScene3?.sceneVideo ?? null);
   const [sceneLoading, setSceneLoading] = useState(false);
 
@@ -1718,12 +1754,36 @@ function Scene3Content({
     }, 1000);
   };
 
-  const handleComposite = () => {
+  const handleComposite = async () => {
+    if (!bgRemoved || !bgImage) return;
+    setCompositeError(null);
     setCompositeLoading(true);
-    setTimeout(() => {
-      setComposited(`${BASE}/scene3-compositied.png`);
+    try {
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const overlayUrl = bgRemoved.startsWith("http") ? bgRemoved : `${origin}${bgRemoved}`;
+      const backgroundUrl = bgImage.startsWith("http") ? bgImage : `${origin}${bgImage}`;
+      const sceneId = productId ? `${productId}-scene3` : `scene3-${Date.now()}`;
+      const res = await fetch(COMPOSITE_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          background_url: backgroundUrl,
+          overlay_url: overlayUrl,
+          scene_id: sceneId,
+          user_id: "anonymous",
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.image_url) {
+        setComposited(data.image_url);
+      } else {
+        setCompositeError(data.error ?? data.message ?? "Compositing failed");
+      }
+    } catch (e) {
+      setCompositeError(e instanceof Error ? e.message : "Compositing failed");
+    } finally {
       setCompositeLoading(false);
-    }, 1500);
+    }
   };
 
   const handleGenerateScene = () => {
@@ -1899,6 +1959,9 @@ function Scene3Content({
               <span className="spinner" style={{ width: 24, height: 24, border: "2px solid #e1e3e5", borderTopColor: "#2c6ecb", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
               <span style={{ fontSize: "14px", color: "#6d7175" }}>Compositing…</span>
             </div>
+          )}
+          {compositeError && (
+            <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{compositeError}</span>
           )}
           {composited && (
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
