@@ -1,10 +1,7 @@
 /**
  * Remotion server integration for Scene 1 (and future scenes) video generation.
  * Uses async/polling: POST /shopify/videos → GET /tasks/:taskId until completed/failed.
- *
- * REMOTION_URL in .env must point to the Remotion API:
- * - Same host as this app (e.g. http://localhost:3000): Vite proxy forwards /shopify/videos and /tasks to the API (see vite.config proxy; run Remotion API on REMOTION_API_TARGET port, e.g. 5050).
- * - Direct API (e.g. http://localhost:5050): use when Remotion API runs on a different port.
+ * REMOTION_URL in .env must point to the Remotion API (e.g. http://localhost:5050).
  */
 
 const LOG_PREFIX = "[Remotion Service]";
