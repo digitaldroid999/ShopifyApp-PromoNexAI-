@@ -1338,6 +1338,8 @@ function Scene1Content({
         await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
         const pollRes = await fetch(`${TASKS_API_BASE}/${encodeURIComponent(taskId)}`, {
           credentials: "include",
+          cache: "no-store",
+          headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
         });
         const task = await pollRes.json().catch(() => ({}));
         setSceneProgress(task.progress ?? null);

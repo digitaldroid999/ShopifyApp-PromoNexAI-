@@ -80,7 +80,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
           videoUrl: updated.videoUrl,
           error: updated.error,
         },
-        { headers: { "Content-Type": "application/json" } }
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            Pragma: "no-cache",
+          },
+        }
       );
     }
   }
@@ -94,6 +100,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       videoUrl: task.videoUrl,
       error: task.error,
     },
-    { headers: { "Content-Type": "application/json" } }
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+        Pragma: "no-cache",
+      },
+    }
   );
 };
