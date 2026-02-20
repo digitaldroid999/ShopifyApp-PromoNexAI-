@@ -71,12 +71,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const result = await compositeImages(background_url, overlay_url, scene_id);
   console.log(`${LOG_PREFIX} 5. compositeImages result:`, { success: result.success, image_url: result.image_url, error: result.error });
 
-  return Response.json({
+  const jsonBody = {
     success: result.success,
     image_url: result.image_url,
     error: result.error,
     message: result.message,
     created_at: result.created_at,
+  };
+  return new Response(JSON.stringify(jsonBody), {
+    status: 200,
+    headers: { "Content-Type": "application/json; charset=utf-8" },
   });
 };
 

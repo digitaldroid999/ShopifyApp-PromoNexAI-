@@ -1180,10 +1180,21 @@ function Scene1Content({
       });
       const res = await fetch(COMPOSITE_API, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      const rawText = await res.text();
+      let data: { success?: boolean; image_url?: string | null; error?: string | null; message?: string } = {};
+      try {
+        data = rawText ? JSON.parse(rawText) : {};
+      } catch (parseErr) {
+        console.error(`[Composite] ${sceneLabel}: response is not JSON (status ${res.status}). Raw (first 200 chars):`, rawText.slice(0, 200));
+        setCompositeError("Server returned invalid response. Try again.");
+        return;
+      }
       console.log(`[Composite] ${sceneLabel}: API response (status ${res.status})`, data);
       if (data.success && data.image_url) {
         setComposited(data.image_url);
@@ -1789,10 +1800,21 @@ function Scene3Content({
       });
       const res = await fetch(COMPOSITE_API, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      const rawText = await res.text();
+      let data: { success?: boolean; image_url?: string | null; error?: string | null; message?: string } = {};
+      try {
+        data = rawText ? JSON.parse(rawText) : {};
+      } catch (parseErr) {
+        console.error(`[Composite] ${sceneLabel}: response is not JSON (status ${res.status}). Raw (first 200 chars):`, rawText.slice(0, 200));
+        setCompositeError("Server returned invalid response. Try again.");
+        return;
+      }
       console.log(`[Composite] ${sceneLabel}: API response (status ${res.status})`, data);
       if (data.success && data.image_url) {
         setComposited(data.image_url);
