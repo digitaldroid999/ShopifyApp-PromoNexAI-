@@ -1051,44 +1051,31 @@ const COMPOSITE_API = "/app/api/image/composite";
 const SHORTS_API = "/app/api/shorts";
 const PER_PAGE = 12;
 
-/** Matches server CompositeImagesResult: success, image_url, error, message, created_at */
-type CompositeApiPayload = {
-  success?: boolean;
-  image_url?: string | null;
-  error?: string | null;
+/** Response shape from POST /app/api/image/composite (JSON only) */
+type CompositeApiResponse = {
+  success: boolean;
+  image_url: string | null;
+  error: string | null;
   message?: string;
   created_at?: string;
 };
 
-/**
- * Reads the composite API JSON response (server uses Response.json()).
- * Accepts direct payload or envelope { data: { success, image_url, ... } }.
- */
+/** Parses the composite API JSON response. */
 async function parseCompositeApiResponse(
   res: Response
 ): Promise<{ ok: true; image_url: string } | { ok: false; error: string }> {
-  let data: unknown;
+  let data: CompositeApiResponse;
   try {
     data = await res.json();
   } catch {
-    console.error("[Composite] Response is not JSON. Status:", res.status);
     return { ok: false, error: "Server returned invalid response. Try again." };
   }
-  const obj: CompositeApiPayload =
-    data && typeof data === "object" && "data" in data && (data as { data?: CompositeApiPayload }).data != null
-      ? ((data as { data: CompositeApiPayload }).data)
-      : (data as CompositeApiPayload);
-
-  console.log("[Composite] API response:", { status: res.status, payload: obj });
-
-  const success = obj.success === true;
-  const imageUrl = typeof obj.image_url === "string" ? obj.image_url.trim() : "";
-  if (success && imageUrl.length > 0) {
-    return { ok: true, image_url: imageUrl };
+  if (data.success && typeof data.image_url === "string" && data.image_url.trim()) {
+    return { ok: true, image_url: data.image_url.trim() };
   }
   const errorMessage =
-    (typeof obj.error === "string" && obj.error) ||
-    (typeof obj.message === "string" && obj.message) ||
+    (typeof data.error === "string" && data.error) ||
+    (typeof data.message === "string" && data.message) ||
     "Compositing failed";
   return { ok: false, error: errorMessage };
 }
@@ -1266,7 +1253,6 @@ function Scene1Content({
         },
         body: JSON.stringify(payload),
       });
-      console.log( "abc: ", res ) ;
       const result = await parseCompositeApiResponse(res);
       console.log(`[Composite] ${sceneLabel}: parsed result`, result);
       if (result.ok) {

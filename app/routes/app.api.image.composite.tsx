@@ -83,7 +83,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       message: result.message,
       created_at: result.created_at,
     },
-    { status: 200 }
+    {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }
   );
 };
 
