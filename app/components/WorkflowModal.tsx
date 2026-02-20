@@ -402,7 +402,8 @@ function FetchVideoModal({
   };
 
   const handleSelect = (item: (typeof videos)[0]) => {
-    const url = item.preview_url || item.download_url;
+    // Prefer download_url (actual video file) for merge; fall back to preview_url for display-only sources
+    const url = item.download_url || item.preview_url;
     if (url) {
       onSelect(url);
       onClose();
@@ -1765,11 +1766,22 @@ function Scene2Content({
           user_id: shortUserId,
         }),
       });
-      const data = await res.json().catch(() => ({}));
-      const taskId = data.taskId;
+      const rawText = await res.text();
+      let data: { taskId?: string; task_id?: string; error?: string; data?: { taskId?: string; task_id?: string } } = {};
+      try {
+        data = rawText && rawText.trim() ? JSON.parse(rawText) : {};
+      } catch {
+        console.warn("[Scene2] Start response not JSON. Status:", res.status, "Body sample:", rawText.slice(0, 200));
+      }
+      const taskId = data?.taskId ?? data?.task_id ?? data?.data?.taskId ?? data?.data?.task_id;
       if (!taskId) {
-        const errMsg = typeof data.error === "string" ? data.error : !res.ok ? `Server error ${res.status}` : "Failed to start video generation";
-        console.warn("[Scene2] Generate video start failed:", { status: res.status, data, error: errMsg });
+        const errMsg = typeof data?.error === "string" ? data.error : !res.ok ? `Server error ${res.status}` : "Failed to start video generation";
+        console.warn("[Scene2] Generate video start failed:", {
+          status: res.status,
+          dataKeys: typeof data === "object" && data !== null ? Object.keys(data) : [],
+          bodySample: rawText.slice(0, 300),
+          error: errMsg,
+        });
         setSceneError(errMsg);
         setSceneLoading(false);
         return;
