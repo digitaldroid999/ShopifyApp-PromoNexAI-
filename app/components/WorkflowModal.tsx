@@ -645,6 +645,7 @@ export function WorkflowModal({
   isSample,
   productImages: productImagesProp,
   productId,
+  shortId,
 }: {
   onClose: () => void;
   /** Called when user clicks Done after viewing the final video; pass the final video URL to add to product */
@@ -654,6 +655,8 @@ export function WorkflowModal({
   productImages?: ProductImageItem[];
   /** Product ID for temp save/restore (e.g. product.id). When set, workflow state is loaded on open and saved while in progress; temp is deleted when Done. */
   productId?: string | null;
+  /** Short row ID; when set, first action in a scene tab creates the corresponding VideoScene row. */
+  shortId?: string | null;
 }) {
   const productImages = productImagesProp?.length ? productImagesProp : defaultProductImages;
   const firstImageId = productImages[0]?.id ?? "s1";
@@ -982,6 +985,8 @@ export function WorkflowModal({
                 <Scene1Content
                   productImages={productImages}
                   productId={productId ?? undefined}
+                  shortId={shortId ?? undefined}
+                  sceneNumber={1}
                   initialScene1={restoredState?.scene1}
                   onScene1Change={setScene1Snapshot}
                   onComplete={() => setScene1Complete(true)}
@@ -990,6 +995,8 @@ export function WorkflowModal({
               <div style={{ display: activeTab === "scene2" ? "block" : "none" }} key={`scene2-${restoredState?.scene2 ? "restored" : "default"}`}>
                 <Scene2Content
                   productImages={productImages}
+                  shortId={shortId ?? undefined}
+                  sceneNumber={2}
                   initialScene2={restoredState?.scene2}
                   onScene2Change={setScene2Snapshot}
                   onComplete={() => setScene2Complete(true)}
@@ -999,6 +1006,8 @@ export function WorkflowModal({
                 <Scene3Content
                   productImages={productImages}
                   productId={productId ?? undefined}
+                  shortId={shortId ?? undefined}
+                  sceneNumber={3}
                   initialScene3={restoredState?.scene3}
                   onScene3Change={setScene3Snapshot}
                   onComplete={() => setScene3Complete(true)}
@@ -1017,6 +1026,7 @@ const STOCK_IMAGES_API = "/app/api/stock/images";
 const STOCK_VIDEOS_API = "/app/api/stock/videos";
 const WORKFLOW_TEMP_API = "/app/api/promo-workflow-temp";
 const COMPOSITE_API = "/app/api/image/composite";
+const SHORTS_SCENES_API = "/app/api/shorts/scenes";
 const PER_PAGE = 12;
 
 /** Serializable workflow state for temp save/restore (matches server WorkflowTempState) */
@@ -1084,12 +1094,16 @@ type Scene1State = WorkflowTempState["scene1"];
 function Scene1Content({
   productImages: productImagesProp,
   productId,
+  shortId,
+  sceneNumber,
   initialScene1,
   onScene1Change,
   onComplete,
 }: {
   productImages: ProductImageItem[];
   productId?: string | null;
+  shortId?: string | null;
+  sceneNumber: number;
   initialScene1?: Scene1State | null;
   onScene1Change?: (s: Scene1State) => void;
   onComplete?: () => void;
@@ -1134,7 +1148,7 @@ function Scene1Content({
     }
   }, [removeBgFetcher.state, removeBgFetcher.data]);
 
-  const handleRemoveBg = () => {
+  const handleRemoveBg = async () => {
     const img = productImagesProp.find((i) => i.id === selectedImage);
     const imageUrl = img?.src;
     if (!imageUrl) {
@@ -1143,6 +1157,17 @@ function Scene1Content({
     }
     setBgRemovedError(null);
     setBgRemovedLoading(true);
+    if (shortId) {
+      try {
+        await fetch(SHORTS_SCENES_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ shortId, sceneNumber }),
+        });
+      } catch {
+        // continue with remove BG even if ensure-scene fails
+      }
+    }
     removeBgFetcher.submit(
       { step: "removeBg", imageUrl },
       { method: "post", action: VIDEO_API, encType: "application/json" }
@@ -1477,11 +1502,15 @@ type Scene2State = WorkflowTempState["scene2"];
 
 function Scene2Content({
   productImages: productImagesProp,
+  shortId,
+  sceneNumber,
   initialScene2,
   onScene2Change,
   onComplete,
 }: {
   productImages: ProductImageItem[];
+  shortId?: string | null;
+  sceneNumber: number;
   initialScene2?: Scene2State | null;
   onScene2Change?: (s: Scene2State) => void;
   onComplete?: () => void;
@@ -1521,7 +1550,7 @@ function Scene2Content({
     }
   }, [removeBgFetcher.state, removeBgFetcher.data]);
 
-  const handleRemoveBg = () => {
+  const handleRemoveBg = async () => {
     const img = productImagesProp.find((i) => i.id === selectedImage);
     const imageUrl = img?.src;
     if (!imageUrl) {
@@ -1530,6 +1559,17 @@ function Scene2Content({
     }
     setBgRemovedError(null);
     setBgRemovedLoading(true);
+    if (shortId) {
+      try {
+        await fetch(SHORTS_SCENES_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ shortId, sceneNumber }),
+        });
+      } catch {
+        // continue with remove BG even if ensure-scene fails
+      }
+    }
     removeBgFetcher.submit(
       { step: "removeBg", imageUrl },
       { method: "post", action: VIDEO_API, encType: "application/json" }
@@ -1704,12 +1744,16 @@ type Scene3State = WorkflowTempState["scene3"];
 function Scene3Content({
   productImages: productImagesProp,
   productId,
+  shortId,
+  sceneNumber,
   initialScene3,
   onScene3Change,
   onComplete,
 }: {
   productImages: ProductImageItem[];
   productId?: string | null;
+  shortId?: string | null;
+  sceneNumber: number;
   initialScene3?: Scene3State | null;
   onScene3Change?: (s: Scene3State) => void;
   onComplete?: () => void;
@@ -1754,7 +1798,7 @@ function Scene3Content({
     }
   }, [removeBgFetcher.state, removeBgFetcher.data]);
 
-  const handleRemoveBg = () => {
+  const handleRemoveBg = async () => {
     const img = productImagesProp.find((i) => i.id === selectedImage);
     const imageUrl = img?.src;
     if (!imageUrl) {
@@ -1763,6 +1807,17 @@ function Scene3Content({
     }
     setBgRemovedError(null);
     setBgRemovedLoading(true);
+    if (shortId) {
+      try {
+        await fetch(SHORTS_SCENES_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ shortId, sceneNumber }),
+        });
+      } catch {
+        // continue with remove BG even if ensure-scene fails
+      }
+    }
     removeBgFetcher.submit(
       { step: "removeBg", imageUrl },
       { method: "post", action: VIDEO_API, encType: "application/json" }

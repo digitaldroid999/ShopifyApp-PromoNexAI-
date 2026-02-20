@@ -67,8 +67,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     );
   }
 
-  console.log(`${LOG_PREFIX} 4. Calling compositeImages(background_url, overlay_url, scene_id="${scene_id}")`);
-  const result = await compositeImages(background_url, overlay_url, scene_id);
+  console.log(`${LOG_PREFIX} 4. Calling compositeImages(background_url, overlay_url, scene_id="${scene_id}", user_id="${user_id}")`);
+  const result = await compositeImages(background_url, overlay_url, scene_id, user_id);
   console.log(`${LOG_PREFIX} 5. compositeImages result:`, { success: result.success, image_url: result.image_url, error: result.error });
 
   const jsonBody = {

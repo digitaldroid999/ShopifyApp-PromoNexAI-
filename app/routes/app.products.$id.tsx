@@ -59,10 +59,30 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   return { product, isSample: false };
 };
 
+const SHORTS_API = "/app/api/shorts";
+
 export default function ProductDetail() {
   const { product, isSample } = useLoaderData<typeof loader>();
   const [workflowOpen, setWorkflowOpen] = useState(false);
+  const [shortId, setShortId] = useState<string | null>(null);
   const [productVideoUrl, setProductVideoUrl] = useState<string | null>(null);
+
+  const handleGenerateVideoClick = async () => {
+    try {
+      const res = await fetch(SHORTS_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: product.title ?? "Promo video", productId: product.id }),
+      });
+      const data = await res.json();
+      if (data.shortId) {
+        setShortId(data.shortId);
+        setWorkflowOpen(true);
+      }
+    } catch {
+      setWorkflowOpen(true);
+    }
+  };
 
   const images = product.images?.edges?.map((e: { node: { id: string; url: string; altText: string | null } }) => e.node) ?? [];
   const productImagesForWorkflow = images.map((img: { id: string; url: string; altText: string | null }, i: number) => ({
@@ -114,7 +134,7 @@ export default function ProductDetail() {
               </s-stack>
             ) : null}
             <s-stack direction="inline" gap="base">
-              <s-button variant="primary" onClick={() => setWorkflowOpen(true)}>
+              <s-button variant="primary" onClick={handleGenerateVideoClick}>
                 Generate video
               </s-button>
               <Link to="/app">
@@ -129,6 +149,7 @@ export default function ProductDetail() {
         <WorkflowModal
           isSample={isSample}
           productId={product.id}
+          shortId={shortId}
           productImages={productImagesForWorkflow}
           onClose={() => setWorkflowOpen(false)}
           onDone={(videoUrl) => setProductVideoUrl(videoUrl)}
