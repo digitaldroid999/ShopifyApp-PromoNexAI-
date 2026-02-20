@@ -1273,6 +1273,7 @@ function Scene1Content({
         },
         body: JSON.stringify(payload),
       });
+      console.log( "abc: ", res ) ;
       const result = await parseCompositeApiResponse(res);
       console.log(`[Composite] ${sceneLabel}: parsed result`, result);
       if (result.ok) {
