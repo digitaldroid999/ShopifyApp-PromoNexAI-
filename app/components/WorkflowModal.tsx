@@ -1062,7 +1062,7 @@ const COMPOSITE_API = "/app/api/image/composite";
 const SHORTS_API = "/app/api/shorts";
 const SHORTS_SCENES_API = "/app/api/shorts/scenes";
 const REMOTION_START_API = "/app/api/remotion/start";
-const TASKS_API_BASE = "/api/tasks";
+const TASKS_API_BASE = "/app/api/tasks";
 const PER_PAGE = 12;
 const POLL_INTERVAL_MS = 5000;
 const POLL_MAX_ATTEMPTS = 60; // 5 min at 5s
@@ -1774,15 +1774,28 @@ function Scene2Content({
         setSceneLoading(false);
         return;
       }
+      console.log("[Scene2] Start OK, polling taskId=" + taskId + " at " + TASKS_API_BASE + "/" + taskId);
       let done = false;
       for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
         await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-        const pollRes = await fetch(`${TASKS_API_BASE}/${encodeURIComponent(taskId)}`, {
+        const pollUrl = `${TASKS_API_BASE}/${encodeURIComponent(taskId)}`;
+        const pollRes = await fetch(pollUrl, {
           credentials: "include",
           cache: "no-store",
           headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
         });
         const task = await pollRes.json().catch(() => ({}));
+        if (!pollRes.ok) {
+          console.warn("[Scene2] Poll error:", pollRes.status, task);
+          if (task?.error) {
+            setSceneError(typeof task.error === "string" ? task.error : "Poll failed");
+            done = true;
+            break;
+          }
+        }
+        if (i < 3 || task.status === "completed" || task.status === "failed") {
+          console.log("[Scene2] Poll", i + 1, "status=" + (task.status ?? "?") + " videoUrl=" + (task.videoUrl ?? task.video_url ?? "-"));
+        }
         if (task.status === "completed" && (task.videoUrl ?? task.video_url)) {
           const rawUrl = task.videoUrl ?? task.video_url;
           const videoUrl = typeof rawUrl === "string" && rawUrl.startsWith("http") ? rawUrl : `${origin}${rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`}`;

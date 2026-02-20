@@ -2,9 +2,19 @@ import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { fetchRemotionTaskStatus } from "../services/remotion.server";
+import { mergeVideoTaskStatus } from "../services/promonexai.server";
 
 const LOG_PREFIX = "[Tasks API]";
 
+const isScene2MergeTask = (task: { metadata?: unknown; stage?: string | null }) => {
+  const meta = task.metadata as { type?: string } | null | undefined;
+  return meta?.type === "scene2_merge" || task.stage === "scene2_merge";
+};
+
+/**
+ * GET /app/api/tasks/:taskId - Task status (used for polling).
+ * Handles both Remotion (scene 1/3) and Scene 2 merge-video tasks.
+ */
 export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   await authenticate.admin(request);
 
@@ -21,8 +31,56 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   console.log(`${LOG_PREFIX} Poll taskId=${taskId} status=${task.status} stage=${task.stage ?? "-"} progress=${task.progress ?? "-"}%`);
 
-  // If still pending, poll Remotion and update our Task (and VideoScene if completed)
-  if (task.status === "pending") {
+  const isTerminal = task.status === "completed" || task.status === "failed";
+  if (!isTerminal) {
+    // Scene 2 merge: poll backend merge-video/tasks/{task_id}
+    if (isScene2MergeTask(task)) {
+      console.log(`${LOG_PREFIX} [Scene2 polling] taskId=${taskId} backendTaskId=${task.remotionTaskId} → GET merge-video/tasks/${task.remotionTaskId}`);
+      const mergeStatus = await mergeVideoTaskStatus(task.remotionTaskId);
+      if (mergeStatus) {
+        console.log(`${LOG_PREFIX} [Scene2 polling] backend response: status=${mergeStatus.status} video_url=${mergeStatus.video_url ?? "-"} error_message=${mergeStatus.error_message ?? "-"}`);
+
+        const updates: { status: string; videoUrl?: string | null; error?: string | null } = {
+          status: mergeStatus.status,
+        };
+        if (mergeStatus.status === "completed" && mergeStatus.video_url) {
+          updates.videoUrl = mergeStatus.video_url;
+        }
+        if (mergeStatus.status === "failed" && mergeStatus.error_message) {
+          updates.error = mergeStatus.error_message;
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const updated = await (prisma as any).task.update({
+          where: { id: taskId },
+          data: updates,
+        });
+
+        // Persist scene2 result to video_scenes.generated_video_url (VideoScene.generatedVideoUrl)
+        if (mergeStatus.status === "completed" && mergeStatus.video_url && task.videoSceneId) {
+          try {
+            await (prisma as any).videoScene.update({
+              where: { id: task.videoSceneId },
+              data: { generatedVideoUrl: mergeStatus.video_url, status: "ready" },
+            });
+            console.log(`${LOG_PREFIX} [Scene2 polling] completed. Saved generated_video_url to VideoScene ${task.videoSceneId} → ${mergeStatus.video_url}`);
+          } catch (e) {
+            console.error(`${LOG_PREFIX} [Scene2 polling] Failed to update VideoScene:`, e);
+          }
+        } else if (mergeStatus.status === "failed") {
+          console.log(`${LOG_PREFIX} [Scene2 polling] failed: ${mergeStatus.error_message ?? "unknown"}`);
+        }
+
+        console.log(`${LOG_PREFIX} [Scene2 polling] returning: status=${updated.status} videoUrl=${updated.videoUrl ?? "-"}`);
+        return Response.json(
+          { id: updated.id, status: updated.status, stage: updated.stage, progress: updated.progress, videoUrl: updated.videoUrl, error: updated.error },
+          { headers: { "Content-Type": "application/json", "Cache-Control": "no-store, no-cache, must-revalidate", Pragma: "no-cache" } }
+        );
+      }
+      console.warn(`${LOG_PREFIX} [Scene2 polling] mergeVideoTaskStatus returned null for backendTaskId=${task.remotionTaskId}`);
+    }
+
+    // Remotion (e.g. scene 1/3): poll Remotion API
     const remotion = await fetchRemotionTaskStatus(task.remotionTaskId);
     if (remotion) {
       console.log(`${LOG_PREFIX} Remotion task ${task.remotionTaskId} → status=${remotion.status} stage=${remotion.stage ?? "-"} progress=${remotion.progress ?? "-"}%`);
@@ -45,20 +103,24 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         data: updates,
       });
 
-      // When completed, set VideoScene.generatedVideoUrl
-      if (remotion.status === "completed" && remotion.videoUrl && task.videoSceneId) {
+      if (remotion.status === "completed" && remotion.videoUrl) {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (prisma as any).videoScene.update({
-            where: { id: task.videoSceneId },
-            data: {
-              generatedVideoUrl: remotion.videoUrl,
-              status: "ready",
-            },
-          });
-          console.log(`${LOG_PREFIX} Completed. Updated VideoScene ${task.videoSceneId} videoUrl=${remotion.videoUrl}`);
+          const videoSceneId =
+            task.videoSceneId ??
+            (await (prisma as any).videoScene
+              .findFirst({ where: { shortId: task.shortId, sceneNumber: 1 }, select: { id: true } })
+              .then((s: { id: string } | null) => s?.id ?? null));
+          if (videoSceneId) {
+            await (prisma as any).videoScene.update({
+              where: { id: videoSceneId },
+              data: { generatedVideoUrl: remotion.videoUrl, status: "ready" },
+            });
+            console.log(`${LOG_PREFIX} Completed. Saved generated_video_url to VideoScene ${videoSceneId} (scene 1)`);
+          } else {
+            console.warn(`${LOG_PREFIX} Completed but no VideoScene found for shortId=${task.shortId} scene 1; generated URL not saved to VideoScene.`);
+          }
         } catch (e) {
-          console.error(`${LOG_PREFIX} Failed to update VideoScene:`, e);
+          console.error(`${LOG_PREFIX} Failed to update VideoScene generated_video_url:`, e);
         }
       }
 
@@ -75,7 +137,13 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
           videoUrl: updated.videoUrl,
           error: updated.error,
         },
-        { headers: { "Content-Type": "application/json" } }
+        {
+          headers: {
+            "Content-Type": "application/json",
+            "Cache-Control": "no-store, no-cache, must-revalidate",
+            Pragma: "no-cache",
+          },
+        }
       );
     }
   }
@@ -89,6 +157,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       videoUrl: task.videoUrl,
       error: task.error,
     },
-    { headers: { "Content-Type": "application/json" } }
+    {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-store, no-cache, must-revalidate",
+        Pragma: "no-cache",
+      },
+    }
   );
 };
