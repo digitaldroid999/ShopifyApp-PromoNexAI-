@@ -145,6 +145,7 @@ export default function ProductDetail() {
           isSample={isSample}
           productId={product.id}
           productImages={productImagesForWorkflow}
+          product={{ name: product.title ?? "Product" }}
           onClose={() => setWorkflowOpen(false)}
           onDone={(videoUrl) => setProductVideoUrl(videoUrl)}
         />

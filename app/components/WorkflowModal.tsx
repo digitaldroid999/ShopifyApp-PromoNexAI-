@@ -647,12 +647,15 @@ type ShortInfo = {
   scene3Id: string | null;
 };
 
+export type WorkflowProduct = { name: string; price?: string; rating?: number };
+
 export function WorkflowModal({
   onClose,
   onDone,
   isSample,
   productImages: productImagesProp,
   productId,
+  product,
 }: {
   onClose: () => void;
   /** Called when user clicks Done after viewing the final video; pass the final video URL to add to product */
@@ -662,6 +665,8 @@ export function WorkflowModal({
   productImages?: ProductImageItem[];
   /** Product ID for temp save/restore (e.g. product.id). When set, workflow state is loaded on open and saved while in progress; temp is deleted when Done. */
   productId?: string | null;
+  /** Product info for Remotion (scene 1 video generation). */
+  product?: WorkflowProduct | null;
 }) {
   const productImages = productImagesProp?.length ? productImagesProp : defaultProductImages;
   const firstImageId = productImages[0]?.id ?? "s1";
@@ -1009,7 +1014,9 @@ export function WorkflowModal({
                 <Scene1Content
                   productImages={productImages}
                   productId={productId ?? undefined}
+                  product={product ?? undefined}
                   sceneId={shortInfo?.scene1Id ?? undefined}
+                  shortId={shortInfo?.shortId ?? undefined}
                   shortUserId={shortInfo?.userId ?? undefined}
                   initialScene1={restoredState?.scene1}
                   onScene1Change={setScene1Snapshot}
@@ -1050,7 +1057,11 @@ const WORKFLOW_TEMP_API = "/app/api/promo-workflow-temp";
 const COMPOSITE_API = "/app/api/image/composite";
 const SHORTS_API = "/app/api/shorts";
 const SHORTS_SCENES_API = "/app/api/shorts/scenes";
+const REMOTION_START_API = "/app/api/remotion/start";
+const TASKS_API_BASE = "/app/api/tasks";
 const PER_PAGE = 12;
+const POLL_INTERVAL_MS = 5000;
+const POLL_MAX_ATTEMPTS = 60; // 5 min at 5s
 
 /** Response shape from POST /app/api/image/composite (JSON only) */
 type CompositeApiResponse = {
@@ -1154,7 +1165,9 @@ type Scene1State = WorkflowTempState["scene1"];
 function Scene1Content({
   productImages: productImagesProp,
   productId,
+  product: productProp,
   sceneId: videoSceneId,
+  shortId,
   shortUserId,
   initialScene1,
   onScene1Change,
@@ -1162,7 +1175,9 @@ function Scene1Content({
 }: {
   productImages: ProductImageItem[];
   productId?: string | null;
+  product?: WorkflowProduct | null;
   sceneId?: string | null;
+  shortId?: string | null;
   shortUserId?: string | null;
   initialScene1?: Scene1State | null;
   onScene1Change?: (s: Scene1State) => void;
@@ -1182,6 +1197,8 @@ function Scene1Content({
   const [compositeError, setCompositeError] = useState<string | null>(null);
   const [sceneVideo, setSceneVideo] = useState<string | null>(initialScene1?.sceneVideo ?? null);
   const [sceneLoading, setSceneLoading] = useState(false);
+  const [sceneError, setSceneError] = useState<string | null>(null);
+  const [sceneProgress, setSceneProgress] = useState<number | null>(null);
 
   useEffect(() => {
     onScene1Change?.({
@@ -1282,13 +1299,71 @@ function Scene1Content({
     }
   };
 
-  const handleGenerateScene = () => {
+  const handleGenerateScene = async () => {
+    if (!composited) return;
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const fullImageUrl = composited.startsWith("http") ? composited : `${origin}${composited}`;
+    if (!shortId || !shortUserId) {
+      setSceneError("Short not loaded. Please close and reopen the workflow.");
+      return;
+    }
+    setSceneError(null);
+    setSceneProgress(0);
     setSceneLoading(true);
-    setTimeout(() => {
-      setSceneVideo(`${BASE}/scene1-video.mp4`);
+    try {
+      const startRes = await fetch(REMOTION_START_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          shortId,
+          sceneId: videoSceneId ?? undefined,
+          imageUrl: fullImageUrl,
+          product: {
+            name: productProp?.name ?? "Product",
+            price: productProp?.price ?? "$0.00",
+            rating: productProp?.rating ?? 0,
+          },
+        }),
+      });
+      const startData = await startRes.json().catch(() => ({}));
+      const taskId = startData.taskId;
+      if (!taskId) {
+        setSceneError(startData.error ?? "Failed to start video generation");
+        setSceneLoading(false);
+        return;
+      }
+      let done = false;
+      for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        const pollRes = await fetch(`${TASKS_API_BASE}/${encodeURIComponent(taskId)}`, {
+          credentials: "include",
+        });
+        const task = await pollRes.json().catch(() => ({}));
+        setSceneProgress(task.progress ?? null);
+        if (task.status === "completed" && task.videoUrl) {
+          const videoUrl = task.videoUrl.startsWith("http") ? task.videoUrl : `${origin}${task.videoUrl}`;
+          setSceneVideo(videoUrl);
+          setSceneError(null);
+          onComplete?.();
+          done = true;
+          break;
+        }
+        if (task.status === "failed") {
+          setSceneError(task.error ?? "Video generation failed");
+          done = true;
+          break;
+        }
+      }
+      if (!done) {
+        setSceneError("Video generation timed out. Please try again.");
+      }
+    } catch (e) {
+      setSceneError(e instanceof Error ? e.message : "Video generation failed");
+    } finally {
       setSceneLoading(false);
-      onComplete?.();
-    }, 2000);
+      setSceneProgress(null);
+    }
   };
 
   const handleNextStepAfterComposite = async () => {
@@ -1530,7 +1605,29 @@ function Scene1Content({
               {sceneLoading ? (
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
                   <span className="spinner" style={{ width: 32, height: 32, border: "3px solid #e1e3e5", borderTopColor: "#2c6ecb", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                  <span style={{ fontSize: "14px", color: "#6d7175" }}>Generating scene video…</span>
+                  <span style={{ fontSize: "14px", color: "#6d7175" }}>
+                    Generating scene video…{sceneProgress != null ? ` ${sceneProgress}%` : ""}
+                  </span>
+                </div>
+              ) : sceneError ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{sceneError}</span>
+                  <button
+                    type="button"
+                    onClick={() => { setSceneError(null); handleGenerateScene(); }}
+                    style={{
+                      padding: "12px 24px",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: "var(--p-color-bg-fill-info, #2c6ecb)",
+                      color: "#fff",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      alignSelf: "flex-start",
+                    }}
+                  >
+                    Retry
+                  </button>
                 </div>
               ) : sceneVideo ? (
                 <video src={sceneVideo} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
@@ -1538,14 +1635,15 @@ function Scene1Content({
                 <button
                   type="button"
                   onClick={handleGenerateScene}
+                  disabled={!composited}
                   style={{
                     padding: "12px 24px",
                     borderRadius: "8px",
                     border: "none",
-                    background: "var(--p-color-bg-fill-info, #2c6ecb)",
+                    background: composited ? "var(--p-color-bg-fill-info, #2c6ecb)" : "#ccc",
                     color: "#fff",
                     fontWeight: 600,
-                    cursor: "pointer",
+                    cursor: composited ? "pointer" : "not-allowed",
                   }}
                 >
                   Generate scene
