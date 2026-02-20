@@ -90,6 +90,4 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   );
 };
 
-export default function ApiImageCompositeRoute() {
-  return null;
-}
+// No default export = resource route. POST gets the action Response.json() directly, not the HTML document.
