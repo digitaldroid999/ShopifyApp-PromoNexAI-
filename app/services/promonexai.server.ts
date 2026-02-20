@@ -1,7 +1,8 @@
 /**
  * PromoNex AI – video generation steps.
  * Step 1: Remove background via PhotoRoom segment API, save to public/bg_removed_images/.
- * Stock images: Pexels, Pixabay, Unsplash (each optional; missing/failed sources reported for UI).
+ * Stock images: Pexels, Pixabay only (image select modal).
+ * Stock videos: Pexels, Pixabay, Coverr (video select modal).
  */
 
 import { mkdir, writeFile } from "node:fs/promises";
@@ -24,14 +25,20 @@ export interface NormalizedStockImage {
 export interface SearchStockImagesResult {
   success: boolean;
   images: NormalizedStockImage[];
+  /** Total count for pagination (sum of source totals when multiple APIs). */
   total: number;
   page: number;
   per_page: number;
   source?: "demo";
   /** Per-source counts when using APIs; undefined when demo. */
-  sources?: { pexels?: number; pixabay?: number; unsplash?: number };
+  sources?: { pexels?: number; pixabay?: number; coverr?: number };
   /** Per-source error messages when one or more APIs fail or return no data. */
-  errors?: { pexels?: string; pixabay?: string; unsplash?: string };
+  errors?: { pexels?: string; pixabay?: string; coverr?: string };
+}
+
+/** Same shape as SearchStockImagesResult; used for video search. */
+export interface SearchStockVideosResult extends Omit<SearchStockImagesResult, "images"> {
+  images: NormalizedStockImage[]; // id, title, thumbnail_url, preview_url, download_url, type: "video"
 }
 
 export type RemoveBackgroundResult =
@@ -104,7 +111,7 @@ export async function removeBackground(
   }
 }
 
-// --- Stock image search (Pexels, Pixabay, Unsplash) ---
+// --- Stock image/video search (Pexels, Pixabay, Coverr) ---
 
 async function searchPexels(
   query: string,
@@ -190,43 +197,48 @@ async function searchPixabay(
   return { images, total: data.total ?? data.totalHits ?? images.length };
 }
 
-async function searchUnsplash(
+async function searchCoverr(
   query: string,
   page: number,
   perPage: number
 ): Promise<{ images: NormalizedStockImage[]; total: number }> {
-  const apiKey = process.env.UNSPLASH_ACCESS_KEY;
+  const apiKey = process.env.COVERR_API_KEY;
   if (!apiKey) return { images: [], total: 0 };
 
+  // Coverr: page is 0-based, page_size per page, urls=true to get video URLs
   const params = new URLSearchParams({
-    query,
-    page: String(page),
-    per_page: String(perPage),
-    client_id: apiKey,
+    query: query.trim(),
+    page: String(Math.max(0, page - 1)),
+    page_size: String(perPage),
+    urls: "true",
   });
   const response = await fetch(
-    `https://api.unsplash.com/search/photos?${params.toString()}`
+    `https://api.coverr.co/videos?${params.toString()}`,
+    {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    }
   );
 
-  if (!response.ok) throw new Error(`Unsplash API error: ${response.status}`);
+  if (!response.ok) throw new Error(`Coverr API error: ${response.status}`);
 
   const data = (await response.json()) as {
-    results?: Array<{
+    hits?: Array<{
       id: string;
-      urls?: { raw?: string; full?: string; regular?: string; small?: string; thumb?: string };
-      alt_description?: string;
-      user?: { name?: string };
+      title?: string;
+      poster?: string;
+      thumbnail?: string;
+      urls?: { mp4?: string; mp4_preview?: string; mp4_download?: string };
     }>;
     total?: number;
   };
 
-  const images: NormalizedStockImage[] = (data.results || []).map((photo) => ({
-    id: `unsplash-${photo.id}`,
-    title: photo.alt_description || `Photo by ${photo.user?.name || "Unsplash"}`,
-    thumbnail_url: photo.urls?.small || photo.urls?.thumb,
-    preview_url: photo.urls?.regular || photo.urls?.full,
-    download_url: photo.urls?.full || photo.urls?.regular,
-    type: "photo",
+  const images: NormalizedStockImage[] = (data.hits || []).map((hit) => ({
+    id: `coverr-${hit.id}`,
+    title: hit.title || "Coverr video",
+    thumbnail_url: hit.thumbnail || hit.poster,
+    preview_url: hit.urls?.mp4_preview || hit.urls?.mp4,
+    download_url: hit.urls?.mp4_download || hit.urls?.mp4 || hit.urls?.mp4_preview,
+    type: "video",
   }));
 
   return { images, total: data.total ?? images.length };
@@ -286,9 +298,8 @@ function getDemoImages(): NormalizedStockImage[] {
 }
 
 /**
- * Search stock background images from Pexels, Pixabay, and Unsplash.
- * Uses Promise.allSettled so one failing API does not break others.
- * Returns per-source counts and errors so the UI can show status for each.
+ * Search stock images only (Pexels photos + Pixabay images). For image select modal.
+ * Coverr is video-only and is not used here.
  */
 export async function searchStockImages(
   query: string,
@@ -298,9 +309,8 @@ export async function searchStockImages(
   const per = Math.min(perPage, 30);
   const hasPexels = !!process.env.PEXELS_API_KEY;
   const hasPixabay = !!process.env.PIXABAY_API_KEY;
-  const hasUnsplash = !!process.env.UNSPLASH_ACCESS_KEY;
 
-  if (!hasPexels && !hasPixabay && !hasUnsplash) {
+  if (!hasPexels && !hasPixabay) {
     return {
       success: true,
       images: getDemoImages(),
@@ -314,30 +324,29 @@ export async function searchStockImages(
   const results = await Promise.allSettled([
     hasPexels ? searchPexels(query.trim(), page, per) : Promise.resolve({ images: [] as NormalizedStockImage[], total: 0 }),
     hasPixabay ? searchPixabay(query.trim(), page, per) : Promise.resolve({ images: [] as NormalizedStockImage[], total: 0 }),
-    hasUnsplash ? searchUnsplash(query.trim(), page, per) : Promise.resolve({ images: [] as NormalizedStockImage[], total: 0 }),
   ]);
 
   const bySource: NormalizedStockImage[][] = [];
   const sources: SearchStockImagesResult["sources"] = {};
   const errors: SearchStockImagesResult["errors"] = {};
-  const sourceNames = ["pexels", "pixabay", "unsplash"] as const;
+  let totalFromApis = 0;
+  const sourceNames = ["pexels", "pixabay"] as const;
 
   results.forEach((result, i) => {
     const name = sourceNames[i];
     if (result.status === "fulfilled" && result.value.images.length > 0) {
       bySource.push(result.value.images);
       sources![name] = result.value.images.length;
+      totalFromApis += result.value.total;
     } else if (result.status === "fulfilled" && result.value.images.length === 0) {
       if (name === "pexels" && !hasPexels) errors![name] = "API key not set";
       else if (name === "pixabay" && !hasPixabay) errors![name] = "API key not set";
-      else if (name === "unsplash" && !hasUnsplash) errors![name] = "API key not set";
       else errors![name] = "No results";
     } else if (result.status === "rejected") {
       errors![name] = result.reason?.message ?? "Request failed";
     }
   });
 
-  // Interleave results from multiple sources
   const interleaved: NormalizedStockImage[] = [];
   let idx = 0;
   while (interleaved.length < per) {
@@ -356,7 +365,178 @@ export async function searchStockImages(
   return {
     success: true,
     images: interleaved,
-    total: interleaved.length,
+    total: totalFromApis || interleaved.length,
+    page,
+    per_page: per,
+    sources,
+    errors: Object.keys(errors).length ? errors : undefined,
+  };
+}
+
+// --- Stock video search (Pexels, Pixabay, Coverr) ---
+
+async function searchPexelsVideos(
+  query: string,
+  page: number,
+  perPage: number
+): Promise<{ images: NormalizedStockImage[]; total: number }> {
+  const apiKey = process.env.PEXELS_API_KEY;
+  if (!apiKey) return { images: [], total: 0 };
+
+  const url = `https://api.pexels.com/videos/search?query=${encodeURIComponent(query)}&per_page=${perPage}&page=${page}`;
+  const response = await fetch(url, {
+    headers: { Authorization: apiKey },
+  });
+
+  if (!response.ok) throw new Error(`Pexels API error: ${response.status}`);
+
+  const data = (await response.json()) as {
+    videos?: Array<{
+      id: number;
+      image?: string;
+      video_files?: Array<{ link?: string; quality?: string }>;
+      video_pictures?: Array<{ picture?: string }>;
+      user?: { name?: string };
+    }>;
+    total_results?: number;
+  };
+
+  const images: NormalizedStockImage[] = (data.videos || []).map((v) => {
+    const file = v.video_files?.find((f) => f.quality === "hd" || f.quality === "sd") || v.video_files?.[0];
+    const picture = v.video_pictures?.[0]?.picture || v.image;
+    return {
+      id: `pexels-v-${v.id}`,
+      title: `Video by ${v.user?.name || "Pexels"}`,
+      thumbnail_url: picture,
+      preview_url: file?.link,
+      download_url: file?.link,
+      type: "video",
+    };
+  });
+
+  return { images, total: data.total_results ?? images.length };
+}
+
+async function searchPixabayVideos(
+  query: string,
+  page: number,
+  perPage: number
+): Promise<{ images: NormalizedStockImage[]; total: number }> {
+  const apiKey = process.env.PIXABAY_API_KEY;
+  if (!apiKey) return { images: [], total: 0 };
+
+  const params = new URLSearchParams({
+    key: apiKey,
+    q: query,
+    page: String(page),
+    per_page: String(perPage),
+    safesearch: "true",
+  });
+  const response = await fetch(`https://pixabay.com/api/videos/?${params.toString()}`);
+
+  if (!response.ok) throw new Error(`Pixabay API error: ${response.status}`);
+
+  const data = (await response.json()) as {
+    hits?: Array<{
+      id: number;
+      tags?: string;
+      user?: string;
+      videos?: {
+        medium?: { url?: string; thumbnail?: string };
+        small?: { url?: string; thumbnail?: string };
+        large?: { url?: string; thumbnail?: string };
+      };
+    }>;
+    total?: number;
+    totalHits?: number;
+  };
+
+  const images: NormalizedStockImage[] = (data.hits || []).map((hit) => {
+    const v = hit.videos?.medium || hit.videos?.small || hit.videos?.large;
+    return {
+      id: `pixabay-v-${hit.id}`,
+      title: hit.tags?.split(",")[0]?.trim() || `Video by ${hit.user || "Pixabay"}`,
+      thumbnail_url: v?.thumbnail,
+      preview_url: v?.url,
+      download_url: v?.url,
+      type: "video",
+    };
+  });
+
+  return { images, total: data.total ?? data.totalHits ?? images.length };
+}
+
+/**
+ * Search stock videos only (Pexels, Pixabay, Coverr). For video select modal.
+ */
+export async function searchStockVideos(
+  query: string,
+  page = 1,
+  perPage = 12
+): Promise<SearchStockVideosResult> {
+  const per = Math.min(perPage, 30);
+  const hasPexels = !!process.env.PEXELS_API_KEY;
+  const hasPixabay = !!process.env.PIXABAY_API_KEY;
+  const hasCoverr = !!process.env.COVERR_API_KEY;
+
+  if (!hasPexels && !hasPixabay && !hasCoverr) {
+    return {
+      success: true,
+      images: [],
+      total: 0,
+      page: 1,
+      per_page: per,
+      errors: { pexels: "API key not set", pixabay: "API key not set", coverr: "API key not set" },
+    };
+  }
+
+  const results = await Promise.allSettled([
+    hasPexels ? searchPexelsVideos(query.trim(), page, per) : Promise.resolve({ images: [] as NormalizedStockImage[], total: 0 }),
+    hasPixabay ? searchPixabayVideos(query.trim(), page, per) : Promise.resolve({ images: [] as NormalizedStockImage[], total: 0 }),
+    hasCoverr ? searchCoverr(query.trim(), page, per) : Promise.resolve({ images: [] as NormalizedStockImage[], total: 0 }),
+  ]);
+
+  const bySource: NormalizedStockImage[][] = [];
+  const sources: SearchStockVideosResult["sources"] = {};
+  const errors: SearchStockVideosResult["errors"] = {};
+  let totalFromApis = 0;
+  const sourceNames = ["pexels", "pixabay", "coverr"] as const;
+
+  results.forEach((result, i) => {
+    const name = sourceNames[i];
+    if (result.status === "fulfilled" && result.value.images.length > 0) {
+      bySource.push(result.value.images);
+      sources![name] = result.value.images.length;
+      totalFromApis += result.value.total;
+    } else if (result.status === "fulfilled" && result.value.images.length === 0) {
+      if (name === "pexels" && !hasPexels) errors![name] = "API key not set";
+      else if (name === "pixabay" && !hasPixabay) errors![name] = "API key not set";
+      else if (name === "coverr" && !hasCoverr) errors![name] = "API key not set";
+      else errors![name] = "No results";
+    } else if (result.status === "rejected") {
+      errors![name] = result.reason?.message ?? "Request failed";
+    }
+  });
+
+  const interleaved: NormalizedStockImage[] = [];
+  let idx = 0;
+  while (interleaved.length < per) {
+    let added = 0;
+    for (const list of bySource) {
+      if (list[idx]) {
+        interleaved.push(list[idx]);
+        added++;
+        if (interleaved.length >= per) break;
+      }
+    }
+    if (added === 0) break;
+    idx++;
+  }
+
+  return {
+    success: true,
+    images: interleaved,
+    total: totalFromApis || interleaved.length,
     page,
     per_page: per,
     sources,

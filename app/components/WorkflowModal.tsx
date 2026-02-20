@@ -65,6 +65,7 @@ function FetchBackgroundModal({
   onSelect: (url: string) => void;
 }) {
   const [query, setQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const stockFetcher = useFetcher<StockImagesResponse>();
 
   const isLoading = stockFetcher.state === "loading" || stockFetcher.state === "submitting";
@@ -74,13 +75,36 @@ function FetchBackgroundModal({
   const sources = data?.sources;
   const errors = data?.errors;
   const apiError = data && !data.success && "error" in data ? (data as { error?: string }).error : null;
+  const total = data?.success ? data.total : 0;
+  const perPage = data?.per_page ?? PER_PAGE;
+  const totalPages = Math.max(1, Math.ceil(total / perPage));
+  const displayPage = data?.success && data.page != null ? data.page : currentPage;
 
-  const handleSearch = () => {
+  const loadPage = (page: number) => {
     const q = query.trim();
     if (!q) return;
     stockFetcher.load(
-      `${STOCK_IMAGES_API}?${new URLSearchParams({ query: q, page: "1", per_page: "12" }).toString()}`
+      `${STOCK_IMAGES_API}?${new URLSearchParams({ query: q, page: String(page), per_page: String(PER_PAGE) }).toString()}`
     );
+  };
+
+  const handleSearch = () => {
+    setCurrentPage(1);
+    loadPage(1);
+  };
+
+  const handlePrev = () => {
+    if (displayPage <= 1) return;
+    const next = displayPage - 1;
+    setCurrentPage(next);
+    loadPage(next);
+  };
+
+  const handleNext = () => {
+    if (displayPage >= totalPages) return;
+    const next = displayPage + 1;
+    setCurrentPage(next);
+    loadPage(next);
   };
 
   const handleSelect = (img: (typeof images)[0]) => {
@@ -203,7 +227,7 @@ function FetchBackgroundModal({
           >
             {isDemo && (
               <span style={{ color: "var(--p-color-text-caution, #b98900)" }}>
-                No API keys set. Showing demo images. Add PEXELS_API_KEY, PIXABAY_API_KEY, and/or UNSPLASH_ACCESS_KEY in .env for real search.
+                No API keys set. Showing demo images. Add PEXELS_API_KEY and PIXABAY_API_KEY in .env for real search.
               </span>
             )}
             {!isDemo && (
@@ -214,20 +238,64 @@ function FetchBackgroundModal({
                 {sources?.pixabay != null && (
                   <span>Pixabay: {sources.pixabay} image{sources.pixabay !== 1 ? "s" : ""}</span>
                 )}
-                {sources?.unsplash != null && (
-                  <span>Unsplash: {sources.unsplash} image{sources.unsplash !== 1 ? "s" : ""}</span>
-                )}
                 {errors?.pexels && (
                   <span style={{ color: "var(--p-color-text-critical, #d72c0d)" }}>Pexels: {errors.pexels}</span>
                 )}
                 {errors?.pixabay && (
                   <span style={{ color: "var(--p-color-text-critical, #d72c0d)" }}>Pixabay: {errors.pixabay}</span>
                 )}
-                {errors?.unsplash && (
-                  <span style={{ color: "var(--p-color-text-critical, #d72c0d)" }}>Unsplash: {errors.unsplash}</span>
-                )}
               </>
             )}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {data?.success && total > 0 && (
+          <div
+            style={{
+              padding: "8px 20px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "12px",
+              borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+            }}
+          >
+            <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>
+              Page {displayPage} of {totalPages} ({total} result{total !== 1 ? "s" : ""})
+            </span>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                type="button"
+                onClick={handlePrev}
+                disabled={displayPage <= 1 || isLoading}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: "6px",
+                  border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                  background: "transparent",
+                  cursor: displayPage <= 1 || isLoading ? "not-allowed" : "pointer",
+                  fontSize: "14px",
+                }}
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={handleNext}
+                disabled={displayPage >= totalPages || isLoading}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: "6px",
+                  border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                  background: "transparent",
+                  cursor: displayPage >= totalPages || isLoading ? "not-allowed" : "pointer",
+                  fontSize: "14px",
+                }}
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
 
@@ -272,6 +340,295 @@ function FetchBackgroundModal({
               <img
                 src={img.thumbnail_url || img.preview_url || img.download_url}
                 alt={img.title}
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+              />
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FetchVideoModal({
+  open,
+  onClose,
+  onSelect,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSelect: (url: string) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const stockFetcher = useFetcher<StockVideosResponse>();
+
+  const isLoading = stockFetcher.state === "loading" || stockFetcher.state === "submitting";
+  const data = stockFetcher.data;
+  const videos = data?.success ? data.images : [];
+  const sources = data?.sources;
+  const errors = data?.errors;
+  const apiError = data && !data.success && "error" in data ? (data as { error?: string }).error : null;
+  const total = data?.success ? data.total : 0;
+  const perPage = data?.per_page ?? PER_PAGE;
+  const totalPages = Math.max(1, Math.ceil(total / perPage));
+  const displayPage = data?.success && data.page != null ? data.page : currentPage;
+
+  const loadPage = (page: number) => {
+    const q = query.trim();
+    if (!q) return;
+    stockFetcher.load(
+      `${STOCK_VIDEOS_API}?${new URLSearchParams({ query: q, page: String(page), per_page: String(PER_PAGE) }).toString()}`
+    );
+  };
+
+  const handleSearch = () => {
+    setCurrentPage(1);
+    loadPage(1);
+  };
+
+  const handlePrev = () => {
+    if (displayPage <= 1) return;
+    const next = displayPage - 1;
+    setCurrentPage(next);
+    loadPage(next);
+  };
+
+  const handleNext = () => {
+    if (displayPage >= totalPages) return;
+    const next = displayPage + 1;
+    setCurrentPage(next);
+    loadPage(next);
+  };
+
+  const handleSelect = (item: (typeof videos)[0]) => {
+    const url = item.preview_url || item.download_url;
+    if (url) {
+      onSelect(url);
+      onClose();
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1100,
+        background: "rgba(0,0,0,0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px",
+      }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        style={{
+          background: "var(--p-color-bg-surface, #fff)",
+          borderRadius: "16px",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+          maxWidth: "520px",
+          width: "100%",
+          maxHeight: "85vh",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          style={{
+            padding: "16px 20px",
+            borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 600 }}>Select stock video</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              padding: "8px",
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
+              fontSize: "20px",
+              lineHeight: 1,
+              color: "#5c5f62",
+            }}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        <div style={{ padding: "12px 20px", display: "flex", gap: "8px", alignItems: "center" }}>
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            placeholder="Search videos (e.g. nature, office)"
+            style={{
+              flex: 1,
+              padding: "10px 12px",
+              borderRadius: "8px",
+              border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+              fontSize: "14px",
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleSearch}
+            disabled={!query.trim() || isLoading}
+            style={{
+              padding: "10px 20px",
+              borderRadius: "8px",
+              border: "none",
+              background: isLoading ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
+              color: "#fff",
+              fontWeight: 600,
+              cursor: !query.trim() || isLoading ? "not-allowed" : "pointer",
+            }}
+          >
+            {isLoading ? "Searching…" : "Search"}
+          </button>
+        </div>
+
+        {apiError && (
+          <div style={{ padding: "8px 20px", fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>
+            {apiError}
+          </div>
+        )}
+
+        {(sources || errors) && !apiError && (
+          <div
+            style={{
+              padding: "8px 20px",
+              fontSize: "12px",
+              color: "var(--p-color-text-subdued, #6d7175)",
+              borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: "8px",
+            }}
+          >
+            {sources?.pexels != null && (
+              <span>Pexels: {sources.pexels} video{sources.pexels !== 1 ? "s" : ""}</span>
+            )}
+            {sources?.pixabay != null && (
+              <span>Pixabay: {sources.pixabay} video{sources.pixabay !== 1 ? "s" : ""}</span>
+            )}
+            {sources?.coverr != null && (
+              <span>Coverr: {sources.coverr} video{sources.coverr !== 1 ? "s" : ""}</span>
+            )}
+            {errors?.pexels && (
+              <span style={{ color: "var(--p-color-text-critical, #d72c0d)" }}>Pexels: {errors.pexels}</span>
+            )}
+            {errors?.pixabay && (
+              <span style={{ color: "var(--p-color-text-critical, #d72c0d)" }}>Pixabay: {errors.pixabay}</span>
+            )}
+            {errors?.coverr && (
+              <span style={{ color: "var(--p-color-text-critical, #d72c0d)" }}>Coverr: {errors.coverr}</span>
+            )}
+          </div>
+        )}
+
+        {data?.success && total > 0 && (
+          <div
+            style={{
+              padding: "8px 20px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "12px",
+              borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+            }}
+          >
+            <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>
+              Page {displayPage} of {totalPages} ({total} result{total !== 1 ? "s" : ""})
+            </span>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                type="button"
+                onClick={handlePrev}
+                disabled={displayPage <= 1 || isLoading}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: "6px",
+                  border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                  background: "transparent",
+                  cursor: displayPage <= 1 || isLoading ? "not-allowed" : "pointer",
+                  fontSize: "14px",
+                }}
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                onClick={handleNext}
+                disabled={displayPage >= totalPages || isLoading}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: "6px",
+                  border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                  background: "transparent",
+                  cursor: displayPage >= totalPages || isLoading ? "not-allowed" : "pointer",
+                  fontSize: "14px",
+                }}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div
+          style={{
+            padding: "16px 20px",
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: "12px",
+            overflow: "auto",
+            minHeight: "120px",
+          }}
+        >
+          {isLoading && videos.length === 0 && (
+            <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "24px", color: "var(--p-color-text-subdued, #6d7175)" }}>
+              Searching…
+            </div>
+          )}
+          {!isLoading && videos.length === 0 && data !== undefined && (
+            <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "24px", color: "var(--p-color-text-subdued, #6d7175)" }}>
+              No videos found. Try another search or check API keys (PEXELS_API_KEY, PIXABAY_API_KEY, COVERR_API_KEY).
+            </div>
+          )}
+          {videos.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => handleSelect(item)}
+              style={{
+                aspectRatio: "16/9",
+                padding: 0,
+                border: "2px solid var(--p-color-border-secondary, #e1e3e5)",
+                borderRadius: "8px",
+                overflow: "hidden",
+                cursor: "pointer",
+                background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <img
+                src={item.thumbnail_url || item.preview_url}
+                alt={item.title}
                 style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
               />
             </button>
@@ -562,6 +919,8 @@ export function WorkflowModal({
 
 const VIDEO_API = "/app/api/video";
 const STOCK_IMAGES_API = "/app/api/stock/images";
+const STOCK_VIDEOS_API = "/app/api/stock/videos";
+const PER_PAGE = 12;
 
 /** Response shape from GET /app/api/stock/images (for FetchBackgroundModal) */
 interface StockImagesResponse {
@@ -578,9 +937,12 @@ interface StockImagesResponse {
   page: number;
   per_page: number;
   source?: "demo";
-  sources?: { pexels?: number; pixabay?: number; unsplash?: number };
-  errors?: { pexels?: string; pixabay?: string; unsplash?: string };
+  sources?: { pexels?: number; pixabay?: number; coverr?: number };
+  errors?: { pexels?: string; pixabay?: string; coverr?: string };
 }
+
+/** Same shape for video search (FetchVideoModal) */
+type StockVideosResponse = StockImagesResponse;
 
 function Scene1Content({ productImages: productImagesProp, onComplete }: { productImages: ProductImageItem[]; onComplete?: () => void }) {
   const [step, setStep] = useState(1);
@@ -905,11 +1267,10 @@ function Scene2Content({ productImages: productImagesProp, onComplete }: { produ
   const [bgRemoved, setBgRemoved] = useState<string | null>(null);
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
   const [bgRemovedError, setBgRemovedError] = useState<string | null>(null);
-  const [selectedVideoSlot, setSelectedVideoSlot] = useState<number | null>(null);
+  const [videoModalOpen, setVideoModalOpen] = useState(false);
+  const [selectedStockVideoUrl, setSelectedStockVideoUrl] = useState<string | null>(null);
   const [sceneVideo, setSceneVideo] = useState<string | null>(null);
   const [sceneLoading, setSceneLoading] = useState(false);
-
-  const videoSlots = [1, 2, 3, 4, 5, 6];
 
   const removeBgFetcher = useFetcher<{ ok: boolean; url?: string; error?: string }>();
 
@@ -1028,26 +1389,48 @@ function Scene2Content({ productImages: productImagesProp, onComplete }: { produ
             step={2}
             total={2}
             title="Select stock video & generate scene"
-            description="Pick a stock video from Pexels, Pixabay, or Coverr as the background. Then click Generate video to composite your subject onto it and create the scene (~8s)."
+            description="Search and pick a stock video from Pexels, Pixabay, or Coverr as the background. Then click Generate video to composite your subject onto it and create the scene (~8s)."
           />
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px" }}>
-            {videoSlots.map((slot) => (
-              <button
-                key={slot}
-                type="button"
-                onClick={() => setSelectedVideoSlot(slot)}
-                style={{
-                  ...boxStyle,
-                  minHeight: "100px",
-                  cursor: "pointer",
-                  borderColor: selectedVideoSlot === slot ? "var(--p-color-border-info, #2c6ecb)" : undefined,
-                  borderWidth: selectedVideoSlot === slot ? "2px" : "1px",
-                }}
-              >
-                <span style={{ fontSize: "14px", color: "#6d7175" }}>Video slot {slot}</span>
-              </button>
-            ))}
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <button
+              type="button"
+              onClick={() => setVideoModalOpen(true)}
+              style={{
+                ...boxStyle,
+                minHeight: "60px",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              {selectedStockVideoUrl ? (
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <video
+                    src={selectedStockVideoUrl}
+                    style={{ width: "120px", height: "68px", objectFit: "cover", borderRadius: "6px" }}
+                    muted
+                    playsInline
+                  />
+                  <span style={{ fontSize: "14px", color: "var(--p-color-text-primary, #202223)" }}>Stock video selected</span>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); setVideoModalOpen(true); }}
+                    style={{ padding: "4px 8px", fontSize: "12px", borderRadius: "4px", border: "1px solid #e1e3e5", background: "#fff", cursor: "pointer" }}
+                  >
+                    Change
+                  </button>
+                </div>
+              ) : (
+                <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Search stock videos (Pexels, Pixabay, Coverr)</span>
+              )}
+            </button>
           </div>
+          <FetchVideoModal
+            open={videoModalOpen}
+            onClose={() => setVideoModalOpen(false)}
+            onSelect={(url) => { setSelectedStockVideoUrl(url); setVideoModalOpen(false); }}
+          />
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             {sceneLoading ? (
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
@@ -1060,15 +1443,15 @@ function Scene2Content({ productImages: productImagesProp, onComplete }: { produ
               <button
                 type="button"
                 onClick={handleGenerateVideo}
-                disabled={selectedVideoSlot === null}
+                disabled={!selectedStockVideoUrl}
                 style={{
                   padding: "10px 20px",
                   borderRadius: "8px",
                   border: "none",
-                  background: selectedVideoSlot === null ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
+                  background: !selectedStockVideoUrl ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
                   color: "#fff",
                   fontWeight: 600,
-                  cursor: selectedVideoSlot === null ? "not-allowed" : "pointer",
+                  cursor: !selectedStockVideoUrl ? "not-allowed" : "pointer",
                 }}
               >
                 Generate video
