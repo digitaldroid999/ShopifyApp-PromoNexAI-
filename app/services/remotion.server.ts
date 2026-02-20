@@ -57,6 +57,8 @@ export async function startShopifyVideo(
       signal: AbortSignal.timeout(15000),
     });
 
+    console.log( res ) ;
+
     const text = await res.text();
     let data: { taskId?: string; status?: string; error?: string };
     try {
