@@ -1768,7 +1768,9 @@ function Scene2Content({
       const data = await res.json().catch(() => ({}));
       const taskId = data.taskId;
       if (!taskId) {
-        setSceneError(data.error ?? "Failed to start video generation");
+        const errMsg = typeof data.error === "string" ? data.error : !res.ok ? `Server error ${res.status}` : "Failed to start video generation";
+        console.warn("[Scene2] Generate video start failed:", { status: res.status, data, error: errMsg });
+        setSceneError(errMsg);
         setSceneLoading(false);
         return;
       }

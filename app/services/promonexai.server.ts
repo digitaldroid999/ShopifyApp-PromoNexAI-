@@ -147,7 +147,7 @@ export async function mergeVideoStart(
       signal: AbortSignal.timeout(30000),
     });
     const raw = await response.text();
-    let data: { task_id?: string; status?: string; message?: string } = {};
+    let data: { task_id?: string; id?: string; status?: string; message?: string } = {};
     try {
       data = raw ? JSON.parse(raw) : {};
     } catch {
@@ -157,9 +157,12 @@ export async function mergeVideoStart(
       const err = data.message ?? raw?.slice(0, 200) ?? response.statusText;
       return { ok: false, error: String(err) };
     }
-    const task_id = typeof data.task_id === "string" ? data.task_id.trim() : "";
+    // Backend may return task_id or id
+    const task_id =
+      (typeof data.task_id === "string" ? data.task_id.trim() : "") ||
+      (typeof data.id === "string" ? data.id.trim() : "");
     if (!task_id) {
-      return { ok: false, error: "Backend did not return task_id" };
+      return { ok: false, error: "Backend did not return task_id or id" };
     }
     return { ok: true, task_id, status: data.status ?? "pending" };
   } catch (e) {

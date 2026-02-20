@@ -39,6 +39,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const background_video_url = body.background_video_url;
     const scene_id = body.scene_id;
     const user_id = body.user_id ?? "anonymous";
+    const LOG = "[app.api.video] [Scene2 start]";
+    console.log(`${LOG} request: scene_id=${scene_id} user_id=${user_id} product_image_url=${product_image_url?.slice(0, 60)}... background_video_url=${background_video_url?.slice(0, 60)}...`);
+
     if (!product_image_url || typeof product_image_url !== "string") {
       return Response.json({ error: "Missing or invalid product_image_url" }, { status: 400 });
     }
@@ -48,15 +51,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (!scene_id || typeof scene_id !== "string") {
       return Response.json({ error: "Missing or invalid scene_id" }, { status: 400 });
     }
+
+    // Ensure scene exists so we have shortId for Task (required FK)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const prismaAny = prisma as any;
+    const scene = await prismaAny.videoScene.findUnique({ where: { id: scene_id }, select: { shortId: true } });
+    if (!scene?.shortId) {
+      console.warn(`${LOG} Scene not found or missing shortId: scene_id=${scene_id}`);
+      return Response.json({ error: "Scene not found. Please reopen the workflow and try again." }, { status: 400 });
+    }
+    const shortId = scene.shortId;
+
+    console.log(`${LOG} Calling backend merge-video/start...`);
     const result = await mergeVideoStart(product_image_url, background_video_url, scene_id, user_id);
     if (!result.ok) {
+      console.warn(`${LOG} Backend start failed: ${result.error}`);
       return Response.json({ error: result.error }, { status: 200 });
     }
+    console.log(`${LOG} Backend returned task_id=${result.task_id} status=${result.status}`);
+
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const prismaAny = prisma as any;
-      const scene = await prismaAny.videoScene.findUnique({ where: { id: scene_id }, select: { shortId: true } });
-      const shortId = scene?.shortId ?? null;
       const task = await prismaAny.task.create({
         data: {
           remotionTaskId: result.task_id,
@@ -68,9 +82,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           metadata: { type: "scene2_merge" },
         },
       });
+      console.log(`${LOG} Task created: id=${task.id} remotionTaskId=${result.task_id}`);
       return Response.json({ taskId: task.id, status: "pending" });
     } catch (err) {
-      console.error("[app.api.video] mergeVideo start: failed to create Task:", err);
+      console.error(`${LOG} Failed to create Task:`, err);
       return Response.json({ error: "Failed to create task" }, { status: 500 });
     }
   }
