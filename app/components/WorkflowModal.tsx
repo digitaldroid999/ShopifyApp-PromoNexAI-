@@ -1086,6 +1086,8 @@ async function parseCompositeApiResponse(
       ? ((data as { data: CompositeApiPayload }).data)
       : (data as CompositeApiPayload);
 
+  console.log("[Composite] API response:", { status: res.status, payload: obj });
+
   const success = obj.success === true;
   const imageUrl = typeof obj.image_url === "string" ? obj.image_url.trim() : "";
   if (success && imageUrl.length > 0) {
@@ -1272,6 +1274,7 @@ function Scene1Content({
         body: JSON.stringify(payload),
       });
       const result = await parseCompositeApiResponse(res);
+      console.log(`[Composite] ${sceneLabel}: parsed result`, result);
       if (result.ok) {
         setComposited(result.image_url);
         console.log(`[Composite] ${sceneLabel}: success → composited image URL:`, result.image_url);
@@ -1889,6 +1892,7 @@ function Scene3Content({
         body: JSON.stringify(payload),
       });
       const result = await parseCompositeApiResponse(res);
+      console.log(`[Composite] ${sceneLabel}: parsed result`, result);
       if (result.ok) {
         setComposited(result.image_url);
         console.log(`[Composite] ${sceneLabel}: success → composited image URL:`, result.image_url);
