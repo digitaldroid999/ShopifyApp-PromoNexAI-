@@ -1051,6 +1051,53 @@ const COMPOSITE_API = "/app/api/image/composite";
 const SHORTS_API = "/app/api/shorts";
 const PER_PAGE = 12;
 
+/** Matches server CompositeImagesResult: success, image_url, error, message, created_at */
+type CompositeApiPayload = {
+  success?: boolean;
+  image_url?: string | null;
+  error?: string | null;
+  message?: string;
+  created_at?: string;
+};
+
+/**
+ * Parses the composite API response to match the server contract (composite.server.ts).
+ * Accepts raw JSON body or envelope like { data: { success, image_url, ... } }.
+ */
+async function parseCompositeApiResponse(
+  res: Response
+): Promise<{ ok: true; image_url: string } | { ok: false; error: string }> {
+  let raw: string;
+  try {
+    raw = await res.text();
+  } catch {
+    return { ok: false, error: "Failed to read response" };
+  }
+  const toParse = (raw ?? "").replace(/^\uFEFF/, "").trim();
+  let data: unknown;
+  try {
+    data = toParse ? JSON.parse(toParse) : {};
+  } catch {
+    console.error("[Composite] Response is not JSON. Status:", res.status, "Raw (first 200 chars):", raw.slice(0, 200));
+    return { ok: false, error: "Server returned invalid response. Try again." };
+  }
+  const obj: CompositeApiPayload =
+    data && typeof data === "object" && "data" in data && (data as { data?: CompositeApiPayload }).data != null
+      ? ((data as { data: CompositeApiPayload }).data)
+      : (data as CompositeApiPayload);
+
+  const success = obj.success === true;
+  const imageUrl = typeof obj.image_url === "string" ? obj.image_url.trim() : "";
+  if (success && imageUrl.length > 0) {
+    return { ok: true, image_url: imageUrl };
+  }
+  const errorMessage =
+    (typeof obj.error === "string" && obj.error) ||
+    (typeof obj.message === "string" && obj.message) ||
+    "Compositing failed";
+  return { ok: false, error: errorMessage };
+}
+
 /** Serializable workflow state for temp save/restore (matches server WorkflowTempState) */
 export type WorkflowTempState = {
   activeTab: "scene1" | "scene2" | "scene3";
@@ -1224,23 +1271,13 @@ function Scene1Content({
         },
         body: JSON.stringify(payload),
       });
-      const rawText = await res.text();
-      let data: { success?: boolean; image_url?: string | null; error?: string | null; message?: string } = {};
-      try {
-        const toParse = (rawText ?? "").replace(/^\uFEFF/, "").trim();
-        data = toParse ? JSON.parse(toParse) : {};
-      } catch (parseErr) {
-        console.error(`[Composite] ${sceneLabel}: response is not JSON (status ${res.status}). Raw (first 200 chars):`, rawText.slice(0, 200));
-        setCompositeError("Server returned invalid response. Try again.");
-        return;
-      }
-      console.log(`[Composite] ${sceneLabel}: API response (status ${res.status})`, data);
-      if (data.success && data.image_url) {
-        setComposited(data.image_url);
-        console.log(`[Composite] ${sceneLabel}: success → composited image URL:`, data.image_url);
+      const result = await parseCompositeApiResponse(res);
+      if (result.ok) {
+        setComposited(result.image_url);
+        console.log(`[Composite] ${sceneLabel}: success → composited image URL:`, result.image_url);
       } else {
-        setCompositeError(data.error ?? data.message ?? "Compositing failed");
-        console.warn(`[Composite] ${sceneLabel}: failed`, data.error ?? data.message);
+        setCompositeError(result.error);
+        console.warn(`[Composite] ${sceneLabel}: failed`, result.error);
       }
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : "Compositing failed";
@@ -1851,23 +1888,13 @@ function Scene3Content({
         },
         body: JSON.stringify(payload),
       });
-      const rawText = await res.text();
-      let data: { success?: boolean; image_url?: string | null; error?: string | null; message?: string } = {};
-      try {
-        const toParse = (rawText ?? "").replace(/^\uFEFF/, "").trim();
-        data = toParse ? JSON.parse(toParse) : {};
-      } catch (parseErr) {
-        console.error(`[Composite] ${sceneLabel}: response is not JSON (status ${res.status}). Raw (first 200 chars):`, rawText.slice(0, 200));
-        setCompositeError("Server returned invalid response. Try again.");
-        return;
-      }
-      console.log(`[Composite] ${sceneLabel}: API response (status ${res.status})`, data);
-      if (data.success && data.image_url) {
-        setComposited(data.image_url);
-        console.log(`[Composite] ${sceneLabel}: success → composited image URL:`, data.image_url);
+      const result = await parseCompositeApiResponse(res);
+      if (result.ok) {
+        setComposited(result.image_url);
+        console.log(`[Composite] ${sceneLabel}: success → composited image URL:`, result.image_url);
       } else {
-        setCompositeError(data.error ?? data.message ?? "Compositing failed");
-        console.warn(`[Composite] ${sceneLabel}: failed`, data.error ?? data.message);
+        setCompositeError(result.error);
+        console.warn(`[Composite] ${sceneLabel}: failed`, result.error);
       }
     } catch (e) {
       const errMsg = e instanceof Error ? e.message : "Compositing failed";
