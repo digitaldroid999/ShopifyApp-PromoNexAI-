@@ -1037,7 +1037,9 @@ export function WorkflowModal({
                 <Scene3Content
                   productImages={productImages}
                   productId={productId ?? undefined}
+                  product={product ?? undefined}
                   sceneId={shortInfo?.scene3Id ?? undefined}
+                  shortId={shortInfo?.shortId ?? undefined}
                   shortUserId={shortInfo?.userId ?? undefined}
                   initialScene3={restoredState?.scene3}
                   onScene3Change={setScene3Snapshot}
@@ -1968,7 +1970,9 @@ type Scene3State = WorkflowTempState["scene3"];
 function Scene3Content({
   productImages: productImagesProp,
   productId,
+  product: productProp,
   sceneId: videoSceneId,
+  shortId,
   shortUserId,
   initialScene3,
   onScene3Change,
@@ -1976,7 +1980,9 @@ function Scene3Content({
 }: {
   productImages: ProductImageItem[];
   productId?: string | null;
+  product?: WorkflowProduct | null;
   sceneId?: string | null;
+  shortId?: string | null;
   shortUserId?: string | null;
   initialScene3?: Scene3State | null;
   onScene3Change?: (s: Scene3State) => void;
@@ -1996,6 +2002,8 @@ function Scene3Content({
   const [compositeError, setCompositeError] = useState<string | null>(null);
   const [sceneVideo, setSceneVideo] = useState<string | null>(initialScene3?.sceneVideo ?? null);
   const [sceneLoading, setSceneLoading] = useState(false);
+  const [sceneError, setSceneError] = useState<string | null>(null);
+  const [sceneProgress, setSceneProgress] = useState<number | null>(null);
 
   useEffect(() => {
     onScene3Change?.({
@@ -2096,13 +2104,75 @@ function Scene3Content({
     }
   };
 
-  const handleGenerateScene = () => {
+  const handleGenerateScene = async () => {
+    if (!composited) return;
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const fullImageUrl = composited.startsWith("http") ? composited : `${origin}${composited}`;
+    if (!shortId || !shortUserId) {
+      setSceneError("Short not loaded. Please close and reopen the workflow.");
+      return;
+    }
+    setSceneError(null);
+    setSceneProgress(0);
     setSceneLoading(true);
-    setTimeout(() => {
-      setSceneVideo(`${BASE}/scene3-video.mp4`);
+    try {
+      const startRes = await fetch(REMOTION_START_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          shortId,
+          sceneId: videoSceneId ?? undefined,
+          imageUrl: fullImageUrl,
+          template: "product-minimal-v1",
+          product: {
+            name: productProp?.name ?? "Product",
+            price: productProp?.price ?? "$0.00",
+            rating: productProp?.rating ?? 0,
+          },
+        }),
+      });
+      const startData = await startRes.json().catch(() => ({}));
+      const taskId = startData.taskId;
+      if (!taskId) {
+        setSceneError(startData.error ?? "Failed to start video generation");
+        setSceneLoading(false);
+        return;
+      }
+      let done = false;
+      for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        const pollRes = await fetch(`${TASKS_API_BASE}/${encodeURIComponent(taskId)}`, {
+          credentials: "include",
+          cache: "no-store",
+          headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
+        });
+        const task = await pollRes.json().catch(() => ({}));
+        setSceneProgress(task.progress ?? null);
+        if (task.status === "completed" && (task.videoUrl ?? task.video_url)) {
+          const rawUrl = task.videoUrl ?? task.video_url;
+          const videoUrl = typeof rawUrl === "string" && rawUrl.startsWith("http") ? rawUrl : `${origin}${rawUrl}`;
+          setSceneVideo(videoUrl);
+          setSceneError(null);
+          onComplete?.();
+          done = true;
+          break;
+        }
+        if (task.status === "failed") {
+          setSceneError(task.error ?? "Video generation failed");
+          done = true;
+          break;
+        }
+      }
+      if (!done) {
+        setSceneError("Video generation timed out. Please try again.");
+      }
+    } catch (e) {
+      setSceneError(e instanceof Error ? e.message : "Video generation failed");
+    } finally {
       setSceneLoading(false);
-      onComplete?.();
-    }, 2000);
+      setSceneProgress(null);
+    }
   };
 
   const handleNextStepAfterComposite = async () => {
@@ -2333,6 +2403,9 @@ function Scene3Content({
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
                   <span className="spinner" style={{ width: 32, height: 32, border: "3px solid #e1e3e5", borderTopColor: "#2c6ecb", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
                   <span style={{ fontSize: "14px", color: "#6d7175" }}>Generating scene video…</span>
+                  {sceneProgress != null && (
+                    <span style={{ fontSize: "12px", color: "#6d7175" }}>{sceneProgress}%</span>
+                  )}
                 </div>
               ) : sceneVideo ? (
                 <video src={sceneVideo} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
@@ -2340,14 +2413,15 @@ function Scene3Content({
                 <button
                   type="button"
                   onClick={handleGenerateScene}
+                  disabled={!composited || !shortId || !shortUserId}
                   style={{
                     padding: "12px 24px",
                     borderRadius: "8px",
                     border: "none",
-                    background: "var(--p-color-bg-fill-info, #2c6ecb)",
+                    background: !composited || !shortId ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
                     color: "#fff",
                     fontWeight: 600,
-                    cursor: "pointer",
+                    cursor: !composited || !shortId ? "not-allowed" : "pointer",
                   }}
                 >
                   Generate scene
@@ -2355,6 +2429,9 @@ function Scene3Content({
               )}
             </div>
           </div>
+          {sceneError && (
+            <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{sceneError}</span>
+          )}
         </>
       )}
     </div>

@@ -36,9 +36,10 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   if (!isTerminal) {
     // Scene 2 merge: poll backend merge-video/tasks/{task_id}
     if (isScene2MergeTask(task)) {
+      console.log(`${LOG_PREFIX} [Scene2 polling] taskId=${taskId} backendTaskId=${task.remotionTaskId} → GET merge-video/tasks/${task.remotionTaskId}`);
       const mergeStatus = await mergeVideoTaskStatus(task.remotionTaskId);
       if (mergeStatus) {
-        console.log(`${LOG_PREFIX} Scene2 merge task ${task.remotionTaskId} → status=${mergeStatus.status}`);
+        console.log(`${LOG_PREFIX} [Scene2 polling] backend response: status=${mergeStatus.status} video_url=${mergeStatus.video_url ?? "-"} error_message=${mergeStatus.error_message ?? "-"}`);
 
         const updates: { status: string; videoUrl?: string | null; error?: string | null } = {
           status: mergeStatus.status,
@@ -63,17 +64,21 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
               where: { id: task.videoSceneId },
               data: { generatedVideoUrl: mergeStatus.video_url, status: "ready" },
             });
-            console.log(`${LOG_PREFIX} Scene2 merge completed. Saved generated_video_url to VideoScene ${task.videoSceneId}`);
+            console.log(`${LOG_PREFIX} [Scene2 polling] completed. Saved generated_video_url to VideoScene ${task.videoSceneId} → ${mergeStatus.video_url}`);
           } catch (e) {
-            console.error(`${LOG_PREFIX} Failed to update VideoScene (scene2):`, e);
+            console.error(`${LOG_PREFIX} [Scene2 polling] Failed to update VideoScene:`, e);
           }
+        } else if (mergeStatus.status === "failed") {
+          console.log(`${LOG_PREFIX} [Scene2 polling] failed: ${mergeStatus.error_message ?? "unknown"}`);
         }
 
+        console.log(`${LOG_PREFIX} [Scene2 polling] returning: status=${updated.status} videoUrl=${updated.videoUrl ?? "-"}`);
         return Response.json(
           { id: updated.id, status: updated.status, stage: updated.stage, progress: updated.progress, videoUrl: updated.videoUrl, error: updated.error },
           { headers: { "Content-Type": "application/json", "Cache-Control": "no-store, no-cache, must-revalidate", Pragma: "no-cache" } }
         );
       }
+      console.warn(`${LOG_PREFIX} [Scene2 polling] mergeVideoTaskStatus returned null for backendTaskId=${task.remotionTaskId}`);
     }
 
     // Remotion (e.g. scene 1): poll Remotion API

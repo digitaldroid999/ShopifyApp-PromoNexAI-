@@ -17,6 +17,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     shortId?: string;
     sceneId?: string;
     imageUrl?: string;
+    template?: string;
     product?: { name?: string; price?: string; rating?: number };
   };
   try {
@@ -28,6 +29,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const shortId = body.shortId?.trim();
   const sceneId = body.sceneId?.trim();
   const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl.trim() : "";
+  const template = typeof body.template === "string" && body.template.trim() ? body.template.trim() : DEFAULT_TEMPLATE;
   const product = body.product;
   const name = typeof product?.name === "string" ? product.name.trim() : "Product";
   const price = typeof product?.price === "string" ? product.price : "$0.00";
@@ -43,7 +45,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const user_id = session?.shop ?? "anonymous";
 
   const result = await startShopifyVideo({
-    template: DEFAULT_TEMPLATE,
+    template,
     imageUrl,
     product: { name, price, rating },
     user_id,
@@ -64,7 +66,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         status: "pending",
         stage: "queued",
         progress: 0,
-        metadata: { template: DEFAULT_TEMPLATE, product: { name, price, rating }, imageUrl },
+        metadata: { template, product: { name, price, rating }, imageUrl },
       },
     });
     return Response.json(
