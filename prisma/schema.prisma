@@ -9,8 +9,8 @@ generator client {
 // enough when changing adapters.
 // See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
-  provider = "sqlite"
-  url      = "file:dev.sqlite"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model Session {
@@ -88,4 +88,17 @@ model AudioInfo {
   short Short @relation(fields: [shortId], references: [id], onDelete: Cascade)
 
   @@map("audio_info")
+}
+
+// Temporary state for "Create promo video" modal — saved while generation is in progress, deleted when done
+model PromoWorkflowTemp {
+  id        String   @id @default(cuid())
+  shop      String
+  productId String   @map("product_id")
+  state     Json     // serialized workflow state (activeTab, scene completion, per-scene step/urls)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([shop, productId])
+  @@map("promo_workflow_temp")
 }

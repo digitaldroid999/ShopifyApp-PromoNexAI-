@@ -128,6 +128,7 @@ export default function ProductDetail() {
       {workflowOpen && (
         <WorkflowModal
           isSample={isSample}
+          productId={product.id}
           productImages={productImagesForWorkflow}
           onClose={() => setWorkflowOpen(false)}
           onDone={(videoUrl) => setProductVideoUrl(videoUrl)}

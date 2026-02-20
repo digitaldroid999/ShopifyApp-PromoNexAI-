@@ -644,6 +644,7 @@ export function WorkflowModal({
   onDone,
   isSample,
   productImages: productImagesProp,
+  productId,
 }: {
   onClose: () => void;
   /** Called when user clicks Done after viewing the final video; pass the final video URL to add to product */
@@ -651,19 +652,86 @@ export function WorkflowModal({
   isSample: boolean;
   /** Product images from the store (real product). When empty or not provided, mockup images are used (e.g. sample product). */
   productImages?: ProductImageItem[];
+  /** Product ID for temp save/restore (e.g. product.id). When set, workflow state is loaded on open and saved while in progress; temp is deleted when Done. */
+  productId?: string | null;
 }) {
   const productImages = productImagesProp?.length ? productImagesProp : defaultProductImages;
+  const firstImageId = productImages[0]?.id ?? "s1";
+
+  const loadTempFetcher = useFetcher<{ state: WorkflowTempState | null }>();
+  const saveTempFetcher = useFetcher();
+  const deleteTempFetcher = useFetcher();
+
+  const [loadedState, setLoadedState] = useState<WorkflowTempState | null | "pending">(null);
   const [activeTab, setActiveTab] = useState<"scene1" | "scene2" | "scene3">("scene1");
   const [scene1Complete, setScene1Complete] = useState(false);
   const [scene2Complete, setScene2Complete] = useState(false);
   const [scene3Complete, setScene3Complete] = useState(false);
   const [showingFinal, setShowingFinal] = useState(false);
-
-  const allScenesComplete = scene1Complete && scene2Complete && scene3Complete;
-
   const [scriptGenerated, setScriptGenerated] = useState(false);
   const [audioGenerated, setAudioGenerated] = useState(false);
   const [audioLoading, setAudioLoading] = useState(false);
+
+  const [scene1Snapshot, setScene1Snapshot] = useState<WorkflowTempState["scene1"] | null>(null);
+  const [scene2Snapshot, setScene2Snapshot] = useState<WorkflowTempState["scene2"] | null>(null);
+  const [scene3Snapshot, setScene3Snapshot] = useState<WorkflowTempState["scene3"] | null>(null);
+
+  const allScenesComplete = scene1Complete && scene2Complete && scene3Complete;
+
+  /** Restored state from temp (null while loading or when none saved) */
+  const restoredState: WorkflowTempState | null =
+    loadedState !== null && loadedState !== "pending" ? loadedState : null;
+
+  // Load temp when modal opens and we have productId
+  useEffect(() => {
+    if (productId?.trim() && loadTempFetcher.state === "idle" && !loadTempFetcher.data) {
+      setLoadedState("pending");
+      loadTempFetcher.load(`${WORKFLOW_TEMP_API}?productId=${encodeURIComponent(productId.trim())}`);
+    }
+  }, [productId, loadTempFetcher.state, loadTempFetcher.data]);
+
+  useEffect(() => {
+    if (loadTempFetcher.state !== "idle" || !loadTempFetcher.data) return;
+    const data = loadTempFetcher.data;
+    const state = data?.state ?? null;
+    setLoadedState(state);
+    if (state) {
+      setActiveTab(state.activeTab);
+      setScene1Complete(state.scene1Complete);
+      setScene2Complete(state.scene2Complete);
+      setScene3Complete(state.scene3Complete);
+      setShowingFinal(state.showingFinal);
+      setScriptGenerated(state.scriptGenerated);
+      setAudioGenerated(state.audioGenerated);
+      setScene1Snapshot(state.scene1);
+      setScene2Snapshot(state.scene2);
+      setScene3Snapshot(state.scene3);
+    }
+  }, [loadTempFetcher.state, loadTempFetcher.data]);
+
+  // Debounced save while workflow is in progress (skip while still loading temp)
+  useEffect(() => {
+    if (!productId?.trim() || loadedState === "pending") return;
+    const timer = setTimeout(() => {
+      const state: WorkflowTempState = {
+        activeTab,
+        scene1Complete,
+        scene2Complete,
+        scene3Complete,
+        showingFinal,
+        scriptGenerated,
+        audioGenerated,
+        scene1: scene1Snapshot ?? defaultScene1State(firstImageId),
+        scene2: scene2Snapshot ?? defaultScene2State(firstImageId),
+        scene3: scene3Snapshot ?? defaultScene3State(firstImageId),
+      };
+      saveTempFetcher.submit(
+        { productId: productId.trim(), state },
+        { method: "post", action: WORKFLOW_TEMP_API, encType: "application/json" }
+      );
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [productId, loadedState, activeTab, scene1Complete, scene2Complete, scene3Complete, showingFinal, scriptGenerated, audioGenerated, scene1Snapshot, scene2Snapshot, scene3Snapshot, firstImageId]);
 
   return (
     <div
@@ -733,6 +801,12 @@ export function WorkflowModal({
             <button
               type="button"
               onClick={() => {
+                if (productId?.trim()) {
+                  deleteTempFetcher.submit(null, {
+                    method: "delete",
+                    action: `${WORKFLOW_TEMP_API}?productId=${encodeURIComponent(productId.trim())}`,
+                  });
+                }
                 onDone?.(`${BASE}/final.mp4`);
                 onClose();
               }}
@@ -748,6 +822,10 @@ export function WorkflowModal({
             >
               Done
             </button>
+          </div>
+        ) : loadedState === "pending" ? (
+          <div style={{ padding: "48px 24px", textAlign: "center", color: "var(--p-color-text-subdued, #6d7175)" }}>
+            Restoring progress…
           </div>
         ) : (
           <>
@@ -900,14 +978,29 @@ export function WorkflowModal({
             )}
 
             <div style={{ padding: "20px", overflow: "auto", flex: 1 }}>
-              <div style={{ display: activeTab === "scene1" ? "block" : "none" }}>
-                <Scene1Content productImages={productImages} onComplete={() => setScene1Complete(true)} />
+              <div style={{ display: activeTab === "scene1" ? "block" : "none" }} key={`scene1-${restoredState?.scene1 ? "restored" : "default"}`}>
+                <Scene1Content
+                  productImages={productImages}
+                  initialScene1={restoredState?.scene1}
+                  onScene1Change={setScene1Snapshot}
+                  onComplete={() => setScene1Complete(true)}
+                />
               </div>
-              <div style={{ display: activeTab === "scene2" ? "block" : "none" }}>
-                <Scene2Content productImages={productImages} onComplete={() => setScene2Complete(true)} />
+              <div style={{ display: activeTab === "scene2" ? "block" : "none" }} key={`scene2-${restoredState?.scene2 ? "restored" : "default"}`}>
+                <Scene2Content
+                  productImages={productImages}
+                  initialScene2={restoredState?.scene2}
+                  onScene2Change={setScene2Snapshot}
+                  onComplete={() => setScene2Complete(true)}
+                />
               </div>
-              <div style={{ display: activeTab === "scene3" ? "block" : "none" }}>
-                <Scene3Content productImages={productImages} onComplete={() => setScene3Complete(true)} />
+              <div style={{ display: activeTab === "scene3" ? "block" : "none" }} key={`scene3-${restoredState?.scene3 ? "restored" : "default"}`}>
+                <Scene3Content
+                  productImages={productImages}
+                  initialScene3={restoredState?.scene3}
+                  onScene3Change={setScene3Snapshot}
+                  onComplete={() => setScene3Complete(true)}
+                />
               </div>
             </div>
           </>
@@ -920,7 +1013,46 @@ export function WorkflowModal({
 const VIDEO_API = "/app/api/video";
 const STOCK_IMAGES_API = "/app/api/stock/images";
 const STOCK_VIDEOS_API = "/app/api/stock/videos";
+const WORKFLOW_TEMP_API = "/app/api/promo-workflow-temp";
 const PER_PAGE = 12;
+
+/** Serializable workflow state for temp save/restore (matches server WorkflowTempState) */
+export type WorkflowTempState = {
+  activeTab: "scene1" | "scene2" | "scene3";
+  scene1Complete: boolean;
+  scene2Complete: boolean;
+  scene3Complete: boolean;
+  showingFinal: boolean;
+  scriptGenerated: boolean;
+  audioGenerated: boolean;
+  scene1: { step: number; selectedImage: string | null; bgRemoved: string | null; bgImage: string | null; composited: string | null; sceneVideo: string | null };
+  scene2: { step: number; selectedImage: string | null; bgRemoved: string | null; selectedStockVideoUrl: string | null; sceneVideo: string | null };
+  scene3: { step: number; selectedImage: string | null; bgRemoved: string | null; bgImage: string | null; composited: string | null; sceneVideo: string | null };
+};
+
+const defaultScene1State = (firstImageId: string): WorkflowTempState["scene1"] => ({
+  step: 1,
+  selectedImage: firstImageId,
+  bgRemoved: null,
+  bgImage: null,
+  composited: null,
+  sceneVideo: null,
+});
+const defaultScene2State = (firstImageId: string): WorkflowTempState["scene2"] => ({
+  step: 1,
+  selectedImage: firstImageId,
+  bgRemoved: null,
+  selectedStockVideoUrl: null,
+  sceneVideo: null,
+});
+const defaultScene3State = (firstImageId: string): WorkflowTempState["scene3"] => ({
+  step: 1,
+  selectedImage: firstImageId,
+  bgRemoved: null,
+  bgImage: null,
+  composited: null,
+  sceneVideo: null,
+});
 
 /** Response shape from GET /app/api/stock/images (for FetchBackgroundModal) */
 interface StockImagesResponse {
@@ -944,19 +1076,43 @@ interface StockImagesResponse {
 /** Same shape for video search (FetchVideoModal) */
 type StockVideosResponse = StockImagesResponse;
 
-function Scene1Content({ productImages: productImagesProp, onComplete }: { productImages: ProductImageItem[]; onComplete?: () => void }) {
-  const [step, setStep] = useState(1);
-  const [selectedImage, setSelectedImage] = useState<string | null>(productImagesProp[0]?.id ?? "s1");
-  const [bgRemoved, setBgRemoved] = useState<string | null>(null);
+type Scene1State = WorkflowTempState["scene1"];
+
+function Scene1Content({
+  productImages: productImagesProp,
+  initialScene1,
+  onScene1Change,
+  onComplete,
+}: {
+  productImages: ProductImageItem[];
+  initialScene1?: Scene1State | null;
+  onScene1Change?: (s: Scene1State) => void;
+  onComplete?: () => void;
+}) {
+  const firstId = productImagesProp[0]?.id ?? "s1";
+  const [step, setStep] = useState(initialScene1?.step ?? 1);
+  const [selectedImage, setSelectedImage] = useState<string | null>(initialScene1?.selectedImage ?? firstId);
+  const [bgRemoved, setBgRemoved] = useState<string | null>(initialScene1?.bgRemoved ?? null);
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
   const [bgRemovedError, setBgRemovedError] = useState<string | null>(null);
-  const [bgImage, setBgImage] = useState<string | null>(null);
+  const [bgImage, setBgImage] = useState<string | null>(initialScene1?.bgImage ?? null);
   const [bgLoading, setBgLoading] = useState(false);
   const [fetchModalOpen, setFetchModalOpen] = useState(false);
-  const [composited, setComposited] = useState<string | null>(null);
+  const [composited, setComposited] = useState<string | null>(initialScene1?.composited ?? null);
   const [compositeLoading, setCompositeLoading] = useState(false);
-  const [sceneVideo, setSceneVideo] = useState<string | null>(null);
+  const [sceneVideo, setSceneVideo] = useState<string | null>(initialScene1?.sceneVideo ?? null);
   const [sceneLoading, setSceneLoading] = useState(false);
+
+  useEffect(() => {
+    onScene1Change?.({
+      step,
+      selectedImage,
+      bgRemoved,
+      bgImage,
+      composited,
+      sceneVideo,
+    });
+  }, [step, selectedImage, bgRemoved, bgImage, composited, sceneVideo, onScene1Change]);
 
   const removeBgFetcher = useFetcher<{ ok: boolean; url?: string; error?: string }>();
 
@@ -1261,16 +1417,39 @@ function Scene1Content({ productImages: productImagesProp, onComplete }: { produ
   );
 }
 
-function Scene2Content({ productImages: productImagesProp, onComplete }: { productImages: ProductImageItem[]; onComplete?: () => void }) {
-  const [step, setStep] = useState(1);
-  const [selectedImage, setSelectedImage] = useState<string | null>(productImagesProp[0]?.id ?? "s1");
-  const [bgRemoved, setBgRemoved] = useState<string | null>(null);
+type Scene2State = WorkflowTempState["scene2"];
+
+function Scene2Content({
+  productImages: productImagesProp,
+  initialScene2,
+  onScene2Change,
+  onComplete,
+}: {
+  productImages: ProductImageItem[];
+  initialScene2?: Scene2State | null;
+  onScene2Change?: (s: Scene2State) => void;
+  onComplete?: () => void;
+}) {
+  const firstId = productImagesProp[0]?.id ?? "s1";
+  const [step, setStep] = useState(initialScene2?.step ?? 1);
+  const [selectedImage, setSelectedImage] = useState<string | null>(initialScene2?.selectedImage ?? firstId);
+  const [bgRemoved, setBgRemoved] = useState<string | null>(initialScene2?.bgRemoved ?? null);
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
   const [bgRemovedError, setBgRemovedError] = useState<string | null>(null);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
-  const [selectedStockVideoUrl, setSelectedStockVideoUrl] = useState<string | null>(null);
-  const [sceneVideo, setSceneVideo] = useState<string | null>(null);
+  const [selectedStockVideoUrl, setSelectedStockVideoUrl] = useState<string | null>(initialScene2?.selectedStockVideoUrl ?? null);
+  const [sceneVideo, setSceneVideo] = useState<string | null>(initialScene2?.sceneVideo ?? null);
   const [sceneLoading, setSceneLoading] = useState(false);
+
+  useEffect(() => {
+    onScene2Change?.({
+      step,
+      selectedImage,
+      bgRemoved,
+      selectedStockVideoUrl,
+      sceneVideo,
+    });
+  }, [step, selectedImage, bgRemoved, selectedStockVideoUrl, sceneVideo, onScene2Change]);
 
   const removeBgFetcher = useFetcher<{ ok: boolean; url?: string; error?: string }>();
 
@@ -1464,19 +1643,43 @@ function Scene2Content({ productImages: productImagesProp, onComplete }: { produ
   );
 }
 
-function Scene3Content({ productImages: productImagesProp, onComplete }: { productImages: ProductImageItem[]; onComplete?: () => void }) {
-  const [step, setStep] = useState(1);
-  const [selectedImage, setSelectedImage] = useState<string | null>(productImagesProp[0]?.id ?? "s1");
-  const [bgRemoved, setBgRemoved] = useState<string | null>(null);
+type Scene3State = WorkflowTempState["scene3"];
+
+function Scene3Content({
+  productImages: productImagesProp,
+  initialScene3,
+  onScene3Change,
+  onComplete,
+}: {
+  productImages: ProductImageItem[];
+  initialScene3?: Scene3State | null;
+  onScene3Change?: (s: Scene3State) => void;
+  onComplete?: () => void;
+}) {
+  const firstId = productImagesProp[0]?.id ?? "s1";
+  const [step, setStep] = useState(initialScene3?.step ?? 1);
+  const [selectedImage, setSelectedImage] = useState<string | null>(initialScene3?.selectedImage ?? firstId);
+  const [bgRemoved, setBgRemoved] = useState<string | null>(initialScene3?.bgRemoved ?? null);
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
   const [bgRemovedError, setBgRemovedError] = useState<string | null>(null);
-  const [bgImage, setBgImage] = useState<string | null>(null);
+  const [bgImage, setBgImage] = useState<string | null>(initialScene3?.bgImage ?? null);
   const [bgLoading, setBgLoading] = useState(false);
   const [fetchModalOpen, setFetchModalOpen] = useState(false);
-  const [composited, setComposited] = useState<string | null>(null);
+  const [composited, setComposited] = useState<string | null>(initialScene3?.composited ?? null);
   const [compositeLoading, setCompositeLoading] = useState(false);
-  const [sceneVideo, setSceneVideo] = useState<string | null>(null);
+  const [sceneVideo, setSceneVideo] = useState<string | null>(initialScene3?.sceneVideo ?? null);
   const [sceneLoading, setSceneLoading] = useState(false);
+
+  useEffect(() => {
+    onScene3Change?.({
+      step,
+      selectedImage,
+      bgRemoved,
+      bgImage,
+      composited,
+      sceneVideo,
+    });
+  }, [step, selectedImage, bgRemoved, bgImage, composited, sceneVideo, onScene3Change]);
 
   const removeBgFetcher = useFetcher<{ ok: boolean; url?: string; error?: string }>();
 
