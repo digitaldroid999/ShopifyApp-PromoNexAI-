@@ -59,7 +59,11 @@ export default defineConfig({
     // sharp is a native addon; must be loaded at runtime, not bundled
     external: ["sharp"],
   },
+  resolve: {
+    // Prevent duplicate React instances so Router context is shared (fixes useContext null)
+    dedupe: ["react", "react-dom", "react-router", "react-router-dom"],
+  },
   optimizeDeps: {
-    include: ["@shopify/app-bridge-react"],
+    include: ["@shopify/app-bridge-react", "react", "react-dom", "react-router"],
   },
 }) satisfies UserConfig;
