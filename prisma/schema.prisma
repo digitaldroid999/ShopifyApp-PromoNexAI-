@@ -37,7 +37,7 @@ model Session {
 model Short {
   id             String    @id @default(cuid())
   productId      String?   @unique @map("product_id") // one short per product
-  userId         BigInt?   @map("user_id") // Shopify user ID (matches Session.userId)
+  userId         String?   @map("user_id") // Session.shop (store domain)
   title          String
   status         String    @default("draft") // e.g. draft, generating, ready, failed
   finalVideoUrl  String?   @map("final_video_url")

@@ -19,20 +19,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const title = typeof body.title === "string" && body.title.trim() ? body.title.trim() : "Promo video";
   const productId = typeof body.productId === "string" ? body.productId.trim() || undefined : undefined;
 
-  // Use Shopify user ID from session (stored in DB when user authenticated)
-  const sess = session as { id?: string } | undefined;
-  let userId: bigint | null = null;
-  if (sess?.id) {
-    const row = await prisma.session.findUnique({
-      where: { id: sess.id },
-      select: { userId: true },
-    });
-    if (row?.userId != null) userId = row.userId;
-  }
-  if (userId == null) {
-    const raw = (session as unknown as { userId?: string | number }).userId;
-    if (raw != null) userId = BigInt(Number(raw));
-  }
+  const shop = (session as { shop?: string }).shop?.trim() || null;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const shortDelegate = (prisma as any).short;
@@ -49,7 +36,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     data: {
       title,
       productId: productId ?? undefined,
-      userId,
+      userId: shop,
       status: "draft",
     },
   });
