@@ -1,6 +1,33 @@
-import type { ActionFunctionArgs } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+
+/** GET ?productId=xxx → short + scene ids from DB (for modal open) */
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+  await authenticate.admin(request);
+  const url = new URL(request.url);
+  const productId = url.searchParams.get("productId")?.trim();
+  if (!productId) {
+    return Response.json({ error: "productId required" }, { status: 400 });
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const shortDelegate = (prisma as any).short;
+  const short = await shortDelegate.findUnique({
+    where: { productId },
+    include: { scenes: { orderBy: { sceneNumber: "asc" } } },
+  });
+  if (!short) {
+    return Response.json({ shortId: null, userId: null, scene1Id: null, scene2Id: null, scene3Id: null });
+  }
+  const [s1, s2, s3] = short.scenes;
+  return Response.json({
+    shortId: short.id,
+    userId: short.userId ?? null,
+    scene1Id: s1?.id ?? null,
+    scene2Id: s2?.id ?? null,
+    scene3Id: s3?.id ?? null,
+  });
+};
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { session } = await authenticate.admin(request);

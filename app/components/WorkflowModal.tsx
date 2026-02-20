@@ -639,17 +639,20 @@ function FetchVideoModal({
   );
 }
 
+type ShortInfo = {
+  shortId: string | null;
+  userId: string | null;
+  scene1Id: string | null;
+  scene2Id: string | null;
+  scene3Id: string | null;
+};
+
 export function WorkflowModal({
   onClose,
   onDone,
   isSample,
   productImages: productImagesProp,
   productId,
-  shortId,
-  shortUserId,
-  scene1Id,
-  scene2Id,
-  scene3Id,
 }: {
   onClose: () => void;
   /** Called when user clicks Done after viewing the final video; pass the final video URL to add to product */
@@ -659,21 +662,25 @@ export function WorkflowModal({
   productImages?: ProductImageItem[];
   /** Product ID for temp save/restore (e.g. product.id). When set, workflow state is loaded on open and saved while in progress; temp is deleted when Done. */
   productId?: string | null;
-  /** Short row ID */
-  shortId?: string | null;
-  /** Short.user_id (shop) for composite API */
-  shortUserId?: string | null;
-  /** VideoScene ids for composite API (scene_id) */
-  scene1Id?: string | null;
-  scene2Id?: string | null;
-  scene3Id?: string | null;
 }) {
   const productImages = productImagesProp?.length ? productImagesProp : defaultProductImages;
   const firstImageId = productImages[0]?.id ?? "s1";
 
   const loadTempFetcher = useFetcher<{ state: WorkflowTempState | null }>();
+  const loadShortFetcher = useFetcher<ShortInfo>();
   const saveTempFetcher = useFetcher();
   const deleteTempFetcher = useFetcher();
+
+  const shortInfo: ShortInfo | null =
+    loadShortFetcher.data != null
+      ? {
+          shortId: loadShortFetcher.data.shortId ?? null,
+          userId: loadShortFetcher.data.userId ?? null,
+          scene1Id: loadShortFetcher.data.scene1Id ?? null,
+          scene2Id: loadShortFetcher.data.scene2Id ?? null,
+          scene3Id: loadShortFetcher.data.scene3Id ?? null,
+        }
+      : null;
 
   const [loadedState, setLoadedState] = useState<WorkflowTempState | null | "pending">(null);
   const [activeTab, setActiveTab] = useState<"scene1" | "scene2" | "scene3">("scene1");
@@ -694,6 +701,13 @@ export function WorkflowModal({
   /** Restored state from temp (null while loading or when none saved) */
   const restoredState: WorkflowTempState | null =
     loadedState !== null && loadedState !== "pending" ? loadedState : null;
+
+  // Load short + scene ids from DB when modal opens with productId
+  useEffect(() => {
+    if (productId?.trim() && loadShortFetcher.state === "idle" && !loadShortFetcher.data) {
+      loadShortFetcher.load(`${SHORTS_API}?productId=${encodeURIComponent(productId.trim())}`);
+    }
+  }, [productId, loadShortFetcher.state, loadShortFetcher.data]);
 
   // Load temp when modal opens and we have productId
   useEffect(() => {
@@ -995,8 +1009,8 @@ export function WorkflowModal({
                 <Scene1Content
                   productImages={productImages}
                   productId={productId ?? undefined}
-                  sceneId={scene1Id ?? undefined}
-                  shortUserId={shortUserId ?? undefined}
+                  sceneId={shortInfo?.scene1Id ?? undefined}
+                  shortUserId={shortInfo?.userId ?? undefined}
                   initialScene1={restoredState?.scene1}
                   onScene1Change={setScene1Snapshot}
                   onComplete={() => setScene1Complete(true)}
@@ -1014,8 +1028,8 @@ export function WorkflowModal({
                 <Scene3Content
                   productImages={productImages}
                   productId={productId ?? undefined}
-                  sceneId={scene3Id ?? undefined}
-                  shortUserId={shortUserId ?? undefined}
+                  sceneId={shortInfo?.scene3Id ?? undefined}
+                  shortUserId={shortInfo?.userId ?? undefined}
                   initialScene3={restoredState?.scene3}
                   onScene3Change={setScene3Snapshot}
                   onComplete={() => setScene3Complete(true)}
@@ -1034,6 +1048,7 @@ const STOCK_IMAGES_API = "/app/api/stock/images";
 const STOCK_VIDEOS_API = "/app/api/stock/videos";
 const WORKFLOW_TEMP_API = "/app/api/promo-workflow-temp";
 const COMPOSITE_API = "/app/api/image/composite";
+const SHORTS_API = "/app/api/shorts";
 const PER_PAGE = 12;
 
 /** Serializable workflow state for temp save/restore (matches server WorkflowTempState) */
