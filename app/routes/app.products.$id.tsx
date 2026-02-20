@@ -74,14 +74,14 @@ export default function ProductDetail() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: product.title ?? "Promo video", productId: product.id }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (data.shortId) {
         setShortId(data.shortId);
-        setWorkflowOpen(true);
       }
     } catch {
-      // Don't open modal without shortId - scene rows wouldn't be created
+      // continue to open modal
     }
+    setWorkflowOpen(true);
   };
 
   const images = product.images?.edges?.map((e: { node: { id: string; url: string; altText: string | null } }) => e.node) ?? [];
