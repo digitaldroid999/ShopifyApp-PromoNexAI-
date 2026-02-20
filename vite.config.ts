@@ -18,6 +18,10 @@ if (
 const host = new URL(process.env.SHOPIFY_APP_URL || "http://localhost")
   .hostname;
 
+// Remotion API (VideoGenerationServer/Remotion-api) – proxy so /videos_shopify and /tasks hit the API
+const REMOTION_API_TARGET =
+  process.env.REMOTION_API_TARGET || "http://localhost:5050";
+
 let hmrConfig;
 if (host === "localhost") {
   hmrConfig = {
@@ -46,6 +50,11 @@ export default defineConfig({
     fs: {
       // See https://vitejs.dev/config/server-options.html#server-fs-allow for more information
       allow: ["app", "node_modules"],
+    },
+    proxy: {
+      "/videos_shopify": REMOTION_API_TARGET,
+      "/videos": REMOTION_API_TARGET,
+      "/tasks": REMOTION_API_TARGET,
     },
   },
   plugins: [
