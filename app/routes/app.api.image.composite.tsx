@@ -71,9 +71,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const result = await compositeImages(background_url, overlay_url, scene_id, user_id);
   console.log(`${LOG_PREFIX} 5. compositeImages result:`, { success: result.success, image_url: result.image_url, error: result.error });
 
+  // Ensure image_url has no literal newlines so JSON is always valid for the client
+  const imageUrl = typeof result.image_url === "string"
+    ? result.image_url.replace(/\r\n|\r|\n/g, "").trim()
+    : result.image_url;
   const jsonBody = {
     success: result.success,
-    image_url: result.image_url,
+    image_url: imageUrl,
     error: result.error,
     message: result.message,
     created_at: result.created_at,

@@ -1227,7 +1227,8 @@ function Scene1Content({
       const rawText = await res.text();
       let data: { success?: boolean; image_url?: string | null; error?: string | null; message?: string } = {};
       try {
-        data = rawText ? JSON.parse(rawText) : {};
+        const toParse = (rawText ?? "").replace(/^\uFEFF/, "").trim();
+        data = toParse ? JSON.parse(toParse) : {};
       } catch (parseErr) {
         console.error(`[Composite] ${sceneLabel}: response is not JSON (status ${res.status}). Raw (first 200 chars):`, rawText.slice(0, 200));
         setCompositeError("Server returned invalid response. Try again.");
@@ -1853,7 +1854,8 @@ function Scene3Content({
       const rawText = await res.text();
       let data: { success?: boolean; image_url?: string | null; error?: string | null; message?: string } = {};
       try {
-        data = rawText ? JSON.parse(rawText) : {};
+        const toParse = (rawText ?? "").replace(/^\uFEFF/, "").trim();
+        data = toParse ? JSON.parse(toParse) : {};
       } catch (parseErr) {
         console.error(`[Composite] ${sceneLabel}: response is not JSON (status ${res.status}). Raw (first 200 chars):`, rawText.slice(0, 200));
         setCompositeError("Server returned invalid response. Try again.");
