@@ -1343,8 +1343,10 @@ function Scene1Content({
         });
         const task = await pollRes.json().catch(() => ({}));
         setSceneProgress(task.progress ?? null);
-        if (task.status === "completed" && task.videoUrl) {
-          const videoUrl = task.videoUrl.startsWith("http") ? task.videoUrl : `${origin}${task.videoUrl}`;
+        // Remotion response shape: status "completed", stage "done", progress 100, videoUrl (relative path)
+        if (task.status === "completed" && (task.videoUrl ?? task.video_url)) {
+          const rawUrl = task.videoUrl ?? task.video_url;
+          const videoUrl = typeof rawUrl === "string" && rawUrl.startsWith("http") ? rawUrl : `${origin}${rawUrl}`;
           setSceneVideo(videoUrl);
           setSceneError(null);
           onComplete?.();

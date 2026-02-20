@@ -26,8 +26,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   console.log(`${LOG_PREFIX} Poll taskId=${taskId} status=${task.status} stage=${task.stage ?? "-"} progress=${task.progress ?? "-"}%`);
 
-  // If still pending, poll Remotion and update our Task (and VideoScene if completed)
-  if (task.status === "pending") {
+  // Poll Remotion whenever task is not yet terminal (completed/failed).
+  // Remotion goes: pending → processing (bundling/rendering/uploading) → completed.
+  // If we only fetched when "pending", we'd stop after the first "processing" and never see "completed".
+  const isTerminal = task.status === "completed" || task.status === "failed";
+  if (!isTerminal) {
     const remotion = await fetchRemotionTaskStatus(task.remotionTaskId);
     if (remotion) {
       console.log(`${LOG_PREFIX} Remotion task ${task.remotionTaskId} → status=${remotion.status} stage=${remotion.stage ?? "-"} progress=${remotion.progress ?? "-"}%`);
