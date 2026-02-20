@@ -1061,24 +1061,17 @@ type CompositeApiPayload = {
 };
 
 /**
- * Parses the composite API response to match the server contract (composite.server.ts).
- * Accepts raw JSON body or envelope like { data: { success, image_url, ... } }.
+ * Reads the composite API JSON response (server uses Response.json()).
+ * Accepts direct payload or envelope { data: { success, image_url, ... } }.
  */
 async function parseCompositeApiResponse(
   res: Response
 ): Promise<{ ok: true; image_url: string } | { ok: false; error: string }> {
-  let raw: string;
-  try {
-    raw = await res.text();
-  } catch {
-    return { ok: false, error: "Failed to read response" };
-  }
-  const toParse = (raw ?? "").replace(/^\uFEFF/, "").trim();
   let data: unknown;
   try {
-    data = toParse ? JSON.parse(toParse) : {};
+    data = await res.json();
   } catch {
-    console.error("[Composite] Response is not JSON. Status:", res.status, "Raw (first 200 chars):", raw.slice(0, 200));
+    console.error("[Composite] Response is not JSON. Status:", res.status);
     return { ok: false, error: "Server returned invalid response. Try again." };
   }
   const obj: CompositeApiPayload =
