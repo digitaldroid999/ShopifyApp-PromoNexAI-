@@ -1074,7 +1074,12 @@ async function parseCompositeApiResponse(
     return { ok: false, error: "Server returned invalid response. Try again." };
   }
   if (data.success && typeof data.image_url === "string" && data.image_url.trim()) {
-    return { ok: true, image_url: data.image_url.trim() };
+    let image_url = data.image_url.trim();
+    // Normalize: public/composited_images/... is served at /composited_images/...
+    if (!image_url.startsWith("http") && !image_url.startsWith("/")) {
+      image_url = `/${image_url}`;
+    }
+    return { ok: true, image_url };
   }
   const errorMessage =
     (typeof data.error === "string" && data.error) ||
