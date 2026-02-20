@@ -1026,6 +1026,8 @@ export function WorkflowModal({
               <div style={{ display: activeTab === "scene2" ? "block" : "none" }} key={`scene2-${restoredState?.scene2 ? "restored" : "default"}`}>
                 <Scene2Content
                   productImages={productImages}
+                  sceneId={shortInfo?.scene2Id ?? undefined}
+                  shortUserId={shortInfo?.userId ?? undefined}
                   initialScene2={restoredState?.scene2}
                   onScene2Change={setScene2Snapshot}
                   onComplete={() => setScene2Complete(true)}
@@ -1665,11 +1667,15 @@ type Scene2State = WorkflowTempState["scene2"];
 
 function Scene2Content({
   productImages: productImagesProp,
+  sceneId: scene2Id,
+  shortUserId,
   initialScene2,
   onScene2Change,
   onComplete,
 }: {
   productImages: ProductImageItem[];
+  sceneId?: string | null;
+  shortUserId?: string | null;
   initialScene2?: Scene2State | null;
   onScene2Change?: (s: Scene2State) => void;
   onComplete?: () => void;
@@ -1684,6 +1690,7 @@ function Scene2Content({
   const [selectedStockVideoUrl, setSelectedStockVideoUrl] = useState<string | null>(initialScene2?.selectedStockVideoUrl ?? null);
   const [sceneVideo, setSceneVideo] = useState<string | null>(initialScene2?.sceneVideo ?? null);
   const [sceneLoading, setSceneLoading] = useState(false);
+  const [sceneError, setSceneError] = useState<string | null>(null);
 
   useEffect(() => {
     onScene2Change?.({
@@ -1704,10 +1711,19 @@ function Scene2Content({
     if (data.ok && data.url) {
       setBgRemoved(data.url);
       setBgRemovedError(null);
+      // Save scene2 image_url to DB (same pattern as other scenes: /bg_removed_images/{filename})
+      if (scene2Id && data.url) {
+        fetch(SHORTS_SCENES_API, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ sceneId: scene2Id, imageUrl: data.url }),
+        }).catch((err) => console.warn("[Scene2] Failed to save image_url:", err));
+      }
     } else {
       setBgRemovedError(data.error ?? "Remove BG failed");
     }
-  }, [removeBgFetcher.state, removeBgFetcher.data]);
+  }, [removeBgFetcher.state, removeBgFetcher.data, scene2Id]);
 
   const handleRemoveBg = () => {
     const img = productImagesProp.find((i) => i.id === selectedImage);
@@ -1724,13 +1740,44 @@ function Scene2Content({
     );
   };
 
-  const handleGenerateVideo = () => {
+  const handleGenerateVideo = async () => {
+    if (!bgRemoved || !selectedStockVideoUrl || !scene2Id || !shortUserId) {
+      setSceneError("Missing image, video, or scene. Ensure BG is removed, a stock video is selected, and the short is loaded.");
+      return;
+    }
+    setSceneError(null);
     setSceneLoading(true);
-    setTimeout(() => {
-      setSceneVideo(`${BASE}/scene2-video.mp4`);
+    try {
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const product_image_url = bgRemoved.startsWith("http") ? bgRemoved : `${origin}${bgRemoved}`;
+      const background_video_url = selectedStockVideoUrl.startsWith("http") ? selectedStockVideoUrl : `${origin}${selectedStockVideoUrl}`;
+      const res = await fetch(VIDEO_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          step: "mergeVideo",
+          product_image_url,
+          background_video_url,
+          scene_id: scene2Id,
+          user_id: shortUserId,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data.success && typeof data.video_url === "string" && data.video_url.trim()) {
+        const raw = data.video_url.trim();
+        const videoUrl = raw.startsWith("http") ? raw : `${origin}${raw.startsWith("/") ? raw : `/${raw}`}`;
+        setSceneVideo(videoUrl);
+        setSceneError(null);
+        onComplete?.();
+      } else {
+        setSceneError(data.error ?? "Generate video failed");
+      }
+    } catch (e) {
+      setSceneError(e instanceof Error ? e.message : "Generate video failed");
+    } finally {
       setSceneLoading(false);
-      onComplete?.();
-    }, 2000);
+    }
   };
 
   return (
@@ -1854,31 +1901,36 @@ function Scene2Content({
             onClose={() => setVideoModalOpen(false)}
             onSelect={(url) => { setSelectedStockVideoUrl(url); setVideoModalOpen(false); }}
           />
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            {sceneLoading ? (
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <span className="spinner" style={{ width: 24, height: 24, border: "2px solid #e1e3e5", borderTopColor: "#2c6ecb", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                <span style={{ fontSize: "14px", color: "#6d7175" }}>Generating video…</span>
-              </div>
-            ) : sceneVideo ? (
-              <video src={sceneVideo} controls style={{ maxWidth: "400px", maxHeight: "240px", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
-            ) : (
-              <button
-                type="button"
-                onClick={handleGenerateVideo}
-                disabled={!selectedStockVideoUrl}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "8px",
-                  border: "none",
-                  background: !selectedStockVideoUrl ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
-                  color: "#fff",
-                  fontWeight: 600,
-                  cursor: !selectedStockVideoUrl ? "not-allowed" : "pointer",
-                }}
-              >
-                Generate video
-              </button>
+          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              {sceneLoading ? (
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <span className="spinner" style={{ width: 24, height: 24, border: "2px solid #e1e3e5", borderTopColor: "#2c6ecb", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
+                  <span style={{ fontSize: "14px", color: "#6d7175" }}>Generating video…</span>
+                </div>
+              ) : sceneVideo ? (
+                <video src={sceneVideo} controls style={{ maxWidth: "400px", maxHeight: "240px", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleGenerateVideo}
+                  disabled={!selectedStockVideoUrl || !bgRemoved || !scene2Id || !shortUserId || sceneLoading}
+                  style={{
+                    padding: "10px 20px",
+                    borderRadius: "8px",
+                    border: "none",
+                    background: !selectedStockVideoUrl || !bgRemoved || !scene2Id ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
+                    color: "#fff",
+                    fontWeight: 600,
+                    cursor: !selectedStockVideoUrl || !scene2Id ? "not-allowed" : "pointer",
+                  }}
+                >
+                  Generate video
+                </button>
+              )}
+            </div>
+            {sceneError && (
+              <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{sceneError}</span>
             )}
           </div>
         </>

@@ -53,20 +53,28 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         data: updates,
       });
 
-      // When completed, set VideoScene.generatedVideoUrl
-      if (remotion.status === "completed" && remotion.videoUrl && task.videoSceneId) {
+      // When scene 1 generation completes, save generated URL to VideoScene.generatedVideoUrl (DB: generated_video_url)
+      if (remotion.status === "completed" && remotion.videoUrl) {
         try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await (prisma as any).videoScene.update({
-            where: { id: task.videoSceneId },
-            data: {
-              generatedVideoUrl: remotion.videoUrl,
-              status: "ready",
-            },
-          });
-          console.log(`${LOG_PREFIX} Completed. Updated VideoScene ${task.videoSceneId} videoUrl=${remotion.videoUrl}`);
+          const videoSceneId =
+            task.videoSceneId ??
+            (await (prisma as any).videoScene
+              .findFirst({ where: { shortId: task.shortId, sceneNumber: 1 }, select: { id: true } })
+              .then((s: { id: string } | null) => s?.id ?? null));
+          if (videoSceneId) {
+            await (prisma as any).videoScene.update({
+              where: { id: videoSceneId },
+              data: {
+                generatedVideoUrl: remotion.videoUrl,
+                status: "ready",
+              },
+            });
+            console.log(`${LOG_PREFIX} Completed. Saved generated_video_url to VideoScene ${videoSceneId} (scene 1)`);
+          } else {
+            console.warn(`${LOG_PREFIX} Completed but no VideoScene found for shortId=${task.shortId} scene 1; generated URL not saved to VideoScene.`);
+          }
         } catch (e) {
-          console.error(`${LOG_PREFIX} Failed to update VideoScene:`, e);
+          console.error(`${LOG_PREFIX} Failed to update VideoScene generated_video_url:`, e);
         }
       }
 

@@ -111,6 +111,71 @@ export async function removeBackground(
   }
 }
 
+// --- Scene 2: merge product image onto background video (third-party API) ---
+
+export type MergeVideoResult =
+  | { success: true; video_url: string }
+  | { success: false; video_url: null; error: string };
+
+/**
+ * Merges product image (e.g. bg-removed) onto a background video via third-party API.
+ * POST {BACKEND_URL}/image/merge-video
+ * Request: { product_image_url, background_video_url, scene_id, user_id }
+ * Response: { success, video_url, error }
+ */
+export async function mergeVideo(
+  productImageUrl: string,
+  backgroundVideoUrl: string,
+  sceneId: string,
+  userId: string
+): Promise<MergeVideoResult> {
+  const base = process.env.BACKEND_URL;
+  if (!base?.trim()) {
+    return { success: false, video_url: null, error: "BACKEND_URL is not set in .env" };
+  }
+  const endpoint = `${base.replace(/\/$/, "")}/image/merge-video`;
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        product_image_url: productImageUrl,
+        background_video_url: backgroundVideoUrl,
+        scene_id: sceneId,
+        user_id: userId,
+      }),
+      signal: AbortSignal.timeout(120000),
+    });
+    const raw = await response.text();
+    let data: { success?: boolean; video_url?: string | null; error?: string | null } = {};
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch {
+      return {
+        success: false,
+        video_url: null,
+        error: `Backend returned invalid JSON (${response.status})`,
+      };
+    }
+    if (!response.ok) {
+      const err = data.error ?? raw?.slice(0, 200) ?? response.statusText;
+      return { success: false, video_url: null, error: String(err) };
+    }
+    if (!data.success || typeof data.video_url !== "string" || !data.video_url.trim()) {
+      return {
+        success: false,
+        video_url: null,
+        error: (data.error as string) ?? "Merge video failed",
+      };
+    }
+    const video_url = data.video_url.trim();
+    return { success: true, video_url };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return { success: false, video_url: null, error: `mergeVideo failed: ${message}` };
+  }
+}
+
 // --- Stock image/video search (Pexels, Pixabay, Coverr) ---
 
 async function searchPexels(
