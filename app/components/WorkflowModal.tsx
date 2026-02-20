@@ -1064,10 +1064,13 @@ type CompositeApiResponse = {
 async function parseCompositeApiResponse(
   res: Response
 ): Promise<{ ok: true; image_url: string } | { ok: false; error: string }> {
+  const raw = await res.text();
+  const trimmed = raw.replace(/^\uFEFF/, "").trim();
   let data: CompositeApiResponse;
   try {
-    data = await res.json();
-  } catch {
+    data = trimmed ? JSON.parse(trimmed) : ({} as CompositeApiResponse);
+  } catch (e) {
+    console.error("[Composite] Response is not valid JSON. Status:", res.status, "Content-Type:", res.headers.get("Content-Type"), "Body (first 400 chars):", raw.slice(0, 400));
     return { ok: false, error: "Server returned invalid response. Try again." };
   }
   if (data.success && typeof data.image_url === "string" && data.image_url.trim()) {
@@ -1252,6 +1255,8 @@ function Scene1Content({
           Accept: "application/json",
         },
         body: JSON.stringify(payload),
+        credentials: "include",
+        cache: "no-store",
       });
       const result = await parseCompositeApiResponse(res);
       console.log(`[Composite] ${sceneLabel}: parsed result`, result);
@@ -1870,6 +1875,8 @@ function Scene3Content({
           Accept: "application/json",
         },
         body: JSON.stringify(payload),
+        credentials: "include",
+        cache: "no-store",
       });
       const result = await parseCompositeApiResponse(res);
       console.log(`[Composite] ${sceneLabel}: parsed result`, result);
