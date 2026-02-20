@@ -1,9 +1,9 @@
 /**
  * Remotion server integration for Scene 1 (and future scenes) video generation.
- * Uses async/polling: POST /videos_shopify → GET /tasks/:taskId until completed/failed.
+ * Uses async/polling: POST /shopify/videos → GET /tasks/:taskId until completed/failed.
  *
  * REMOTION_URL in .env must point to the Remotion API:
- * - Same host as this app (e.g. http://localhost:3000): Vite proxy forwards /videos_shopify and /tasks to the API (see vite.config proxy; run Remotion API on REMOTION_API_TARGET port, e.g. 5050).
+ * - Same host as this app (e.g. http://localhost:3000): Vite proxy forwards /shopify/videos and /tasks to the API (see vite.config proxy; run Remotion API on REMOTION_API_TARGET port, e.g. 5050).
  * - Direct API (e.g. http://localhost:5050): use when Remotion API runs on a different port.
  */
 
@@ -36,14 +36,14 @@ export type StartShopifyVideoResult =
   | { ok: false; error: string };
 
 /**
- * POST to Remotion /videos_shopify to start video generation.
+ * POST to Remotion /shopify/videos to start video generation.
  * Returns the Remotion taskId from the response.
  */
 export async function startShopifyVideo(
   params: StartShopifyVideoParams
 ): Promise<StartShopifyVideoResult> {
   const base = getRemotionBase();
-  const url = `${base}/videos`;
+  const url = `${base}/shopify/videos`;
   console.log(`${LOG_PREFIX} POST ${url}`);
 
   try {
@@ -69,7 +69,7 @@ export async function startShopifyVideo(
       if (res.status === 404 || /Cannot POST|Cannot GET|404|Not Found/i.test(text)) {
         return {
           ok: false,
-          error: `Remotion server at ${url} returned 404. Ensure REMOTION_URL is correct and the server has POST /videos_shopify enabled.`,
+          error: `Remotion server at ${url} returned 404. Ensure REMOTION_URL is correct and the server has POST /shopify/videos enabled.`,
         };
       }
       return { ok: false, error: "Remotion server returned invalid response (not JSON)." };

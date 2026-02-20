@@ -18,7 +18,7 @@ if (
 const host = new URL(process.env.SHOPIFY_APP_URL || "http://localhost")
   .hostname;
 
-// Remotion API (VideoGenerationServer/Remotion-api) – proxy so /videos_shopify and /tasks hit the API
+// Remotion API (VideoGenerationServer/Remotion-api) – proxy so /shopify/videos and /tasks hit the API
 const REMOTION_API_TARGET =
   process.env.REMOTION_API_TARGET || "http://localhost:5050";
 
@@ -52,7 +52,7 @@ export default defineConfig({
       allow: ["app", "node_modules"],
     },
     proxy: {
-      "/videos_shopify": REMOTION_API_TARGET,
+      "/shopify/videos": REMOTION_API_TARGET,
       "/videos": REMOTION_API_TARGET,
       "/tasks": REMOTION_API_TARGET,
     },
