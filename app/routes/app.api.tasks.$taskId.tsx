@@ -19,10 +19,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     return Response.json({ error: "Task not found" }, { status: 404 });
   }
 
+  console.log(`${LOG_PREFIX} Poll taskId=${taskId} status=${task.status} stage=${task.stage ?? "-"} progress=${task.progress ?? "-"}%`);
+
   // If still pending, poll Remotion and update our Task (and VideoScene if completed)
   if (task.status === "pending") {
     const remotion = await fetchRemotionTaskStatus(task.remotionTaskId);
     if (remotion) {
+      console.log(`${LOG_PREFIX} Remotion task ${task.remotionTaskId} → status=${remotion.status} stage=${remotion.stage ?? "-"} progress=${remotion.progress ?? "-"}%`);
+
       const updates: { status: string; stage?: string; progress?: number | null; videoUrl?: string | null; error?: string | null } = {
         status: remotion.status,
         stage: remotion.stage ?? undefined,
@@ -52,10 +56,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
               status: "ready",
             },
           });
-          console.log(`${LOG_PREFIX} Updated VideoScene ${task.videoSceneId} with videoUrl`);
+          console.log(`${LOG_PREFIX} Completed. Updated VideoScene ${task.videoSceneId} videoUrl=${remotion.videoUrl}`);
         } catch (e) {
           console.error(`${LOG_PREFIX} Failed to update VideoScene:`, e);
         }
+      }
+
+      if (updated.status === "failed") {
+        console.log(`${LOG_PREFIX} Task failed: ${updated.error ?? "unknown"}`);
       }
 
       return Response.json(

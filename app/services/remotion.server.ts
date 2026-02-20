@@ -122,6 +122,11 @@ export async function fetchRemotionTaskStatus(
       return null;
     }
 
+    const status = (data.status as string) ?? "pending";
+    const stage = typeof data.stage === "string" ? data.stage : "-";
+    const progress = typeof data.progress === "number" ? data.progress : "-";
+    console.log(`${LOG_PREFIX} GET ${url} → status=${status} stage=${stage} progress=${progress}%`);
+
     return {
       id: String(data.id ?? remotionTaskId),
       status: (data.status as "pending" | "completed" | "failed") ?? "pending",
