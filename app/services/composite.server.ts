@@ -30,6 +30,8 @@ function sanitizeId(sceneId: string): string {
   return safe || `scene-${Date.now()}`;
 }
 
+const LOG_PREFIX = "[Composite Service]";
+
 /**
  * Composites overlay (foreground) on top of background, saves to public/composited_images/composited-{sceneId}.png.
  * Returns public URL path (e.g. /composited_images/composited-abc123.png).
@@ -40,13 +42,19 @@ export async function compositeImages(
   sceneId: string
 ): Promise<CompositeImagesResult> {
   const created_at = new Date().toISOString();
+  console.log(`${LOG_PREFIX} 1. compositeImages called: sceneId="${sceneId}"`);
+  console.log(`${LOG_PREFIX}    background: ${backgroundUrl}`);
+  console.log(`${LOG_PREFIX}    overlay: ${overlayUrl}`);
 
   try {
+    console.log(`${LOG_PREFIX} 2. Fetching background and overlay image buffers...`);
     const [backgroundBuffer, overlayBuffer] = await Promise.all([
       fetchImageBuffer(backgroundUrl),
       fetchImageBuffer(overlayUrl),
     ]);
+    console.log(`${LOG_PREFIX}    background buffer: ${backgroundBuffer.length} bytes, overlay buffer: ${overlayBuffer.length} bytes`);
 
+    console.log(`${LOG_PREFIX} 3. Loading images with sharp and reading metadata...`);
     const background = sharp(backgroundBuffer);
     const overlay = sharp(overlayBuffer);
     const bgMeta = await background.metadata();
@@ -56,12 +64,16 @@ export async function compositeImages(
     const bgHeight = bgMeta.height ?? 1080;
     const ovWidth = ovMeta.width ?? bgWidth;
     const ovHeight = ovMeta.height ?? bgHeight;
+    console.log(`${LOG_PREFIX}    background size: ${bgWidth}x${bgHeight}, overlay size: ${ovWidth}x${ovHeight}`);
+
     const scale = Math.min(bgWidth / ovWidth, bgHeight / ovHeight, 1);
     const overlayWidth = Math.round(ovWidth * scale);
     const overlayHeight = Math.round(ovHeight * scale);
     const left = Math.round((bgWidth - overlayWidth) / 2);
     const top = Math.round((bgHeight - overlayHeight) / 2);
+    console.log(`${LOG_PREFIX} 4. Scale=${scale.toFixed(3)} → overlay placed at ${overlayWidth}x${overlayHeight}, position (${left}, ${top})`);
 
+    console.log(`${LOG_PREFIX} 5. Resizing overlay and compositing onto background...`);
     const resizedOverlay = await overlay
       .resize(overlayWidth, overlayHeight, { fit: "inside" })
       .toBuffer();
@@ -72,16 +84,18 @@ export async function compositeImages(
       ])
       .png()
       .toBuffer();
+    console.log(`${LOG_PREFIX}    composited PNG buffer: ${composited.length} bytes`);
 
     const dir = path.join(process.cwd(), PUBLIC_DIR, COMPOSITED_DIR);
     await mkdir(dir, { recursive: true });
-
     const safeId = sanitizeId(sceneId);
     const filename = `composited-${safeId}.png`;
     const filePath = path.join(dir, filename);
     await writeFile(filePath, composited);
+    console.log(`${LOG_PREFIX} 6. Saved to ${filePath}`);
 
     const image_url = `/${COMPOSITED_DIR}/${filename}`;
+    console.log(`${LOG_PREFIX} 7. Done. Public URL: ${image_url}`);
 
     return {
       success: true,
@@ -92,6 +106,7 @@ export async function compositeImages(
     };
   } catch (e) {
     const error = e instanceof Error ? e.message : String(e);
+    console.error(`${LOG_PREFIX} Error:`, error);
     return {
       success: false,
       image_url: null,

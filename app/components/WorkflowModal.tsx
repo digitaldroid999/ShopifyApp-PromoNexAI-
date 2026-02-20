@@ -1161,29 +1161,41 @@ function Scene1Content({
     if (!bgRemoved || !bgImage) return;
     setCompositeError(null);
     setCompositeLoading(true);
+    const sceneLabel = "Scene 1";
     try {
       const origin = typeof window !== "undefined" ? window.location.origin : "";
       const overlayUrl = bgRemoved.startsWith("http") ? bgRemoved : `${origin}${bgRemoved}`;
       const backgroundUrl = bgImage.startsWith("http") ? bgImage : `${origin}${bgImage}`;
       const sceneId = productId ? `${productId}-scene1` : `scene1-${Date.now()}`;
+      const payload = {
+        background_url: backgroundUrl,
+        overlay_url: overlayUrl,
+        scene_id: sceneId,
+        user_id: "anonymous",
+      };
+      console.log(`[Composite] ${sceneLabel}: user clicked Composite → sending POST to ${COMPOSITE_API}`, {
+        scene_id: sceneId,
+        overlay_url: overlayUrl,
+        background_url: backgroundUrl,
+      });
       const res = await fetch(COMPOSITE_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          background_url: backgroundUrl,
-          overlay_url: overlayUrl,
-          scene_id: sceneId,
-          user_id: "anonymous",
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
+      console.log(`[Composite] ${sceneLabel}: API response (status ${res.status})`, data);
       if (data.success && data.image_url) {
         setComposited(data.image_url);
+        console.log(`[Composite] ${sceneLabel}: success → composited image URL:`, data.image_url);
       } else {
         setCompositeError(data.error ?? data.message ?? "Compositing failed");
+        console.warn(`[Composite] ${sceneLabel}: failed`, data.error ?? data.message);
       }
     } catch (e) {
-      setCompositeError(e instanceof Error ? e.message : "Compositing failed");
+      const errMsg = e instanceof Error ? e.message : "Compositing failed";
+      setCompositeError(errMsg);
+      console.error(`[Composite] ${sceneLabel}: request error`, e);
     } finally {
       setCompositeLoading(false);
     }
@@ -1758,29 +1770,41 @@ function Scene3Content({
     if (!bgRemoved || !bgImage) return;
     setCompositeError(null);
     setCompositeLoading(true);
+    const sceneLabel = "Scene 3";
     try {
       const origin = typeof window !== "undefined" ? window.location.origin : "";
       const overlayUrl = bgRemoved.startsWith("http") ? bgRemoved : `${origin}${bgRemoved}`;
       const backgroundUrl = bgImage.startsWith("http") ? bgImage : `${origin}${bgImage}`;
       const sceneId = productId ? `${productId}-scene3` : `scene3-${Date.now()}`;
+      const payload = {
+        background_url: backgroundUrl,
+        overlay_url: overlayUrl,
+        scene_id: sceneId,
+        user_id: "anonymous",
+      };
+      console.log(`[Composite] ${sceneLabel}: user clicked Composite → sending POST to ${COMPOSITE_API}`, {
+        scene_id: sceneId,
+        overlay_url: overlayUrl,
+        background_url: backgroundUrl,
+      });
       const res = await fetch(COMPOSITE_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          background_url: backgroundUrl,
-          overlay_url: overlayUrl,
-          scene_id: sceneId,
-          user_id: "anonymous",
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
+      console.log(`[Composite] ${sceneLabel}: API response (status ${res.status})`, data);
       if (data.success && data.image_url) {
         setComposited(data.image_url);
+        console.log(`[Composite] ${sceneLabel}: success → composited image URL:`, data.image_url);
       } else {
         setCompositeError(data.error ?? data.message ?? "Compositing failed");
+        console.warn(`[Composite] ${sceneLabel}: failed`, data.error ?? data.message);
       }
     } catch (e) {
-      setCompositeError(e instanceof Error ? e.message : "Compositing failed");
+      const errMsg = e instanceof Error ? e.message : "Compositing failed";
+      setCompositeError(errMsg);
+      console.error(`[Composite] ${sceneLabel}: request error`, e);
     } finally {
       setCompositeLoading(false);
     }
