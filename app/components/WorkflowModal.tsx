@@ -1135,6 +1135,8 @@ function Scene1Content({
   }, [step, selectedImage, bgRemoved, bgImage, composited, sceneVideo, onScene1Change]);
 
   const removeBgFetcher = useFetcher<{ ok: boolean; url?: string; error?: string }>();
+  const ensureSceneFetcher = useFetcher<{ sceneId?: string; created?: boolean }>();
+  const [pendingRemoveBgImageUrl, setPendingRemoveBgImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (removeBgFetcher.state !== "idle" || !removeBgFetcher.data) return;
@@ -1148,7 +1150,16 @@ function Scene1Content({
     }
   }, [removeBgFetcher.state, removeBgFetcher.data]);
 
-  const handleRemoveBg = async () => {
+  useEffect(() => {
+    if (ensureSceneFetcher.state !== "idle" || !pendingRemoveBgImageUrl) return;
+    setPendingRemoveBgImageUrl(null);
+    removeBgFetcher.submit(
+      { step: "removeBg", imageUrl: pendingRemoveBgImageUrl },
+      { method: "post", action: VIDEO_API, encType: "application/json" }
+    );
+  }, [ensureSceneFetcher.state, ensureSceneFetcher.data, pendingRemoveBgImageUrl]);
+
+  const handleRemoveBg = () => {
     const img = productImagesProp.find((i) => i.id === selectedImage);
     const imageUrl = img?.src;
     if (!imageUrl) {
@@ -1158,20 +1169,17 @@ function Scene1Content({
     setBgRemovedError(null);
     setBgRemovedLoading(true);
     if (shortId) {
-      try {
-        await fetch(SHORTS_SCENES_API, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ shortId, sceneNumber }),
-        });
-      } catch {
-        // continue with remove BG even if ensure-scene fails
-      }
+      setPendingRemoveBgImageUrl(imageUrl);
+      ensureSceneFetcher.submit(
+        { shortId, sceneNumber },
+        { method: "post", action: SHORTS_SCENES_API, encType: "application/json" }
+      );
+    } else {
+      removeBgFetcher.submit(
+        { step: "removeBg", imageUrl },
+        { method: "post", action: VIDEO_API, encType: "application/json" }
+      );
     }
-    removeBgFetcher.submit(
-      { step: "removeBg", imageUrl },
-      { method: "post", action: VIDEO_API, encType: "application/json" }
-    );
   };
 
   const handleGenerateBg = () => {
@@ -1537,6 +1545,8 @@ function Scene2Content({
   }, [step, selectedImage, bgRemoved, selectedStockVideoUrl, sceneVideo, onScene2Change]);
 
   const removeBgFetcher = useFetcher<{ ok: boolean; url?: string; error?: string }>();
+  const ensureSceneFetcher = useFetcher<{ sceneId?: string; created?: boolean }>();
+  const [pendingRemoveBgImageUrl, setPendingRemoveBgImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (removeBgFetcher.state !== "idle" || !removeBgFetcher.data) return;
@@ -1550,7 +1560,16 @@ function Scene2Content({
     }
   }, [removeBgFetcher.state, removeBgFetcher.data]);
 
-  const handleRemoveBg = async () => {
+  useEffect(() => {
+    if (ensureSceneFetcher.state !== "idle" || !pendingRemoveBgImageUrl) return;
+    setPendingRemoveBgImageUrl(null);
+    removeBgFetcher.submit(
+      { step: "removeBg", imageUrl: pendingRemoveBgImageUrl },
+      { method: "post", action: VIDEO_API, encType: "application/json" }
+    );
+  }, [ensureSceneFetcher.state, ensureSceneFetcher.data, pendingRemoveBgImageUrl]);
+
+  const handleRemoveBg = () => {
     const img = productImagesProp.find((i) => i.id === selectedImage);
     const imageUrl = img?.src;
     if (!imageUrl) {
@@ -1560,20 +1579,17 @@ function Scene2Content({
     setBgRemovedError(null);
     setBgRemovedLoading(true);
     if (shortId) {
-      try {
-        await fetch(SHORTS_SCENES_API, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ shortId, sceneNumber }),
-        });
-      } catch {
-        // continue with remove BG even if ensure-scene fails
-      }
+      setPendingRemoveBgImageUrl(imageUrl);
+      ensureSceneFetcher.submit(
+        { shortId, sceneNumber },
+        { method: "post", action: SHORTS_SCENES_API, encType: "application/json" }
+      );
+    } else {
+      removeBgFetcher.submit(
+        { step: "removeBg", imageUrl },
+        { method: "post", action: VIDEO_API, encType: "application/json" }
+      );
     }
-    removeBgFetcher.submit(
-      { step: "removeBg", imageUrl },
-      { method: "post", action: VIDEO_API, encType: "application/json" }
-    );
   };
 
   const handleGenerateVideo = () => {
@@ -1785,6 +1801,8 @@ function Scene3Content({
   }, [step, selectedImage, bgRemoved, bgImage, composited, sceneVideo, onScene3Change]);
 
   const removeBgFetcher = useFetcher<{ ok: boolean; url?: string; error?: string }>();
+  const ensureSceneFetcher = useFetcher<{ sceneId?: string; created?: boolean }>();
+  const [pendingRemoveBgImageUrl, setPendingRemoveBgImageUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (removeBgFetcher.state !== "idle" || !removeBgFetcher.data) return;
@@ -1798,7 +1816,16 @@ function Scene3Content({
     }
   }, [removeBgFetcher.state, removeBgFetcher.data]);
 
-  const handleRemoveBg = async () => {
+  useEffect(() => {
+    if (ensureSceneFetcher.state !== "idle" || !pendingRemoveBgImageUrl) return;
+    setPendingRemoveBgImageUrl(null);
+    removeBgFetcher.submit(
+      { step: "removeBg", imageUrl: pendingRemoveBgImageUrl },
+      { method: "post", action: VIDEO_API, encType: "application/json" }
+    );
+  }, [ensureSceneFetcher.state, ensureSceneFetcher.data, pendingRemoveBgImageUrl]);
+
+  const handleRemoveBg = () => {
     const img = productImagesProp.find((i) => i.id === selectedImage);
     const imageUrl = img?.src;
     if (!imageUrl) {
@@ -1808,20 +1835,17 @@ function Scene3Content({
     setBgRemovedError(null);
     setBgRemovedLoading(true);
     if (shortId) {
-      try {
-        await fetch(SHORTS_SCENES_API, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ shortId, sceneNumber }),
-        });
-      } catch {
-        // continue with remove BG even if ensure-scene fails
-      }
+      setPendingRemoveBgImageUrl(imageUrl);
+      ensureSceneFetcher.submit(
+        { shortId, sceneNumber },
+        { method: "post", action: SHORTS_SCENES_API, encType: "application/json" }
+      );
+    } else {
+      removeBgFetcher.submit(
+        { step: "removeBg", imageUrl },
+        { method: "post", action: VIDEO_API, encType: "application/json" }
+      );
     }
-    removeBgFetcher.submit(
-      { step: "removeBg", imageUrl },
-      { method: "post", action: VIDEO_API, encType: "application/json" }
-    );
   };
 
   const handleGenerateBg = () => {

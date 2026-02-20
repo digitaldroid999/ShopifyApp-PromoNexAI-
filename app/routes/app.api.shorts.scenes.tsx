@@ -19,7 +19,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   const shortId = body.shortId?.trim();
-  const sceneNumber = typeof body.sceneNumber === "number" ? body.sceneNumber : undefined;
+  const rawScene = body.sceneNumber;
+  const sceneNumber =
+    typeof rawScene === "number"
+      ? rawScene
+      : typeof rawScene === "string"
+        ? parseInt(rawScene, 10)
+        : undefined;
 
   if (!shortId) {
     return Response.json({ error: "shortId required" }, { status: 400 });

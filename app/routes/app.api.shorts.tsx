@@ -17,16 +17,40 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   const title = typeof body.title === "string" && body.title.trim() ? body.title.trim() : "Promo video";
-  const metadata = body.productId ? { productId: body.productId } : undefined;
+  const productId = typeof body.productId === "string" ? body.productId.trim() || undefined : undefined;
 
-  const sess = session as { userId?: string | number } | undefined;
+  // Use Shopify user ID from session (stored in DB when user authenticated)
+  const sess = session as { id?: string } | undefined;
+  let userId: bigint | null = null;
+  if (sess?.id) {
+    const row = await prisma.session.findUnique({
+      where: { id: sess.id },
+      select: { userId: true },
+    });
+    if (row?.userId != null) userId = row.userId;
+  }
+  if (userId == null) {
+    const raw = (session as unknown as { userId?: string | number }).userId;
+    if (raw != null) userId = BigInt(Number(raw));
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const short = await (prisma as any).short.create({
+  const shortDelegate = (prisma as any).short;
+  if (productId) {
+    const existing = await shortDelegate.findUnique({
+      where: { productId },
+    });
+    if (existing) {
+      return Response.json({ shortId: existing.id });
+    }
+  }
+
+  const short = await shortDelegate.create({
     data: {
       title,
-      userId: sess?.userId != null ? BigInt(Number(sess.userId)) : null,
+      productId: productId ?? undefined,
+      userId,
       status: "draft",
-      metadata: metadata ?? undefined,
     },
   });
 

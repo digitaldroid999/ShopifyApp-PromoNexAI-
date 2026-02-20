@@ -33,9 +33,10 @@ model Session {
   refreshTokenExpires DateTime?
 }
 
-// Final videos — row created when user starts the video generation workflow
+// Final videos — row created when user starts the video generation workflow (one per product)
 model Short {
   id             String    @id @default(cuid())
+  productId      String?   @unique @map("product_id") // one short per product
   userId         BigInt?   @map("user_id") // Shopify user ID (matches Session.userId)
   title          String
   status         String    @default("draft") // e.g. draft, generating, ready, failed
