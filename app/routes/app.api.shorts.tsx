@@ -54,6 +54,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     },
   });
 
+  // Create 3 VideoScene rows (scene_number 1, 2, 3) for this short
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const videoScene = (prisma as any).videoScene;
+  const DEFAULT_DURATION_SEC = 8;
+  for (let sceneNumber = 1; sceneNumber <= 3; sceneNumber++) {
+    await videoScene.create({
+      data: {
+        shortId: short.id,
+        sceneNumber,
+        duration: DEFAULT_DURATION_SEC,
+        status: "pending",
+      },
+    });
+  }
+
   return Response.json({ shortId: short.id });
 };
 
