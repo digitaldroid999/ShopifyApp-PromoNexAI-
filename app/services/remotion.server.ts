@@ -43,7 +43,7 @@ export async function startShopifyVideo(
   params: StartShopifyVideoParams
 ): Promise<StartShopifyVideoResult> {
   const base = getRemotionBase();
-  const url = `${base}/videos_shopify`;
+  const url = `${base}/videos`;
   console.log(`${LOG_PREFIX} POST ${url}`);
 
   try {
