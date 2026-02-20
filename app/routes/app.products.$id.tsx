@@ -80,7 +80,7 @@ export default function ProductDetail() {
         setWorkflowOpen(true);
       }
     } catch {
-      setWorkflowOpen(true);
+      // Don't open modal without shortId - scene rows wouldn't be created
     }
   };
 
