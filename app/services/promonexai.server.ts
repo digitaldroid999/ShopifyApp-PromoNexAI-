@@ -111,29 +111,29 @@ export async function removeBackground(
   }
 }
 
-// --- Scene 2: merge product image onto background video (third-party API) ---
+// --- Scene 2: merge product image onto background video (third-party API, async/polling) ---
 
-export type MergeVideoResult =
-  | { success: true; video_url: string }
-  | { success: false; video_url: null; error: string };
+export type MergeVideoStartResult =
+  | { ok: true; task_id: string; status: string }
+  | { ok: false; error: string };
 
 /**
- * Merges product image (e.g. bg-removed) onto a background video via third-party API.
- * POST {BACKEND_URL}/image/merge-video
+ * Starts image-video merge task via third-party API.
+ * POST {BACKEND_URL}/image/merge-video/start
  * Request: { product_image_url, background_video_url, scene_id, user_id }
- * Response: { success, video_url, error }
+ * Response: { task_id, status, scene_id, user_id, message, created_at }
  */
-export async function mergeVideo(
+export async function mergeVideoStart(
   productImageUrl: string,
   backgroundVideoUrl: string,
   sceneId: string,
   userId: string
-): Promise<MergeVideoResult> {
+): Promise<MergeVideoStartResult> {
   const base = process.env.BACKEND_URL;
   if (!base?.trim()) {
-    return { success: false, video_url: null, error: "BACKEND_URL is not set in .env" };
+    return { ok: false, error: "BACKEND_URL is not set in .env" };
   }
-  const endpoint = `${base.replace(/\/$/, "")}/image/merge-video`;
+  const endpoint = `${base.replace(/\/$/, "")}/image/merge-video/start`;
   try {
     const response = await fetch(endpoint, {
       method: "POST",
@@ -144,35 +144,65 @@ export async function mergeVideo(
         scene_id: sceneId,
         user_id: userId,
       }),
-      signal: AbortSignal.timeout(120000),
+      signal: AbortSignal.timeout(30000),
     });
     const raw = await response.text();
-    let data: { success?: boolean; video_url?: string | null; error?: string | null } = {};
+    let data: { task_id?: string; status?: string; message?: string } = {};
     try {
       data = raw ? JSON.parse(raw) : {};
     } catch {
-      return {
-        success: false,
-        video_url: null,
-        error: `Backend returned invalid JSON (${response.status})`,
-      };
+      return { ok: false, error: `Backend returned invalid JSON (${response.status})` };
     }
     if (!response.ok) {
-      const err = data.error ?? raw?.slice(0, 200) ?? response.statusText;
-      return { success: false, video_url: null, error: String(err) };
+      const err = data.message ?? raw?.slice(0, 200) ?? response.statusText;
+      return { ok: false, error: String(err) };
     }
-    if (!data.success || typeof data.video_url !== "string" || !data.video_url.trim()) {
-      return {
-        success: false,
-        video_url: null,
-        error: (data.error as string) ?? "Merge video failed",
-      };
+    const task_id = typeof data.task_id === "string" ? data.task_id.trim() : "";
+    if (!task_id) {
+      return { ok: false, error: "Backend did not return task_id" };
     }
-    const video_url = data.video_url.trim();
-    return { success: true, video_url };
+    return { ok: true, task_id, status: data.status ?? "pending" };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    return { success: false, video_url: null, error: `mergeVideo failed: ${message}` };
+    return { ok: false, error: `mergeVideoStart failed: ${message}` };
+  }
+}
+
+export type MergeVideoTaskStatus = {
+  status: string;
+  video_url: string | null;
+  error_message: string | null;
+};
+
+/**
+ * Polls merge-video task status.
+ * GET {BACKEND_URL}/image/merge-video/tasks/{task_id}
+ * Response: { task_id, status, video_url?, error_message?, ... }
+ */
+export async function mergeVideoTaskStatus(taskId: string): Promise<MergeVideoTaskStatus | null> {
+  const base = process.env.BACKEND_URL;
+  if (!base?.trim()) return null;
+  const endpoint = `${base.replace(/\/$/, "")}/image/merge-video/tasks/${encodeURIComponent(taskId)}`;
+  try {
+    const response = await fetch(endpoint, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(15000),
+    });
+    const raw = await response.text();
+    let data: { status?: string; video_url?: string | null; error_message?: string | null } = {};
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch {
+      return null;
+    }
+    return {
+      status: typeof data.status === "string" ? data.status : "pending",
+      video_url: typeof data.video_url === "string" ? data.video_url : null,
+      error_message: typeof data.error_message === "string" ? data.error_message : null,
+    };
+  } catch {
+    return null;
   }
 }
 

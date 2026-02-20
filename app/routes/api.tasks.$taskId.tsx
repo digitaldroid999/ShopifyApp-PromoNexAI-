@@ -2,8 +2,14 @@ import type { LoaderFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { fetchRemotionTaskStatus } from "../services/remotion.server";
+import { mergeVideoTaskStatus } from "../services/promonexai.server";
 
 const LOG_PREFIX = "[Tasks API]";
+
+const isScene2MergeTask = (task: { metadata?: unknown; stage?: string | null }) => {
+  const meta = task.metadata as { type?: string } | null | undefined;
+  return meta?.type === "scene2_merge" || task.stage === "scene2_merge";
+};
 
 /**
  * GET /api/tasks/:taskId - Task status (used for polling).
@@ -26,11 +32,51 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
   console.log(`${LOG_PREFIX} Poll taskId=${taskId} status=${task.status} stage=${task.stage ?? "-"} progress=${task.progress ?? "-"}%`);
 
-  // Poll Remotion whenever task is not yet terminal (completed/failed).
-  // Remotion goes: pending → processing (bundling/rendering/uploading) → completed.
-  // If we only fetched when "pending", we'd stop after the first "processing" and never see "completed".
   const isTerminal = task.status === "completed" || task.status === "failed";
   if (!isTerminal) {
+    // Scene 2 merge: poll backend merge-video/tasks/{task_id}
+    if (isScene2MergeTask(task)) {
+      const mergeStatus = await mergeVideoTaskStatus(task.remotionTaskId);
+      if (mergeStatus) {
+        console.log(`${LOG_PREFIX} Scene2 merge task ${task.remotionTaskId} → status=${mergeStatus.status}`);
+
+        const updates: { status: string; videoUrl?: string | null; error?: string | null } = {
+          status: mergeStatus.status,
+        };
+        if (mergeStatus.status === "completed" && mergeStatus.video_url) {
+          updates.videoUrl = mergeStatus.video_url;
+        }
+        if (mergeStatus.status === "failed" && mergeStatus.error_message) {
+          updates.error = mergeStatus.error_message;
+        }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const updated = await (prisma as any).task.update({
+          where: { id: taskId },
+          data: updates,
+        });
+
+        // Persist scene2 result to video_scenes.generated_video_url (VideoScene.generatedVideoUrl)
+        if (mergeStatus.status === "completed" && mergeStatus.video_url && task.videoSceneId) {
+          try {
+            await (prisma as any).videoScene.update({
+              where: { id: task.videoSceneId },
+              data: { generatedVideoUrl: mergeStatus.video_url, status: "ready" },
+            });
+            console.log(`${LOG_PREFIX} Scene2 merge completed. Saved generated_video_url to VideoScene ${task.videoSceneId}`);
+          } catch (e) {
+            console.error(`${LOG_PREFIX} Failed to update VideoScene (scene2):`, e);
+          }
+        }
+
+        return Response.json(
+          { id: updated.id, status: updated.status, stage: updated.stage, progress: updated.progress, videoUrl: updated.videoUrl, error: updated.error },
+          { headers: { "Content-Type": "application/json", "Cache-Control": "no-store, no-cache, must-revalidate", Pragma: "no-cache" } }
+        );
+      }
+    }
+
+    // Remotion (e.g. scene 1): poll Remotion API
     const remotion = await fetchRemotionTaskStatus(task.remotionTaskId);
     if (remotion) {
       console.log(`${LOG_PREFIX} Remotion task ${task.remotionTaskId} → status=${remotion.status} stage=${remotion.stage ?? "-"} progress=${remotion.progress ?? "-"}%`);
@@ -53,7 +99,6 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         data: updates,
       });
 
-      // When scene 1 generation completes, save generated URL to VideoScene.generatedVideoUrl (DB: generated_video_url)
       if (remotion.status === "completed" && remotion.videoUrl) {
         try {
           const videoSceneId =
@@ -64,10 +109,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
           if (videoSceneId) {
             await (prisma as any).videoScene.update({
               where: { id: videoSceneId },
-              data: {
-                generatedVideoUrl: remotion.videoUrl,
-                status: "ready",
-              },
+              data: { generatedVideoUrl: remotion.videoUrl, status: "ready" },
             });
             console.log(`${LOG_PREFIX} Completed. Saved generated_video_url to VideoScene ${videoSceneId} (scene 1)`);
           } else {

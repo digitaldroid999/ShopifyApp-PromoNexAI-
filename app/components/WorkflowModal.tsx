@@ -1747,8 +1747,8 @@ function Scene2Content({
     }
     setSceneError(null);
     setSceneLoading(true);
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
     try {
-      const origin = typeof window !== "undefined" ? window.location.origin : "";
       const product_image_url = bgRemoved.startsWith("http") ? bgRemoved : `${origin}${bgRemoved}`;
       const background_video_url = selectedStockVideoUrl.startsWith("http") ? selectedStockVideoUrl : `${origin}${selectedStockVideoUrl}`;
       const res = await fetch(VIDEO_API, {
@@ -1764,14 +1764,38 @@ function Scene2Content({
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (data.success && typeof data.video_url === "string" && data.video_url.trim()) {
-        const raw = data.video_url.trim();
-        const videoUrl = raw.startsWith("http") ? raw : `${origin}${raw.startsWith("/") ? raw : `/${raw}`}`;
-        setSceneVideo(videoUrl);
-        setSceneError(null);
-        onComplete?.();
-      } else {
-        setSceneError(data.error ?? "Generate video failed");
+      const taskId = data.taskId;
+      if (!taskId) {
+        setSceneError(data.error ?? "Failed to start video generation");
+        setSceneLoading(false);
+        return;
+      }
+      let done = false;
+      for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        const pollRes = await fetch(`${TASKS_API_BASE}/${encodeURIComponent(taskId)}`, {
+          credentials: "include",
+          cache: "no-store",
+          headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
+        });
+        const task = await pollRes.json().catch(() => ({}));
+        if (task.status === "completed" && (task.videoUrl ?? task.video_url)) {
+          const rawUrl = task.videoUrl ?? task.video_url;
+          const videoUrl = typeof rawUrl === "string" && rawUrl.startsWith("http") ? rawUrl : `${origin}${rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`}`;
+          setSceneVideo(videoUrl);
+          setSceneError(null);
+          onComplete?.();
+          done = true;
+          break;
+        }
+        if (task.status === "failed") {
+          setSceneError(task.error ?? "Video generation failed");
+          done = true;
+          break;
+        }
+      }
+      if (!done) {
+        setSceneError("Video generation timed out. Please try again.");
       }
     } catch (e) {
       setSceneError(e instanceof Error ? e.message : "Generate video failed");

@@ -1,6 +1,6 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
-import { removeBackground, mergeVideo } from "../services/promonexai.server";
+import { removeBackground, mergeVideoStart } from "../services/promonexai.server";
 import prisma from "../db.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -40,30 +40,39 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const scene_id = body.scene_id;
     const user_id = body.user_id ?? "anonymous";
     if (!product_image_url || typeof product_image_url !== "string") {
-      return Response.json({ success: false, video_url: null, error: "Missing or invalid product_image_url" }, { status: 400 });
+      return Response.json({ error: "Missing or invalid product_image_url" }, { status: 400 });
     }
     if (!background_video_url || typeof background_video_url !== "string") {
-      return Response.json({ success: false, video_url: null, error: "Missing or invalid background_video_url" }, { status: 400 });
+      return Response.json({ error: "Missing or invalid background_video_url" }, { status: 400 });
     }
     if (!scene_id || typeof scene_id !== "string") {
-      return Response.json({ success: false, video_url: null, error: "Missing or invalid scene_id" }, { status: 400 });
+      return Response.json({ error: "Missing or invalid scene_id" }, { status: 400 });
     }
-    const result = await mergeVideo(product_image_url, background_video_url, scene_id, user_id);
-    if (!result.success) {
-      return Response.json({ success: false, video_url: null, error: result.error }, { status: 200 });
+    const result = await mergeVideoStart(product_image_url, background_video_url, scene_id, user_id);
+    if (!result.ok) {
+      return Response.json({ error: result.error }, { status: 200 });
     }
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const videoScene = (prisma as any).videoScene;
-      await videoScene.update({
-        where: { id: scene_id },
-        data: { generatedVideoUrl: result.video_url },
+      const prismaAny = prisma as any;
+      const scene = await prismaAny.videoScene.findUnique({ where: { id: scene_id }, select: { shortId: true } });
+      const shortId = scene?.shortId ?? null;
+      const task = await prismaAny.task.create({
+        data: {
+          remotionTaskId: result.task_id,
+          shortId,
+          videoSceneId: scene_id,
+          status: "pending",
+          stage: "scene2_merge",
+          progress: 0,
+          metadata: { type: "scene2_merge" },
+        },
       });
+      return Response.json({ taskId: task.id, status: "pending" });
     } catch (err) {
-      console.error("[app.api.video] mergeVideo: failed to update VideoScene:", err);
-      // Still return success and video_url so the UI can show the video
+      console.error("[app.api.video] mergeVideo start: failed to create Task:", err);
+      return Response.json({ error: "Failed to create task" }, { status: 500 });
     }
-    return Response.json({ success: true, video_url: result.video_url, error: null });
   }
 
   return Response.json({ ok: false, error: `Unknown step: ${step}` }, { status: 400 });
