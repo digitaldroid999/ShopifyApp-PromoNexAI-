@@ -120,30 +120,36 @@ export type MergeVideoStartResult =
 /**
  * Starts image-video merge task via third-party API.
  * POST {BACKEND_URL}/image/merge-video/start
- * Request: { product_image_url, background_video_url, scene_id, user_id }
+ * Request: { product_image_url, background_video_url, scene_id, user_id, duration? }
  * Response: { task_id, status, scene_id, user_id, message, created_at }
+ * When duration (seconds) is set, output is limited to that length; omit for full background length.
  */
 export async function mergeVideoStart(
   productImageUrl: string,
   backgroundVideoUrl: string,
   sceneId: string,
-  userId: string
+  userId: string,
+  durationSeconds?: number
 ): Promise<MergeVideoStartResult> {
   const base = process.env.BACKEND_URL;
   if (!base?.trim()) {
     return { ok: false, error: "BACKEND_URL is not set in .env" };
   }
   const endpoint = `${base.replace(/\/$/, "")}/image/merge-video/start`;
+  const body: Record<string, unknown> = {
+    product_image_url: productImageUrl,
+    background_video_url: backgroundVideoUrl,
+    scene_id: sceneId,
+    user_id: userId,
+  };
+  if (durationSeconds != null && Number.isFinite(durationSeconds) && durationSeconds > 0) {
+    body.duration = durationSeconds;
+  }
   try {
     const response = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        product_image_url: productImageUrl,
-        background_video_url: backgroundVideoUrl,
-        scene_id: sceneId,
-        user_id: userId,
-      }),
+      body: JSON.stringify(body),
       signal: AbortSignal.timeout(30000),
     });
     const raw = await response.text();

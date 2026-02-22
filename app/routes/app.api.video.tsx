@@ -63,7 +63,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const shortId = scene.shortId;
 
     console.log(`${LOG} Calling backend merge-video/start...`);
-    const result = await mergeVideoStart(product_image_url, background_video_url, scene_id, user_id);
+    const result = await mergeVideoStart(product_image_url, background_video_url, scene_id, user_id, 8);
     if (!result.ok) {
       console.warn(`${LOG} Backend start failed: ${result.error}`);
       return Response.json({ error: result.error }, { status: 200 });
