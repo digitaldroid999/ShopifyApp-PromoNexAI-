@@ -8,7 +8,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (request.method !== "POST") {
     return Response.json({ error: "Method not allowed" }, { status: 405 });
   }
-  let body: { voice_id?: string; user_id?: string; short_id?: string };
+  let body: { voice_id?: string; user_id?: string; short_id?: string; product_description?: string };
   try {
     body = await request.json();
   } catch {
@@ -17,14 +17,15 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const voice_id = typeof body.voice_id === "string" ? body.voice_id.trim() : "";
   const user_id = typeof body.user_id === "string" ? body.user_id.trim() : "";
   const short_id = typeof body.short_id === "string" ? body.short_id.trim() : "";
+  const product_description = typeof body.product_description === "string" ? body.product_description.trim() || undefined : undefined;
   if (!voice_id || !user_id || !short_id) {
     return Response.json(
       { error: "voice_id, user_id, and short_id are required" },
       { status: 400 }
     );
   }
-  console.log("[app.api.audio.generate-script] request", { voice_id, user_id, short_id });
-  const result = await generateScript(voice_id, user_id, short_id);
+  console.log("[app.api.audio.generate-script] request", { voice_id, user_id, short_id, has_product_description: !!product_description });
+  const result = await generateScript(voice_id, user_id, short_id, product_description);
   if (!result.ok) {
     return Response.json({ error: result.error }, { status: 400 });
   }

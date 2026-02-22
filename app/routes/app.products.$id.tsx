@@ -7,6 +7,14 @@ import { WorkflowModal } from "../components/WorkflowModal";
 
 const MOCKUP_BASE = "/mockup";
 
+function getProductDescription(product: { description?: string | null; descriptionHtml?: string | null }): string | undefined {
+  const plain = product.description?.trim();
+  if (plain) return plain;
+  const html = product.descriptionHtml?.trim();
+  if (!html) return undefined;
+  return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() || undefined;
+}
+
 const PRODUCT_QUERY = `#graphql
   query getProduct($id: ID!) {
     product(id: $id) {
@@ -14,6 +22,8 @@ const PRODUCT_QUERY = `#graphql
       title
       handle
       status
+      description
+      descriptionHtml
       images(first: 10) {
         edges {
           node {
@@ -36,6 +46,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         title: "Sample product (video mockup)",
         handle: "sample-product-mockup",
         status: "ACTIVE",
+        description: "Sample product description for mockup.",
+        descriptionHtml: "<p>Sample product description for mockup.</p>",
         images: {
           edges: [
             { node: { id: "img1", url: `${MOCKUP_BASE}/scene1-original.jpg`, altText: "Scene 1" } },
@@ -145,7 +157,10 @@ export default function ProductDetail() {
           isSample={isSample}
           productId={product.id}
           productImages={productImagesForWorkflow}
-          product={{ name: product.title ?? "Product" }}
+          product={{
+            name: product.title ?? "Product",
+            description: getProductDescription(product),
+          }}
           onClose={() => setWorkflowOpen(false)}
           onDone={(videoUrl) => setProductVideoUrl(videoUrl)}
         />

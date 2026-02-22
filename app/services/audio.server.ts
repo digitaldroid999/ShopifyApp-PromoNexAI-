@@ -55,8 +55,13 @@ export async function getElevenLabsVoices(): Promise<{
   }
 }
 
-/** Backend: generate script. Request/response match user spec. */
-export async function generateScript(voiceId: string, userId: string, shortId: string): Promise<{
+/** Backend: generate script. Request/response match user spec. Optional product_description is sent for context. */
+export async function generateScript(
+  voiceId: string,
+  userId: string,
+  shortId: string,
+  productDescription?: string
+): Promise<{
   ok: true;
   short_id: string;
   script: string;
@@ -66,16 +71,18 @@ export async function generateScript(voiceId: string, userId: string, shortId: s
 } | { ok: false; error: string }> {
   const base = getBackendBase();
   const endpoint = `${base}/audio/generate-script`;
-  console.log(`${LOG_PREFIX} [script] request voice_id=${voiceId} user_id=${userId} short_id=${shortId} -> ${endpoint}`);
+  const payload = {
+    voice_id: voiceId,
+    user_id: userId,
+    short_id: shortId,
+    ...(productDescription && { product_description: productDescription }),
+  };
+  console.log(`${LOG_PREFIX} [script] request voice_id=${voiceId} user_id=${userId} short_id=${shortId} has_product_description=${!!productDescription} -> ${endpoint}`);
   try {
     const res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        voice_id: voiceId,
-        user_id: userId,
-        short_id: shortId,
-      }),
+      body: JSON.stringify(payload),
       signal: AbortSignal.timeout(60000),
     });
     const data = (await res.json()) as {
@@ -95,7 +102,6 @@ export async function generateScript(voiceId: string, userId: string, shortId: s
       return { ok: false, error: "Invalid response: missing script" };
     }
     console.log(`${LOG_PREFIX} [script] success short_id=${data.short_id ?? shortId} script_length=${data.script.length} words_per_minute=${data.words_per_minute ?? "—"} target_duration_seconds=${data.target_duration_seconds ?? "—"}`);
-    console.log( data ) ;
     return {
       ok: true,
       short_id: data.short_id ?? shortId,
