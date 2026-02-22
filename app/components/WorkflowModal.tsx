@@ -1039,6 +1039,7 @@ export function WorkflowModal({
                         disabled={!shortInfo?.shortId || !shortInfo?.userId || !selectedVoiceId || scriptGenerateLoading}
                         onClick={async () => {
                           if (!shortInfo?.shortId || !shortInfo?.userId || !selectedVoiceId) return;
+                          console.log("[Audio Script] Generate script start", { voice_id: selectedVoiceId, user_id: shortInfo.userId, short_id: shortInfo.shortId });
                           setScriptGenerateLoading(true);
                           try {
                             const res = await fetch(AUDIO_GENERATE_SCRIPT_API, {
@@ -1052,10 +1053,11 @@ export function WorkflowModal({
                             });
                             const data = await res.json();
                             if (data.script) {
+                              console.log("[Audio Script] Generate script success", { short_id: data.short_id, script_length: data.script?.length, words_per_minute: data.words_per_minute, target_duration_seconds: data.target_duration_seconds });
                               setAudioScript(data.script);
                               setScriptGenerated(true);
                             } else {
-                              console.error("Generate script failed:", data.error || res.status);
+                              console.error("[Audio Script] Generate script failed:", data.error || res.status, data);
                               alert(data.error || "Failed to generate script");
                             }
                           } finally {
@@ -1153,6 +1155,7 @@ export function WorkflowModal({
                           disabled={!shortInfo?.shortId || !shortInfo?.userId || !selectedVoiceId || !audioScript.trim() || audioGenerateLoading}
                           onClick={async () => {
                             if (!shortInfo?.shortId || !shortInfo?.userId || !selectedVoiceId || !audioScript.trim()) return;
+                            console.log("[Audio Generate] Generate audio start", { voice_id: selectedVoiceId, user_id: shortInfo.userId, short_id: shortInfo.shortId, script_length: audioScript.trim().length });
                             setAudioGenerateLoading(true);
                             try {
                               const res = await fetch(AUDIO_GENERATE_API, {
@@ -1167,10 +1170,12 @@ export function WorkflowModal({
                               });
                               const data = await res.json();
                               if (data.audio_url) {
+                                console.log("[Audio Generate] Generate audio success", { audio_url: data.audio_url, duration: data.duration, is_cached: data.is_cached, subtitle_segments: data.subtitle_timing?.length ?? 0 });
                                 setGeneratedAudioUrl(data.audio_url);
                                 setLastSubtitleTiming(Array.isArray(data.subtitle_timing) ? data.subtitle_timing : null);
                                 setAudioGenerated(true);
                               } else {
+                                console.error("[Audio Generate] Generate audio failed:", data.error || res.status, data);
                                 alert(data.error || "Failed to generate audio");
                               }
                             } finally {

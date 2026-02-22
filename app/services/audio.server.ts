@@ -66,6 +66,7 @@ export async function generateScript(voiceId: string, userId: string, shortId: s
 } | { ok: false; error: string }> {
   const base = getBackendBase();
   const endpoint = `${base}/audio/generate-script`;
+  console.log(`${LOG_PREFIX} [script] request voice_id=${voiceId} user_id=${userId} short_id=${shortId} -> ${endpoint}`);
   try {
     const res = await fetch(endpoint, {
       method: "POST",
@@ -86,11 +87,14 @@ export async function generateScript(voiceId: string, userId: string, shortId: s
       error?: string;
     };
     if (!res.ok) {
+      console.warn(`${LOG_PREFIX} [script] failed status=${res.status} error=${data?.error ?? "unknown"}`);
       return { ok: false, error: data?.error ?? `HTTP ${res.status}` };
     }
     if (typeof data.script !== "string") {
+      console.warn(`${LOG_PREFIX} [script] invalid response: missing script`);
       return { ok: false, error: "Invalid response: missing script" };
     }
+    console.log(`${LOG_PREFIX} [script] success short_id=${data.short_id ?? shortId} script_length=${data.script.length} words_per_minute=${data.words_per_minute ?? "—"} target_duration_seconds=${data.target_duration_seconds ?? "—"}`);
     return {
       ok: true,
       short_id: data.short_id ?? shortId,
@@ -101,7 +105,7 @@ export async function generateScript(voiceId: string, userId: string, shortId: s
     };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    console.error(`${LOG_PREFIX} generateScript error:`, message);
+    console.error(`${LOG_PREFIX} [script] error:`, message);
     return { ok: false, error: message };
   }
 }
@@ -131,6 +135,7 @@ export async function generateAudio(
 > {
   const base = getBackendBase();
   const endpoint = `${base}/audio/generate`;
+  console.log(`${LOG_PREFIX} [audio] request voice_id=${voiceId} user_id=${userId} short_id=${shortId} script_length=${script.length} -> ${endpoint}`);
   try {
     const res = await fetch(endpoint, {
       method: "POST",
@@ -158,11 +163,14 @@ export async function generateAudio(
       error?: string;
     };
     if (!res.ok) {
+      console.warn(`${LOG_PREFIX} [audio] failed status=${res.status} error=${data?.error ?? "unknown"}`);
       return { ok: false, error: data?.error ?? `HTTP ${res.status}` };
     }
     if (typeof data.audio_url !== "string") {
+      console.warn(`${LOG_PREFIX} [audio] invalid response: missing audio_url`);
       return { ok: false, error: "Invalid response: missing audio_url" };
     }
+    console.log(`${LOG_PREFIX} [audio] success audio_url=${data.audio_url} duration=${data.duration ?? "—"} is_cached=${data.is_cached ?? false} subtitle_segments=${data.subtitle_timing?.length ?? 0}`);
     return {
       ok: true,
       voice_id: data.voice_id ?? voiceId,
@@ -179,7 +187,7 @@ export async function generateAudio(
     };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
-    console.error(`${LOG_PREFIX} generateAudio error:`, message);
+    console.error(`${LOG_PREFIX} [audio] error:`, message);
     return { ok: false, error: message };
   }
 }

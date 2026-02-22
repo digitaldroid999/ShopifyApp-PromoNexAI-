@@ -23,6 +23,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       { status: 400 }
     );
   }
+  console.log("[app.api.audio.generate-script] request", { voice_id, user_id, short_id });
   const result = await generateScript(voice_id, user_id, short_id);
   if (!result.ok) {
     return Response.json({ error: result.error }, { status: 400 });
