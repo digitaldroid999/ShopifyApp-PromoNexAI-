@@ -703,3 +703,121 @@ export async function extractBackgroundPrompt(params: {
     return { success: false, prompt: "", error: message };
   }
 }
+
+// --- Background: generate (async task) ---
+
+export type StartBackgroundGenerationResult =
+  | { ok: true; task_id: string }
+  | { ok: false; error: string };
+
+/**
+ * POST {BACKEND_URL}/background/generate
+ * Request: product_description, user_id, scene_id?, short_id?, and either manual_prompt OR mood+style+environment
+ * Response: { success, task_id, status, message, created_at }
+ */
+export async function startBackgroundGeneration(params: {
+  product_description: string;
+  user_id: string;
+  scene_id?: string;
+  short_id?: string;
+  manual_prompt?: string;
+  mood?: string;
+  style?: string;
+  environment?: string;
+}): Promise<StartBackgroundGenerationResult> {
+  const base = process.env.BACKEND_URL;
+  if (!base?.trim()) {
+    return { ok: false, error: "BACKEND_URL is not set in .env" };
+  }
+  const endpoint = `${base.replace(/\/$/, "")}/background/generate`;
+  const body: Record<string, string> = {
+    product_description: params.product_description.trim() || "Product",
+    user_id: params.user_id.trim() || "anonymous",
+  };
+  if (params.scene_id?.trim()) body.scene_id = params.scene_id.trim();
+  if (params.short_id?.trim()) body.short_id = params.short_id.trim();
+  if (params.manual_prompt?.trim()) {
+    body.manual_prompt = params.manual_prompt.trim();
+  } else {
+    if (params.mood?.trim()) body.mood = params.mood.trim();
+    if (params.style?.trim()) body.style = params.style.trim();
+    if (params.environment?.trim()) body.environment = params.environment.trim();
+  }
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30000),
+    });
+    const raw = await response.text();
+    let data: { success?: boolean; task_id?: string; error?: string; message?: string } = {};
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch {
+      return { ok: false, error: `Backend returned invalid JSON (${response.status})` };
+    }
+    if (!response.ok) {
+      const err = data.error ?? data.message ?? raw?.slice(0, 200) ?? response.statusText;
+      return { ok: false, error: String(err) };
+    }
+    const task_id = typeof data.task_id === "string" ? data.task_id.trim() : "";
+    if (!task_id) {
+      return { ok: false, error: data.error ?? "Backend did not return task_id" };
+    }
+    return { ok: true, task_id };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: message };
+  }
+}
+
+export type BackgroundGenerationStatusResult = {
+  status: string;
+  image_url: string | null;
+  error: string | null;
+};
+
+/**
+ * GET {BACKEND_URL}/background/status/{task_id}
+ * Response: { status, image_url?, result_image_url?, error?, error_message? }
+ */
+export async function getBackgroundGenerationStatus(taskId: string): Promise<BackgroundGenerationStatusResult> {
+  const base = process.env.BACKEND_URL;
+  if (!base?.trim()) {
+    return { status: "failed", image_url: null, error: "BACKEND_URL is not set" };
+  }
+  const endpoint = `${base.replace(/\/$/, "")}/background/status/${encodeURIComponent(taskId)}`;
+  try {
+    const response = await fetch(endpoint, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(15000),
+    });
+    const raw = await response.text();
+    let data: {
+      status?: string;
+      image_url?: string | null;
+      result_image_url?: string | null;
+      error?: string | null;
+      error_message?: string | null;
+    } = {};
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch {
+      return { status: "failed", image_url: null, error: "Invalid response" };
+    }
+    const status = typeof data.status === "string" ? data.status : "unknown";
+    const image_url =
+      typeof data.image_url === "string"
+        ? data.image_url
+        : typeof data.result_image_url === "string"
+          ? data.result_image_url
+          : null;
+    const error = typeof data.error === "string" ? data.error : typeof data.error_message === "string" ? data.error_message : null;
+    return { status, image_url, error };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return { status: "failed", image_url: null, error: message };
+  }
+}

@@ -3,6 +3,10 @@ import { useFetcher } from "react-router";
 
 const BASE = "/mockup";
 const BACKGROUND_EXTRACT_PROMPT_API = "/app/api/background/extract-prompt";
+const BACKGROUND_GENERATE_API = "/app/api/background/generate";
+const BACKGROUND_STATUS_API_BASE = "/app/api/background/status";
+const BACKGROUND_POLL_INTERVAL_MS = 2500;
+const BACKGROUND_POLL_MAX_ATTEMPTS = 60;
 
 const defaultProductImages = [
   { id: "s1", src: `${BASE}/scene1-original.jpg`, label: "Image 1" },
@@ -182,7 +186,7 @@ function AIBackgroundModal({
     overflow: "hidden",
   };
   const cardTitle = { margin: 0, padding: "6px 8px", fontSize: "11px", fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.5px", color: "var(--p-color-text-subdued, #6d7175)", borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)" };
-  const listStyle = { flex: 1, overflowY: "auto" as const, padding: "4px", maxHeight: "140px" };
+  const listStyle = { flex: 1, overflowY: "auto" as const, padding: "4px", maxHeight: "240px" };
 
   return (
     <div
@@ -205,6 +209,7 @@ function AIBackgroundModal({
           boxShadow: "0 6px 24px rgba(0,0,0,0.18)",
           width: "100%",
           maxWidth: "720px",
+          maxHeight: "90vh",
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
@@ -2075,6 +2080,7 @@ function Scene1Content({
   const [bgRemovedError, setBgRemovedError] = useState<string | null>(null);
   const [bgImage, setBgImage] = useState<string | null>(initialScene1?.bgImage ?? null);
   const [bgLoading, setBgLoading] = useState(false);
+  const [bgError, setBgError] = useState<string | null>(null);
   const [fetchModalOpen, setFetchModalOpen] = useState(false);
   const [aiBgModalOpen, setAiBgModalOpen] = useState(false);
   const [composited, setComposited] = useState<string | null>(initialScene1?.composited ?? null);
@@ -2125,12 +2131,63 @@ function Scene1Content({
     );
   };
 
-  const handleGenerateBg = () => {
+  const handleGenerateBg = async (opts: AIBackgroundGenerateOpts) => {
+    const product_description = typeof productProp?.description === "string" ? productProp.description.trim() : "";
+    const user_id = shortUserId ?? "anonymous";
+    const scene_id = videoSceneId ?? (productId ? `${productId}-scene1` : `scene1-${Date.now()}`);
+    const short_id = shortId ?? undefined;
+    setBgError(null);
     setBgLoading(true);
-    setTimeout(() => {
-      setBgImage(`${BASE}/scene1-bg.png`);
+    try {
+      const body: Record<string, string> = {
+        product_description: product_description || "Product",
+        user_id,
+      };
+      if (scene_id) body.scene_id = scene_id;
+      if (short_id) body.short_id = short_id;
+      if (opts.mode === "manual") {
+        body.manual_prompt = opts.manual_prompt;
+      } else {
+        body.mood = opts.mood;
+        body.style = opts.style;
+        body.environment = opts.environment;
+      }
+      const res = await fetch(BACKGROUND_GENERATE_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+      const data = (await res.json()) as { ok?: boolean; task_id?: string; error?: string };
+      if (!data.ok || !data.task_id) {
+        setBgError(data.error ?? "Failed to start background generation");
+        return;
+      }
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      for (let i = 0; i < BACKGROUND_POLL_MAX_ATTEMPTS; i++) {
+        await new Promise((r) => setTimeout(r, BACKGROUND_POLL_INTERVAL_MS));
+        const statusRes = await fetch(`${BACKGROUND_STATUS_API_BASE}/${encodeURIComponent(data.task_id)}`, {
+          credentials: "include",
+          headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
+        });
+        const statusData = (await statusRes.json()) as { status?: string; image_url?: string | null; error?: string | null };
+        if (statusData.status === "completed" && statusData.image_url) {
+          const url = statusData.image_url.startsWith("http") ? statusData.image_url : `${origin}${statusData.image_url}`;
+          setBgImage(url);
+          setBgError(null);
+          return;
+        }
+        if (statusData.status === "failed") {
+          setBgError(statusData.error ?? "Background generation failed");
+          return;
+        }
+      }
+      setBgError("Background generation timed out. Please try again.");
+    } catch (e) {
+      setBgError(e instanceof Error ? e.message : "Background generation failed");
+    } finally {
       setBgLoading(false);
-    }, 1000);
+    }
   };
 
   const handleComposite = async () => {
@@ -2412,9 +2469,9 @@ function Scene1Content({
             <AIBackgroundModal
               open={aiBgModalOpen}
               onClose={() => setAiBgModalOpen(false)}
-              onGenerate={() => {
+              onGenerate={(opts) => {
                 setAiBgModalOpen(false);
-                handleGenerateBg();
+                handleGenerateBg(opts);
               }}
               productDescription={typeof productProp?.description === "string" ? productProp.description : ""}
             />
@@ -2451,6 +2508,9 @@ function Scene1Content({
               </button>
             </div>
           </div>
+          {bgError && (
+            <p style={{ margin: "8px 0 0", fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{bgError}</p>
+          )}
           {compositeLoading && (
             <div style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "center" }}>
               <span className="spinner" style={{ width: 24, height: 24, border: "2px solid #e1e3e5", borderTopColor: "#2c6ecb", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
@@ -2921,6 +2981,7 @@ function Scene3Content({
   const [bgRemovedError, setBgRemovedError] = useState<string | null>(null);
   const [bgImage, setBgImage] = useState<string | null>(initialScene3?.bgImage ?? null);
   const [bgLoading, setBgLoading] = useState(false);
+  const [bgError, setBgError] = useState<string | null>(null);
   const [fetchModalOpen, setFetchModalOpen] = useState(false);
   const [aiBgModalOpen, setAiBgModalOpen] = useState(false);
   const [composited, setComposited] = useState<string | null>(initialScene3?.composited ?? null);
@@ -2971,12 +3032,63 @@ function Scene3Content({
     );
   };
 
-  const handleGenerateBg = () => {
+  const handleGenerateBg = async (opts: AIBackgroundGenerateOpts) => {
+    const product_description = typeof productProp?.description === "string" ? productProp.description.trim() : "";
+    const user_id = shortUserId ?? "anonymous";
+    const scene_id = videoSceneId ?? (productId ? `${productId}-scene3` : `scene3-${Date.now()}`);
+    const short_id = shortId ?? undefined;
+    setBgError(null);
     setBgLoading(true);
-    setTimeout(() => {
-      setBgImage(`${BASE}/scene3-bg.png`);
+    try {
+      const body: Record<string, string> = {
+        product_description: product_description || "Product",
+        user_id,
+      };
+      if (scene_id) body.scene_id = scene_id;
+      if (short_id) body.short_id = short_id;
+      if (opts.mode === "manual") {
+        body.manual_prompt = opts.manual_prompt;
+      } else {
+        body.mood = opts.mood;
+        body.style = opts.style;
+        body.environment = opts.environment;
+      }
+      const res = await fetch(BACKGROUND_GENERATE_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+      const data = (await res.json()) as { ok?: boolean; task_id?: string; error?: string };
+      if (!data.ok || !data.task_id) {
+        setBgError(data.error ?? "Failed to start background generation");
+        return;
+      }
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      for (let i = 0; i < BACKGROUND_POLL_MAX_ATTEMPTS; i++) {
+        await new Promise((r) => setTimeout(r, BACKGROUND_POLL_INTERVAL_MS));
+        const statusRes = await fetch(`${BACKGROUND_STATUS_API_BASE}/${encodeURIComponent(data.task_id)}`, {
+          credentials: "include",
+          headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
+        });
+        const statusData = (await statusRes.json()) as { status?: string; image_url?: string | null; error?: string | null };
+        if (statusData.status === "completed" && statusData.image_url) {
+          const url = statusData.image_url.startsWith("http") ? statusData.image_url : `${origin}${statusData.image_url}`;
+          setBgImage(url);
+          setBgError(null);
+          return;
+        }
+        if (statusData.status === "failed") {
+          setBgError(statusData.error ?? "Background generation failed");
+          return;
+        }
+      }
+      setBgError("Background generation timed out. Please try again.");
+    } catch (e) {
+      setBgError(e instanceof Error ? e.message : "Background generation failed");
+    } finally {
       setBgLoading(false);
-    }, 1000);
+    }
   };
 
   const handleComposite = async () => {
@@ -3254,9 +3366,9 @@ function Scene3Content({
             <AIBackgroundModal
               open={aiBgModalOpen}
               onClose={() => setAiBgModalOpen(false)}
-              onGenerate={() => {
+              onGenerate={(opts) => {
                 setAiBgModalOpen(false);
-                handleGenerateBg();
+                handleGenerateBg(opts);
               }}
               productDescription={typeof productProp?.description === "string" ? productProp.description : ""}
             />
@@ -3285,6 +3397,9 @@ function Scene3Content({
               </button>
             </div>
           </div>
+          {bgError && (
+            <p style={{ margin: "8px 0 0", fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{bgError}</p>
+          )}
           {compositeLoading && (
             <div style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "center" }}>
               <span className="spinner" style={{ width: 24, height: 24, border: "2px solid #e1e3e5", borderTopColor: "#2c6ecb", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
