@@ -1004,86 +1004,91 @@ export function WorkflowModal({
               >
                 <p style={{ margin: "0 0 12px", fontSize: "14px", fontWeight: 600 }}>Audio script & voiceover (optional)</p>
                 <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                  <div>
-                    <label style={{ display: "block", marginBottom: "4px", fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)" }}>Voice</label>
-                    <select
-                      value={selectedVoiceId}
-                      onChange={(e) => setSelectedVoiceId(e.target.value)}
-                      disabled={!voicesFetcher.data?.success}
-                      style={{
-                        width: "100%",
-                        maxWidth: "320px",
-                        padding: "8px 12px",
-                        borderRadius: "8px",
-                        border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                        fontSize: "14px",
-                        background: "#fff",
-                      }}
-                    >
-                      {voicesFetcher.state === "loading" && (
-                        <option value="">Loading voices…</option>
-                      )}
-                      {voicesFetcher.data?.success && voicesFetcher.data.voices.length === 0 && (
-                        <option value="">No voices (check ELEVENLABS_API_KEY)</option>
-                      )}
-                      {voicesFetcher.data?.success && voicesFetcher.data.voices.map((v) => (
-                        <option key={v.voice_id} value={v.voice_id}>{v.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  {!scriptGenerated ? (
-                    <button
-                      type="button"
-                      disabled={!shortInfo?.shortId || !shortInfo?.userId || !selectedVoiceId || scriptGenerateLoading}
-                      onClick={async () => {
-                        if (!shortInfo?.shortId || !shortInfo?.userId || !selectedVoiceId) return;
-                        setScriptGenerateLoading(true);
-                        try {
-                          const res = await fetch(AUDIO_GENERATE_SCRIPT_API, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              voice_id: selectedVoiceId,
-                              user_id: shortInfo.userId,
-                              short_id: shortInfo.shortId,
-                            }),
-                          });
-                          const data = await res.json();
-                          if (data.script) {
-                            setAudioScript(data.script);
-                            setScriptGenerated(true);
-                          } else {
-                            console.error("Generate script failed:", data.error || res.status);
-                            alert(data.error || "Failed to generate script");
+                  <div style={{ display: "flex", alignItems: "flex-end", gap: "16px", flexWrap: "wrap" }}>
+                    <div>
+                      <label style={{ display: "block", marginBottom: "4px", fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)" }}>Voice</label>
+                      <select
+                        value={selectedVoiceId}
+                        onChange={(e) => setSelectedVoiceId(e.target.value)}
+                        disabled={!voicesFetcher.data?.success}
+                        style={{
+                          width: "100%",
+                          minWidth: "200px",
+                          maxWidth: "280px",
+                          padding: "8px 12px",
+                          borderRadius: "8px",
+                          border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                          fontSize: "14px",
+                          background: "#fff",
+                        }}
+                      >
+                        {voicesFetcher.state === "loading" && (
+                          <option value="">Loading voices…</option>
+                        )}
+                        {voicesFetcher.data?.success && voicesFetcher.data.voices.length === 0 && (
+                          <option value="">No voices (check ELEVENLABS_API_KEY)</option>
+                        )}
+                        {voicesFetcher.data?.success && voicesFetcher.data.voices.map((v) => (
+                          <option key={v.voice_id} value={v.voice_id}>{v.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {!scriptGenerated && (
+                      <button
+                        type="button"
+                        disabled={!shortInfo?.shortId || !shortInfo?.userId || !selectedVoiceId || scriptGenerateLoading}
+                        onClick={async () => {
+                          if (!shortInfo?.shortId || !shortInfo?.userId || !selectedVoiceId) return;
+                          setScriptGenerateLoading(true);
+                          try {
+                            const res = await fetch(AUDIO_GENERATE_SCRIPT_API, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                voice_id: selectedVoiceId,
+                                user_id: shortInfo.userId,
+                                short_id: shortInfo.shortId,
+                              }),
+                            });
+                            const data = await res.json();
+                            if (data.script) {
+                              setAudioScript(data.script);
+                              setScriptGenerated(true);
+                            } else {
+                              console.error("Generate script failed:", data.error || res.status);
+                              alert(data.error || "Failed to generate script");
+                            }
+                          } finally {
+                            setScriptGenerateLoading(false);
                           }
-                        } finally {
-                          setScriptGenerateLoading(false);
-                        }
-                      }}
-                      style={{
-                        padding: "10px 20px",
-                        borderRadius: "8px",
-                        border: "none",
-                        background: scriptGenerateLoading || !selectedVoiceId ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
-                        color: "#fff",
-                        fontWeight: 600,
-                        cursor: scriptGenerateLoading || !selectedVoiceId ? "not-allowed" : "pointer",
-                        fontSize: "14px",
-                        alignSelf: "flex-start",
-                      }}
-                    >
-                      {scriptGenerateLoading ? "Generating…" : "Generate audio script"}
-                    </button>
-                  ) : (
+                        }}
+                        style={{
+                          padding: "10px 20px",
+                          borderRadius: "8px",
+                          border: "none",
+                          background: scriptGenerateLoading || !selectedVoiceId ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
+                          color: "#fff",
+                          fontWeight: 600,
+                          cursor: scriptGenerateLoading || !selectedVoiceId ? "not-allowed" : "pointer",
+                          fontSize: "14px",
+                        }}
+                      >
+                        {scriptGenerateLoading ? "Generating…" : "Generate audio script"}
+                      </button>
+                    )}
+                  </div>
+                  {scriptGenerated && (
                     <>
                       <div>
                         <label style={{ display: "block", marginBottom: "4px", fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)" }}>Script (edit if needed)</label>
                         <textarea
                           value={audioScript}
                           onChange={(e) => setAudioScript(e.target.value)}
-                          rows={4}
+                          rows={3}
                           style={{
-                            width: "100%",
+                            width: "50%",
+                            maxWidth: "100%",
+                            minWidth: "280px",
                             padding: "12px",
                             borderRadius: "8px",
                             border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
@@ -1091,6 +1096,7 @@ export function WorkflowModal({
                             lineHeight: 1.5,
                             resize: "vertical",
                             fontFamily: "inherit",
+                            boxSizing: "border-box",
                           }}
                         />
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px", flexWrap: "wrap" }}>
