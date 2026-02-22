@@ -20,16 +20,20 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     },
   });
   if (!short) {
-    return Response.json({ shortId: null, userId: null, scene1Id: null, scene2Id: null, scene3Id: null, audioInfo: null });
+    return Response.json({ shortId: null, userId: null, scene1Id: null, scene2Id: null, scene3Id: null, audioInfo: null, scene1GeneratedVideoUrl: null, scene2GeneratedVideoUrl: null, scene3GeneratedVideoUrl: null });
   }
   const [s1, s2, s3] = short.scenes;
   const audioInfo = (short as { audioInfo?: { voiceId: string | null; voiceName: string | null; audioScript: string | null; generatedAudioUrl: string | null; subtitles: unknown } | null }).audioInfo;
+  const sceneWithUrl = (s: { generatedVideoUrl?: string | null } | undefined) => (s?.generatedVideoUrl?.trim() ? s.generatedVideoUrl : null) ?? null;
   return Response.json({
     shortId: short.id,
     userId: short.userId ?? null,
     scene1Id: s1?.id ?? null,
     scene2Id: s2?.id ?? null,
     scene3Id: s3?.id ?? null,
+    scene1GeneratedVideoUrl: sceneWithUrl(s1),
+    scene2GeneratedVideoUrl: sceneWithUrl(s2),
+    scene3GeneratedVideoUrl: sceneWithUrl(s3),
     audioInfo: audioInfo
       ? {
           voiceId: audioInfo.voiceId ?? null,
@@ -75,12 +79,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     if (existing) {
       const [s1, s2, s3] = existing.scenes;
       const audioInfo = (existing as { audioInfo?: { voiceId: string | null; voiceName: string | null; audioScript: string | null; generatedAudioUrl: string | null; subtitles: unknown } | null }).audioInfo;
+      const sceneWithUrl = (s: { generatedVideoUrl?: string | null } | undefined) => (s?.generatedVideoUrl?.trim() ? s.generatedVideoUrl : null) ?? null;
       return Response.json({
         shortId: existing.id,
         userId: existing.userId ?? null,
         scene1Id: s1?.id ?? null,
         scene2Id: s2?.id ?? null,
         scene3Id: s3?.id ?? null,
+        scene1GeneratedVideoUrl: sceneWithUrl(s1),
+        scene2GeneratedVideoUrl: sceneWithUrl(s2),
+        scene3GeneratedVideoUrl: sceneWithUrl(s3),
         audioInfo: audioInfo
           ? { voiceId: audioInfo.voiceId ?? null, voiceName: audioInfo.voiceName ?? null, audioScript: audioInfo.audioScript ?? null, generatedAudioUrl: audioInfo.generatedAudioUrl ?? null, subtitles: audioInfo.subtitles ?? null }
           : null,

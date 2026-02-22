@@ -668,6 +668,9 @@ type ShortInfo = {
   scene1Id: string | null;
   scene2Id: string | null;
   scene3Id: string | null;
+  scene1GeneratedVideoUrl: string | null;
+  scene2GeneratedVideoUrl: string | null;
+  scene3GeneratedVideoUrl: string | null;
   audioInfo: AudioInfoSnapshot;
 };
 
@@ -710,6 +713,9 @@ export function WorkflowModal({
           scene1Id: loadShortFetcher.data.scene1Id ?? null,
           scene2Id: loadShortFetcher.data.scene2Id ?? null,
           scene3Id: loadShortFetcher.data.scene3Id ?? null,
+          scene1GeneratedVideoUrl: (loadShortFetcher.data as { scene1GeneratedVideoUrl?: string | null }).scene1GeneratedVideoUrl ?? null,
+          scene2GeneratedVideoUrl: (loadShortFetcher.data as { scene2GeneratedVideoUrl?: string | null }).scene2GeneratedVideoUrl ?? null,
+          scene3GeneratedVideoUrl: (loadShortFetcher.data as { scene3GeneratedVideoUrl?: string | null }).scene3GeneratedVideoUrl ?? null,
           audioInfo: (loadShortFetcher.data as { audioInfo?: AudioInfoSnapshot }).audioInfo ?? null,
         }
       : null;
@@ -1204,7 +1210,7 @@ export function WorkflowModal({
                         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                           <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                             <audio
-                              src={generatedAudioUrl?.startsWith("http") ? generatedAudioUrl : backendUrl ? `${backendUrl}${generatedAudioUrl?.startsWith("/") ? "" : "/"}${generatedAudioUrl ?? ""}` : undefined}
+                              src={(shortInfo?.audioInfo?.generatedAudioUrl ?? generatedAudioUrl) || undefined}
                               controls
                               style={{ maxWidth: "100%" }}
                             />
@@ -1306,6 +1312,7 @@ export function WorkflowModal({
                   shortId={shortInfo?.shortId ?? undefined}
                   shortUserId={shortInfo?.userId ?? undefined}
                   initialScene1={restoredState?.scene1}
+                  dbSceneVideoUrl={shortInfo?.scene1GeneratedVideoUrl ?? undefined}
                   onScene1Change={setScene1Snapshot}
                   onComplete={() => setScene1Complete(true)}
                 />
@@ -1316,6 +1323,7 @@ export function WorkflowModal({
                   sceneId={shortInfo?.scene2Id ?? undefined}
                   shortUserId={shortInfo?.userId ?? undefined}
                   initialScene2={restoredState?.scene2}
+                  dbSceneVideoUrl={shortInfo?.scene2GeneratedVideoUrl ?? undefined}
                   onScene2Change={setScene2Snapshot}
                   onComplete={() => setScene2Complete(true)}
                 />
@@ -1329,6 +1337,7 @@ export function WorkflowModal({
                   shortId={shortInfo?.shortId ?? undefined}
                   shortUserId={shortInfo?.userId ?? undefined}
                   initialScene3={restoredState?.scene3}
+                  dbSceneVideoUrl={shortInfo?.scene3GeneratedVideoUrl ?? undefined}
                   onScene3Change={setScene3Snapshot}
                   onComplete={() => setScene3Complete(true)}
                 />
@@ -1467,6 +1476,7 @@ function Scene1Content({
   shortId,
   shortUserId,
   initialScene1,
+  dbSceneVideoUrl,
   onScene1Change,
   onComplete,
 }: {
@@ -1477,6 +1487,8 @@ function Scene1Content({
   shortId?: string | null;
   shortUserId?: string | null;
   initialScene1?: Scene1State | null;
+  /** Display URL from DB (video_scenes.generated_video_url); preferred over state from temp */
+  dbSceneVideoUrl?: string | null;
   onScene1Change?: (s: Scene1State) => void;
   onComplete?: () => void;
 }) {
@@ -1930,8 +1942,8 @@ function Scene1Content({
                     Retry
                   </button>
                 </div>
-              ) : sceneVideo ? (
-                <video src={sceneVideo} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
+              ) : (dbSceneVideoUrl ?? sceneVideo) ? (
+                <video src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
               ) : (
                 <button
                   type="button"
@@ -1965,6 +1977,7 @@ function Scene2Content({
   sceneId: scene2Id,
   shortUserId,
   initialScene2,
+  dbSceneVideoUrl,
   onScene2Change,
   onComplete,
 }: {
@@ -1972,6 +1985,8 @@ function Scene2Content({
   sceneId?: string | null;
   shortUserId?: string | null;
   initialScene2?: Scene2State | null;
+  /** Display URL from DB (video_scenes.generated_video_url); preferred over state from temp */
+  dbSceneVideoUrl?: string | null;
   onScene2Change?: (s: Scene2State) => void;
   onComplete?: () => void;
 }) {
@@ -2256,8 +2271,8 @@ function Scene2Content({
                   <span className="spinner" style={{ width: 24, height: 24, border: "2px solid #e1e3e5", borderTopColor: "#2c6ecb", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
                   <span style={{ fontSize: "14px", color: "#6d7175" }}>Generating video…</span>
                 </div>
-              ) : sceneVideo ? (
-                <video src={sceneVideo} controls style={{ maxWidth: "400px", maxHeight: "240px", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
+              ) : (dbSceneVideoUrl ?? sceneVideo) ? (
+                <video src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "400px", maxHeight: "240px", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
               ) : (
                 <button
                   type="button"
@@ -2297,6 +2312,7 @@ function Scene3Content({
   shortId,
   shortUserId,
   initialScene3,
+  dbSceneVideoUrl,
   onScene3Change,
   onComplete,
 }: {
@@ -2307,6 +2323,8 @@ function Scene3Content({
   shortId?: string | null;
   shortUserId?: string | null;
   initialScene3?: Scene3State | null;
+  /** Display URL from DB (video_scenes.generated_video_url); preferred over state from temp */
+  dbSceneVideoUrl?: string | null;
   onScene3Change?: (s: Scene3State) => void;
   onComplete?: () => void;
 }) {
@@ -2729,8 +2747,8 @@ function Scene3Content({
                     <span style={{ fontSize: "12px", color: "#6d7175" }}>{sceneProgress}%</span>
                   )}
                 </div>
-              ) : sceneVideo ? (
-                <video src={sceneVideo} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
+              ) : (dbSceneVideoUrl ?? sceneVideo) ? (
+                <video src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
               ) : (
                 <button
                   type="button"
