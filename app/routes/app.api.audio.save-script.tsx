@@ -51,7 +51,3 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return Response.json({ error: "Failed to save script" }, { status: 500 });
   }
 };
-
-export default function AudioSaveScriptRoute() {
-  return null;
-}

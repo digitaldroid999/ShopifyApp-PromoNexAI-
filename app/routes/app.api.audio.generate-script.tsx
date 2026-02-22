@@ -31,7 +31,3 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
   return Response.json(result);
 };
-
-export default function AudioGenerateScriptRoute() {
-  return null;
-}
