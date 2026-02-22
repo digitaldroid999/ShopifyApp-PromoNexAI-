@@ -55,7 +55,3 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   return Response.json({ error: "Method not allowed" }, { status: 405 });
 };
-
-export default function ApiPromoWorkflowTempRoute() {
-  return null;
-}

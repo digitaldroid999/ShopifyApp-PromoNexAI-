@@ -20,7 +20,3 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const result = await searchStockImages(query.trim(), page, perPage);
   return Response.json(result);
 };
-
-export default function ApiStockImagesRoute() {
-  return null;
-}

@@ -122,7 +122,3 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     scene3Id: sceneIds[2] ?? null,
   });
 };
-
-export default function ApiShortsRoute() {
-  return null;
-}

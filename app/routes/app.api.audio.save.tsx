@@ -63,7 +63,3 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return Response.json({ error: "Failed to save audio" }, { status: 500 });
   }
 };
-
-export default function AudioSaveRoute() {
-  return null;
-}

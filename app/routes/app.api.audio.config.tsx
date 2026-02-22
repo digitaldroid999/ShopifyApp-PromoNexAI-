@@ -7,7 +7,3 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const backendUrl = process.env.BACKEND_URL?.replace(/\/$/, "") ?? "";
   return Response.json({ backendUrl });
 };
-
-export default function AudioConfigRoute() {
-  return null;
-}

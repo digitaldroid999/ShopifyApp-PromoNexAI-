@@ -11,7 +11,3 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
   return Response.json({ success: true, voices: result.voices });
 };
-
-export default function AudioVoicesRoute() {
-  return null;
-}
