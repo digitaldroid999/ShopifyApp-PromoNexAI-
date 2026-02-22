@@ -814,8 +814,10 @@ export function WorkflowModal({
     }
   }, [voicesFetcher.data, selectedVoiceId]);
 
+  // Restore workflow state from temp only on initial load (when still "pending").
+  // This prevents revalidation from overwriting state the user just set (e.g. after generating script).
   useEffect(() => {
-    if (loadTempFetcher.state !== "idle" || !loadTempFetcher.data) return;
+    if (loadedState !== "pending" || loadTempFetcher.state !== "idle" || !loadTempFetcher.data) return;
     const data = loadTempFetcher.data;
     const state = data?.state ?? null;
     setLoadedState(state);
@@ -831,7 +833,7 @@ export function WorkflowModal({
       setScene2Snapshot(state.scene2);
       setScene3Snapshot(state.scene3);
     }
-  }, [loadTempFetcher.state, loadTempFetcher.data]);
+  }, [loadedState, loadTempFetcher.state, loadTempFetcher.data]);
 
   // Debounced save while workflow is in progress (skip while still loading temp)
   useEffect(() => {
@@ -1052,12 +1054,13 @@ export function WorkflowModal({
                               }),
                             });
                             const data = await res.json();
-                            if (data.script) {
-                              console.log("[Audio Script] Generate script success", { short_id: data.short_id, script_length: data.script?.length, words_per_minute: data.words_per_minute, target_duration_seconds: data.target_duration_seconds });
-                              setAudioScript(data.script);
+                            const scriptText = typeof data.script === "string" ? data.script : "";
+                            if (scriptText) {
+                              console.log("[Audio Script] Generate script success", { short_id: data.short_id, script_length: scriptText.length, words_per_minute: data.words_per_minute, target_duration_seconds: data.target_duration_seconds });
+                              setAudioScript(scriptText);
                               setScriptGenerated(true);
                             } else {
-                              console.error("[Audio Script] Generate script failed:", data.error || res.status, data);
+                              console.error("[Audio Script] Generate script failed:", data.error || res.status, "response:", data);
                               alert(data.error || "Failed to generate script");
                             }
                           } finally {
