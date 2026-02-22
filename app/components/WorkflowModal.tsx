@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
 
 const BASE = "/mockup";
+const BACKGROUND_EXTRACT_PROMPT_API = "/app/api/background/extract-prompt";
 
 const defaultProductImages = [
   { id: "s1", src: `${BASE}/scene1-original.jpg`, label: "Image 1" },
@@ -97,25 +98,74 @@ const ENVIRONMENTS = [
   { value: "home-cozy", label: "Home Cozy", icon: "🏠" },
 ];
 
+export type AIBackgroundGenerateOpts =
+  | { mode: "manual"; manual_prompt: string }
+  | { mode: "env"; mood: string; style: string; environment: string };
+
 function AIBackgroundModal({
   open,
   onClose,
   onGenerate,
+  productDescription = "",
 }: {
   open: boolean;
   onClose: () => void;
-  onGenerate: (opts: { mood: string; style: string; environment: string }) => void;
+  onGenerate: (opts: AIBackgroundGenerateOpts) => void;
+  productDescription?: string;
 }) {
+  const [generationMode, setGenerationMode] = useState<"manual" | "env">("env");
   const [prompt, setPrompt] = useState("");
   const [mood, setMood] = useState<string | null>(null);
   const [style, setStyle] = useState<string | null>(null);
   const [environment, setEnvironment] = useState<string | null>(null);
+  const [extractPromptLoading, setExtractPromptLoading] = useState(false);
+  const [hasExtractedPromptOnce, setHasExtractedPromptOnce] = useState(false);
+  const [extractError, setExtractError] = useState<string | null>(null);
 
-  const canGenerate = mood !== null && style !== null && environment !== null;
+  const canGenerate =
+    generationMode === "manual"
+      ? prompt.trim().length > 0
+      : mood !== null && style !== null && environment !== null;
+
+  const handleExtractPrompt = async () => {
+    setExtractError(null);
+    setExtractPromptLoading(true);
+    try {
+      const moodLabel = mood ? MOODS.find((m) => m.value === mood)?.label ?? mood : undefined;
+      const styleLabel = style ? STYLES.find((s) => s.value === style)?.label ?? style : undefined;
+      const envLabel = environment ? ENVIRONMENTS.find((e) => e.value === environment)?.label ?? environment : undefined;
+      const res = await fetch(BACKGROUND_EXTRACT_PROMPT_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          product_description: (productDescription || "").trim() || "Product",
+          mood: moodLabel,
+          style: styleLabel,
+          environment: envLabel,
+        }),
+      });
+      const data = (await res.json()) as { success?: boolean; prompt?: string; error?: string | null };
+      if (data.success === true && typeof data.prompt === "string") {
+        setPrompt(data.prompt);
+        setHasExtractedPromptOnce(true);
+      } else {
+        setExtractError(data.error ?? "Failed to extract prompt");
+      }
+    } catch (e) {
+      setExtractError(e instanceof Error ? e.message : "Request failed");
+    } finally {
+      setExtractPromptLoading(false);
+    }
+  };
 
   const handleGenerate = () => {
     if (!canGenerate) return;
-    onGenerate({ mood: mood!, style: style!, environment: environment! });
+    if (generationMode === "manual") {
+      onGenerate({ mode: "manual", manual_prompt: prompt.trim() });
+    } else {
+      onGenerate({ mode: "env", mood: mood!, style: style!, environment: environment! });
+    }
     onClose();
   };
 
@@ -165,39 +215,71 @@ function AIBackgroundModal({
           <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 600 }}>Generate background with AI</h3>
           <button type="button" onClick={onClose} style={{ padding: "4px", border: "none", background: "transparent", cursor: "pointer", fontSize: "18px", lineHeight: 1, color: "#5c5f62" }} aria-label="Close">×</button>
         </div>
-        <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)", display: "flex", alignItems: "flex-start", gap: "8px" }}>
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="Describe the background (or use Generate to suggest from product)"
-            rows={2}
-            style={{
-              flex: 1,
-              minWidth: 0,
-              padding: "8px 10px",
-              borderRadius: "8px",
-              border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-              fontSize: "12px",
-              resize: "vertical",
-              fontFamily: "inherit",
-            }}
-          />
-          <button
-            type="button"
-            style={{
-              padding: "8px 14px",
-              borderRadius: "8px",
-              border: "none",
-              background: "var(--p-color-bg-fill-info, #2c6ecb)",
-              color: "#fff",
-              fontWeight: 600,
-              cursor: "pointer",
-              fontSize: "12px",
-              flexShrink: 0,
-            }}
-          >
-            Generate
-          </button>
+        <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)" }}>
+          <p style={{ margin: "0 0 8px", fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-primary, #202223)" }}>How to generate the background</p>
+          <div style={{ display: "flex", gap: "16px", alignItems: "center", flexWrap: "wrap" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "12px" }}>
+              <input
+                type="radio"
+                name="ai-bg-mode"
+                checked={generationMode === "manual"}
+                onChange={() => setGenerationMode("manual")}
+                style={{ width: "14px", height: "14px", accentColor: "var(--p-color-bg-fill-info, #2c6ecb)" }}
+              />
+              <span>Manual prompt</span>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "12px" }}>
+              <input
+                type="radio"
+                name="ai-bg-mode"
+                checked={generationMode === "env"}
+                onChange={() => setGenerationMode("env")}
+                style={{ width: "14px", height: "14px", accentColor: "var(--p-color-bg-fill-info, #2c6ecb)" }}
+              />
+              <span>Mood, style & environment</span>
+            </label>
+          </div>
+        </div>
+        <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Describe the background (or use Generate to suggest from product)"
+              rows={2}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                padding: "8px 10px",
+                borderRadius: "8px",
+                border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                fontSize: "12px",
+                resize: "vertical",
+                fontFamily: "inherit",
+              }}
+            />
+            <button
+              type="button"
+              onClick={handleExtractPrompt}
+              disabled={extractPromptLoading}
+              style={{
+                padding: "8px 14px",
+                borderRadius: "8px",
+                border: "none",
+                background: extractPromptLoading ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
+                color: "#fff",
+                fontWeight: 600,
+                cursor: extractPromptLoading ? "wait" : "pointer",
+                fontSize: "12px",
+                flexShrink: 0,
+              }}
+            >
+              {extractPromptLoading ? "…" : hasExtractedPromptOnce ? "Regenerate Prompt" : "Generate Prompt"}
+            </button>
+          </div>
+          {extractError && (
+            <p style={{ margin: "6px 0 0", fontSize: "12px", color: "var(--p-color-text-critical, #d72c0d)" }}>{extractError}</p>
+          )}
         </div>
         <div style={{ display: "flex", gap: "10px", padding: "10px 12px", flex: "1 1 auto", minHeight: 0 }}>
           <div style={cardBase}>
@@ -2292,7 +2374,7 @@ function Scene1Content({
                 </div>
               )}
               {bgImage ? (
-                <img src={bgImage} alt="Background" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
+                <img key={bgImage} src={bgImage} alt="Background" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
               ) : null}
             </div>
             <AIBackgroundModal
@@ -2302,6 +2384,7 @@ function Scene1Content({
                 setAiBgModalOpen(false);
                 handleGenerateBg();
               }}
+              productDescription={typeof productProp?.description === "string" ? productProp.description : ""}
             />
             <FetchBackgroundModal
               open={fetchModalOpen}
@@ -3133,7 +3216,7 @@ function Scene3Content({
                 </div>
               )}
               {bgImage ? (
-                <img src={bgImage} alt="Background" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
+                <img key={bgImage} src={bgImage} alt="Background" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
               ) : null}
             </div>
             <AIBackgroundModal
@@ -3143,6 +3226,7 @@ function Scene3Content({
                 setAiBgModalOpen(false);
                 handleGenerateBg();
               }}
+              productDescription={typeof productProp?.description === "string" ? productProp.description : ""}
             />
             <FetchBackgroundModal
               open={fetchModalOpen}

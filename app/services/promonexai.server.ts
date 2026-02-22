@@ -647,3 +647,59 @@ export async function searchStockVideos(
     errors: Object.keys(errors).length ? errors : undefined,
   };
 }
+
+// --- Background: extract prompt (OpenAI) ---
+
+export type ExtractBackgroundPromptResult =
+  | { success: true; prompt: string; error: null }
+  | { success: false; prompt: ""; error: string };
+
+/**
+ * POST {BACKEND_URL}/background/extract-prompt
+ * Request: { product_description, mood?, style?, environment? }
+ * Response: { success, prompt, error? }
+ */
+export async function extractBackgroundPrompt(params: {
+  product_description: string;
+  mood?: string;
+  style?: string;
+  environment?: string;
+}): Promise<ExtractBackgroundPromptResult> {
+  const base = process.env.BACKEND_URL;
+  if (!base?.trim()) {
+    return { success: false, prompt: "", error: "BACKEND_URL is not set in .env" };
+  }
+  const endpoint = `${base.replace(/\/$/, "")}/background/extract-prompt`;
+  const body = {
+    product_description: params.product_description.trim(),
+    ...(params.mood?.trim() && { mood: params.mood.trim() }),
+    ...(params.style?.trim() && { style: params.style.trim() }),
+    ...(params.environment?.trim() && { environment: params.environment.trim() }),
+  };
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(20000),
+    });
+    const raw = await response.text();
+    let data: { success?: boolean; prompt?: string; error?: string | null } = {};
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch {
+      return { success: false, prompt: "", error: `Backend returned invalid JSON (${response.status})` };
+    }
+    if (!response.ok) {
+      const err = data.error ?? raw?.slice(0, 200) ?? response.statusText;
+      return { success: false, prompt: "", error: String(err) };
+    }
+    if (data.success === true && typeof data.prompt === "string") {
+      return { success: true, prompt: data.prompt, error: null };
+    }
+    return { success: false, prompt: "", error: data.error ?? "Invalid response" };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return { success: false, prompt: "", error: message };
+  }
+}
