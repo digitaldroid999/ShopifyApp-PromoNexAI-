@@ -14,18 +14,31 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const shortDelegate = (prisma as any).short;
   const short = await shortDelegate.findUnique({
     where: { productId },
-    include: { scenes: { orderBy: { sceneNumber: "asc" } } },
+    include: {
+      scenes: { orderBy: { sceneNumber: "asc" } },
+      audioInfo: true,
+    },
   });
   if (!short) {
-    return Response.json({ shortId: null, userId: null, scene1Id: null, scene2Id: null, scene3Id: null });
+    return Response.json({ shortId: null, userId: null, scene1Id: null, scene2Id: null, scene3Id: null, audioInfo: null });
   }
   const [s1, s2, s3] = short.scenes;
+  const audioInfo = (short as { audioInfo?: { voiceId: string | null; voiceName: string | null; audioScript: string | null; generatedAudioUrl: string | null; subtitles: unknown } | null }).audioInfo;
   return Response.json({
     shortId: short.id,
     userId: short.userId ?? null,
     scene1Id: s1?.id ?? null,
     scene2Id: s2?.id ?? null,
     scene3Id: s3?.id ?? null,
+    audioInfo: audioInfo
+      ? {
+          voiceId: audioInfo.voiceId ?? null,
+          voiceName: audioInfo.voiceName ?? null,
+          audioScript: audioInfo.audioScript ?? null,
+          generatedAudioUrl: audioInfo.generatedAudioUrl ?? null,
+          subtitles: audioInfo.subtitles ?? null,
+        }
+      : null,
   });
 };
 
@@ -57,16 +70,20 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (productId) {
     const existing = await shortDelegate.findUnique({
       where: { productId },
-      include: { scenes: { orderBy: { sceneNumber: "asc" } } },
+      include: { scenes: { orderBy: { sceneNumber: "asc" } }, audioInfo: true },
     });
     if (existing) {
       const [s1, s2, s3] = existing.scenes;
+      const audioInfo = (existing as { audioInfo?: { voiceId: string | null; voiceName: string | null; audioScript: string | null; generatedAudioUrl: string | null; subtitles: unknown } | null }).audioInfo;
       return Response.json({
         shortId: existing.id,
         userId: existing.userId ?? null,
         scene1Id: s1?.id ?? null,
         scene2Id: s2?.id ?? null,
         scene3Id: s3?.id ?? null,
+        audioInfo: audioInfo
+          ? { voiceId: audioInfo.voiceId ?? null, voiceName: audioInfo.voiceName ?? null, audioScript: audioInfo.audioScript ?? null, generatedAudioUrl: audioInfo.generatedAudioUrl ?? null, subtitles: audioInfo.subtitles ?? null }
+          : null,
       });
     }
   }
