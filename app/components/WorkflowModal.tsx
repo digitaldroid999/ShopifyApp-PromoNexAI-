@@ -1714,14 +1714,17 @@ function Scene2Content({
     if (data.ok && data.url) {
       setBgRemoved(data.url);
       setBgRemovedError(null);
-      // Save scene2 image_url to DB (same pattern as other scenes: /bg_removed_images/{filename})
+      // Save scene2 image_url to DB (video_scenes.image_url) — same pattern as other scenes: /bg_removed_images/{filename}
       if (scene2Id && data.url) {
         fetch(SHORTS_SCENES_API, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
           body: JSON.stringify({ sceneId: scene2Id, imageUrl: data.url }),
-        }).catch((err) => console.warn("[Scene2] Failed to save image_url:", err));
+        })
+          .then((r) => (r.ok ? Promise.resolve() : Promise.reject(new Error(r.statusText))))
+          .then(() => console.log("[Scene2] Saved image_url to VideoScene:", data.url))
+          .catch((err) => console.warn("[Scene2] Failed to save image_url:", err));
       }
     } else {
       setBgRemovedError(data.error ?? "Remove BG failed");
