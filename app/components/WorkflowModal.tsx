@@ -106,6 +106,7 @@ function AIBackgroundModal({
   onClose: () => void;
   onGenerate: (opts: { mood: string; style: string; environment: string }) => void;
 }) {
+  const [prompt, setPrompt] = useState("");
   const [mood, setMood] = useState<string | null>(null);
   const [style, setStyle] = useState<string | null>(null);
   const [environment, setEnvironment] = useState<string | null>(null);
@@ -163,6 +164,40 @@ function AIBackgroundModal({
         <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 600 }}>Generate background with AI</h3>
           <button type="button" onClick={onClose} style={{ padding: "4px", border: "none", background: "transparent", cursor: "pointer", fontSize: "18px", lineHeight: 1, color: "#5c5f62" }} aria-label="Close">×</button>
+        </div>
+        <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)", display: "flex", alignItems: "flex-start", gap: "8px" }}>
+          <textarea
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="Describe the background (or use Generate to suggest from product)"
+            rows={2}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              padding: "8px 10px",
+              borderRadius: "8px",
+              border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+              fontSize: "12px",
+              resize: "vertical",
+              fontFamily: "inherit",
+            }}
+          />
+          <button
+            type="button"
+            style={{
+              padding: "8px 14px",
+              borderRadius: "8px",
+              border: "none",
+              background: "var(--p-color-bg-fill-info, #2c6ecb)",
+              color: "#fff",
+              fontWeight: 600,
+              cursor: "pointer",
+              fontSize: "12px",
+              flexShrink: 0,
+            }}
+          >
+            Generate
+          </button>
         </div>
         <div style={{ display: "flex", gap: "10px", padding: "10px 12px", flex: "1 1 auto", minHeight: 0 }}>
           <div style={cardBase}>
@@ -2220,7 +2255,7 @@ function Scene1Content({
                   <span style={{ fontSize: "14px", color: "#6d7175" }}>Generating background…</span>
                 </div>
               ) : null}
-              {!bgImage && !bgLoading && (
+              {!bgLoading && (
                 <div style={{ position: "absolute", top: "8px", right: "8px", display: "flex", gap: "6px", zIndex: 1 }}>
                   <button
                     type="button"
@@ -3061,7 +3096,7 @@ function Scene3Content({
                   <span style={{ fontSize: "14px", color: "#6d7175" }}>Generating background…</span>
                 </div>
               ) : null}
-              {!bgImage && !bgLoading && (
+              {!bgLoading && (
                 <div style={{ position: "absolute", top: "8px", right: "8px", display: "flex", gap: "6px", zIndex: 1 }}>
                   <button
                     type="button"
