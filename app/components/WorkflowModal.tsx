@@ -67,6 +67,7 @@ function FetchBackgroundModal({
   const [query, setQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const stockFetcher = useFetcher<StockImagesResponse>();
+  const lastLoadRef = useRef<{ query: string; page: number } | null>(null);
 
   const isLoading = stockFetcher.state === "loading" || stockFetcher.state === "submitting";
   const data = stockFetcher.data;
@@ -83,6 +84,8 @@ function FetchBackgroundModal({
   const loadPage = (page: number) => {
     const q = query.trim();
     if (!q) return;
+    if (lastLoadRef.current?.query === q && lastLoadRef.current?.page === page) return;
+    lastLoadRef.current = { query: q, page };
     stockFetcher.load(
       `${STOCK_IMAGES_API}?${new URLSearchParams({ query: q, page: String(page), per_page: String(PER_PAGE) }).toString()}`
     );
@@ -114,6 +117,10 @@ function FetchBackgroundModal({
       onClose();
     }
   };
+
+  useEffect(() => {
+    if (!open) lastLoadRef.current = null;
+  }, [open]);
 
   if (!open) return null;
 
@@ -362,6 +369,7 @@ function FetchVideoModal({
   const [query, setQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const stockFetcher = useFetcher<StockVideosResponse>();
+  const lastLoadRef = useRef<{ query: string; page: number } | null>(null);
 
   const isLoading = stockFetcher.state === "loading" || stockFetcher.state === "submitting";
   const data = stockFetcher.data;
@@ -377,6 +385,8 @@ function FetchVideoModal({
   const loadPage = (page: number) => {
     const q = query.trim();
     if (!q) return;
+    if (lastLoadRef.current?.query === q && lastLoadRef.current?.page === page) return;
+    lastLoadRef.current = { query: q, page };
     stockFetcher.load(
       `${STOCK_VIDEOS_API}?${new URLSearchParams({ query: q, page: String(page), per_page: String(PER_PAGE) }).toString()}`
     );
@@ -409,6 +419,10 @@ function FetchVideoModal({
       onClose();
     }
   };
+
+  useEffect(() => {
+    if (!open) lastLoadRef.current = null;
+  }, [open]);
 
   if (!open) return null;
 
@@ -721,6 +735,7 @@ export function WorkflowModal({
   const [audioSavedFeedback, setAudioSavedFeedback] = useState(false);
   const [backendUrl, setBackendUrl] = useState<string>("");
   const initedAudioFromInfoRef = useRef(false);
+  const voicesLoadStartedRef = useRef(false);
 
   const [scene1Snapshot, setScene1Snapshot] = useState<WorkflowTempState["scene1"] | null>(null);
   const [scene2Snapshot, setScene2Snapshot] = useState<WorkflowTempState["scene2"] | null>(null);
@@ -773,16 +788,17 @@ export function WorkflowModal({
     }
   }, [shortInfo?.audioInfo]);
 
-  // Load voices and backend config when audio step is relevant
+  // Load voices and backend config once when audio step becomes relevant (avoid re-fetch loop)
   useEffect(() => {
     if (!allScenesComplete) return;
-    if (voicesFetcher.state === "idle" && !voicesFetcher.data) {
+    if (!voicesLoadStartedRef.current) {
+      voicesLoadStartedRef.current = true;
       voicesFetcher.load(AUDIO_VOICES_API);
     }
     if (audioConfigFetcher.state === "idle" && !audioConfigFetcher.data) {
       audioConfigFetcher.load(AUDIO_CONFIG_API);
     }
-  }, [allScenesComplete, voicesFetcher.state, voicesFetcher.data, audioConfigFetcher.state, audioConfigFetcher.data]);
+  }, [allScenesComplete, audioConfigFetcher.state, audioConfigFetcher.data]);
 
   useEffect(() => {
     if (audioConfigFetcher.data?.backendUrl) {
@@ -993,7 +1009,7 @@ export function WorkflowModal({
                     <select
                       value={selectedVoiceId}
                       onChange={(e) => setSelectedVoiceId(e.target.value)}
-                      disabled={voicesFetcher.state === "loading" || !voicesFetcher.data?.success}
+                      disabled={!voicesFetcher.data?.success}
                       style={{
                         width: "100%",
                         maxWidth: "320px",
@@ -1056,7 +1072,7 @@ export function WorkflowModal({
                         alignSelf: "flex-start",
                       }}
                     >
-                      {scriptGenerateLoading ? "Generating script…" : "Generate script"}
+                      {scriptGenerateLoading ? "Generating…" : "Generate audio script"}
                     </button>
                   ) : (
                     <>
