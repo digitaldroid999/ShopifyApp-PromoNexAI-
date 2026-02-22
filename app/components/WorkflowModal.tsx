@@ -1053,7 +1053,13 @@ export function WorkflowModal({
                                 short_id: shortInfo.shortId,
                               }),
                             });
-                            const data = await res.json();
+                            const parsed = await parseJsonResponse(res);
+                            if (!parsed.ok) {
+                              console.error("[Audio Script] Generate script failed:", parsed.error);
+                              alert(parsed.error);
+                              return;
+                            }
+                            const data = parsed.data;
                             const scriptText = typeof data.script === "string" ? data.script : "";
                             if (scriptText) {
                               console.log("[Audio Script] Generate script success", { short_id: data.short_id, script_length: scriptText.length, words_per_minute: data.words_per_minute, target_duration_seconds: data.target_duration_seconds });
@@ -1061,7 +1067,7 @@ export function WorkflowModal({
                               setScriptGenerated(true);
                             } else {
                               console.error("[Audio Script] Generate script failed:", data.error || res.status, "response:", data);
-                              alert(data.error || "Failed to generate script");
+                              alert((data.error as string) || "Failed to generate script");
                             }
                           } finally {
                             setScriptGenerateLoading(false);
@@ -1123,12 +1129,13 @@ export function WorkflowModal({
                                     voice_name: voicesFetcher.data?.success ? voicesFetcher.data.voices.find((v) => v.voice_id === selectedVoiceId)?.name : undefined,
                                   }),
                                 });
-                                const data = await res.json();
+                                const parsed = await parseJsonResponse(res);
+                                const data = parsed.ok ? parsed.data : { success: false, error: parsed.error };
                                 if (data.success) {
                                   setScriptSavedFeedback(true);
                                   setTimeout(() => setScriptSavedFeedback(false), 2000);
                                 } else {
-                                  alert(data.error || "Failed to save script");
+                                  alert((data.error as string) || "Failed to save script");
                                 }
                               } finally {
                                 setScriptSaveLoading(false);
@@ -1171,15 +1178,21 @@ export function WorkflowModal({
                                   script: audioScript.trim(),
                                 }),
                               });
-                              const data = await res.json();
+                              const parsed = await parseJsonResponse(res);
+                              if (!parsed.ok) {
+                                console.error("[Audio Generate] Generate audio failed:", parsed.error);
+                                alert(parsed.error);
+                                return;
+                              }
+                              const data = parsed.data;
                               if (data.audio_url) {
-                                console.log("[Audio Generate] Generate audio success", { audio_url: data.audio_url, duration: data.duration, is_cached: data.is_cached, subtitle_segments: data.subtitle_timing?.length ?? 0 });
-                                setGeneratedAudioUrl(data.audio_url);
-                                setLastSubtitleTiming(Array.isArray(data.subtitle_timing) ? data.subtitle_timing : null);
+                                console.log("[Audio Generate] Generate audio success", { audio_url: data.audio_url, duration: data.duration, is_cached: data.is_cached, subtitle_segments: Array.isArray(data.subtitle_timing) ? data.subtitle_timing.length : 0 });
+                                setGeneratedAudioUrl(data.audio_url as string);
+                                setLastSubtitleTiming(Array.isArray(data.subtitle_timing) ? data.subtitle_timing as Array<{ text: string; start_time: number; end_time: number; duration: number }> : null);
                                 setAudioGenerated(true);
                               } else {
                                 console.error("[Audio Generate] Generate audio failed:", data.error || res.status, data);
-                                alert(data.error || "Failed to generate audio");
+                                alert((data.error as string) || "Failed to generate audio");
                               }
                             } finally {
                               setAudioGenerateLoading(false);
@@ -1229,12 +1242,13 @@ export function WorkflowModal({
                                       voice_name: voicesFetcher.data?.success ? voicesFetcher.data.voices.find((v) => v.voice_id === selectedVoiceId)?.name : undefined,
                                     }),
                                   });
-                                  const data = await res.json();
+                                  const parsed = await parseJsonResponse(res);
+                                  const data = parsed.ok ? parsed.data : { success: false, error: parsed.error };
                                   if (data.success) {
                                     setAudioSavedFeedback(true);
                                     setTimeout(() => setAudioSavedFeedback(false), 2000);
                                   } else {
-                                    alert(data.error || "Failed to save audio");
+                                    alert((data.error as string) || "Failed to save audio");
                                   }
                                 } finally {
                                   setAudioSaveLoading(false);
@@ -1358,6 +1372,21 @@ const AUDIO_CONFIG_API = "/app/api/audio/config";
 const PER_PAGE = 12;
 const POLL_INTERVAL_MS = 5000;
 const POLL_MAX_ATTEMPTS = 60; // 5 min at 5s
+
+/** Parse response as JSON; if server returns HTML (e.g. error page), return error instead of throwing. */
+async function parseJsonResponse(res: Response): Promise<{ ok: true; data: Record<string, unknown> } | { ok: false; error: string }> {
+  const text = await res.text();
+  const trimmed = text.trim();
+  if (trimmed.startsWith("<")) {
+    return { ok: false, error: "Server returned HTML instead of JSON. Check that you're logged in and the app is running." };
+  }
+  try {
+    const data = (trimmed ? JSON.parse(trimmed) : {}) as Record<string, unknown>;
+    return { ok: true, data };
+  } catch {
+    return { ok: false, error: "Invalid JSON response from server." };
+  }
+}
 
 /** Response shape from POST /app/api/image/composite (JSON only) */
 type CompositeApiResponse = {
