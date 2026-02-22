@@ -215,33 +215,33 @@ function AIBackgroundModal({
           <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 600 }}>Generate background with AI</h3>
           <button type="button" onClick={onClose} style={{ padding: "4px", border: "none", background: "transparent", cursor: "pointer", fontSize: "18px", lineHeight: 1, color: "#5c5f62" }} aria-label="Close">×</button>
         </div>
-        <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)" }}>
-          <p style={{ margin: "0 0 8px", fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-primary, #202223)" }}>How to generate the background</p>
-          <div style={{ display: "flex", gap: "16px", alignItems: "center", flexWrap: "wrap" }}>
-            <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "12px" }}>
-              <input
-                type="radio"
-                name="ai-bg-mode"
-                checked={generationMode === "manual"}
-                onChange={() => setGenerationMode("manual")}
-                style={{ width: "14px", height: "14px", accentColor: "var(--p-color-bg-fill-info, #2c6ecb)" }}
-              />
-              <span>Manual prompt</span>
-            </label>
-            <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "12px" }}>
-              <input
-                type="radio"
-                name="ai-bg-mode"
-                checked={generationMode === "env"}
-                onChange={() => setGenerationMode("env")}
-                style={{ width: "14px", height: "14px", accentColor: "var(--p-color-bg-fill-info, #2c6ecb)" }}
-              />
-              <span>Mood, style & environment</span>
-            </label>
-          </div>
-        </div>
-        <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)" }}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
+        {/* Section 1: Manual prompt */}
+        <div
+          style={{
+            padding: "10px 12px",
+            borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+            opacity: generationMode === "manual" ? 1 : 0.6,
+            transition: "opacity 0.2s ease",
+          }}
+        >
+          <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "12px", fontWeight: 600, marginBottom: "8px" }}>
+            <input
+              type="radio"
+              name="ai-bg-mode"
+              checked={generationMode === "manual"}
+              onChange={() => setGenerationMode("manual")}
+              style={{ width: "14px", height: "14px", accentColor: "var(--p-color-bg-fill-info, #2c6ecb)" }}
+            />
+            <span>Manual prompt</span>
+          </label>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-start",
+              gap: "8px",
+              pointerEvents: generationMode === "manual" ? "auto" : "none",
+            }}
+          >
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
@@ -281,92 +281,124 @@ function AIBackgroundModal({
             <p style={{ margin: "6px 0 0", fontSize: "12px", color: "var(--p-color-text-critical, #d72c0d)" }}>{extractError}</p>
           )}
         </div>
-        <div style={{ display: "flex", gap: "10px", padding: "10px 12px", flex: "1 1 auto", minHeight: 0 }}>
-          <div style={cardBase}>
-            <p style={cardTitle}>Mood</p>
-            <div style={listStyle}>
-              {MOODS.map((m) => (
-                <button
-                  key={m.value}
-                  type="button"
-                  onClick={() => setMood(m.value)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    width: "100%",
-                    padding: "6px 8px",
-                    marginBottom: "2px",
-                    border: "none",
-                    borderRadius: "6px",
-                    background: mood === m.value ? "rgba(44, 110, 203, 0.2)" : "transparent",
-                    cursor: "pointer",
-                    fontSize: "12px",
-                    textAlign: "left",
-                  }}
-                >
-                  <span>{m.icon}</span>
-                  <span>{m.label}</span>
-                </button>
-              ))}
+        {/* Section 2: Mood, style & environment */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: "10px",
+            padding: "10px 12px",
+            flex: "1 1 auto",
+            minHeight: 0,
+            opacity: generationMode === "env" ? 1 : 0.6,
+            transition: "opacity 0.2s ease",
+          }}
+        >
+          <label style={{ display: "flex", alignItems: "center", gap: "6px", cursor: "pointer", fontSize: "12px", fontWeight: 600, flexShrink: 0 }}>
+            <input
+              type="radio"
+              name="ai-bg-mode"
+              checked={generationMode === "env"}
+              onChange={() => setGenerationMode("env")}
+              style={{ width: "14px", height: "14px", accentColor: "var(--p-color-bg-fill-info, #2c6ecb)" }}
+            />
+            <span>Mood, style & environment</span>
+          </label>
+          <div
+            style={{
+              display: "flex",
+              gap: "10px",
+              flex: "1 1 auto",
+              minHeight: 0,
+              pointerEvents: generationMode === "env" ? "auto" : "none",
+            }}
+          >
+            <div style={cardBase}>
+              <p style={cardTitle}>Mood</p>
+              <div style={listStyle}>
+                {MOODS.map((m) => (
+                  <button
+                    key={m.value}
+                    type="button"
+                    onClick={() => setMood(m.value)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      width: "100%",
+                      padding: "6px 8px",
+                      marginBottom: "2px",
+                      border: "none",
+                      borderRadius: "6px",
+                      background: mood === m.value ? "rgba(44, 110, 203, 0.2)" : "transparent",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      textAlign: "left",
+                    }}
+                  >
+                    <span>{m.icon}</span>
+                    <span>{m.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-          <div style={cardBase}>
-            <p style={cardTitle}>Style</p>
-            <div style={listStyle}>
-              {STYLES.map((s) => (
-                <button
-                  key={s.value}
-                  type="button"
-                  onClick={() => setStyle(s.value)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    width: "100%",
-                    padding: "6px 8px",
-                    marginBottom: "2px",
-                    border: "none",
-                    borderRadius: "6px",
-                    background: style === s.value ? "rgba(44, 110, 203, 0.2)" : "transparent",
-                    cursor: "pointer",
-                    fontSize: "12px",
-                    textAlign: "left",
-                  }}
-                >
-                  <span>{s.icon}</span>
-                  <span>{s.label}</span>
-                </button>
-              ))}
+            <div style={cardBase}>
+              <p style={cardTitle}>Style</p>
+              <div style={listStyle}>
+                {STYLES.map((s) => (
+                  <button
+                    key={s.value}
+                    type="button"
+                    onClick={() => setStyle(s.value)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      width: "100%",
+                      padding: "6px 8px",
+                      marginBottom: "2px",
+                      border: "none",
+                      borderRadius: "6px",
+                      background: style === s.value ? "rgba(44, 110, 203, 0.2)" : "transparent",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      textAlign: "left",
+                    }}
+                  >
+                    <span>{s.icon}</span>
+                    <span>{s.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-          <div style={cardBase}>
-            <p style={cardTitle}>Environment</p>
-            <div style={listStyle}>
-              {ENVIRONMENTS.map((e) => (
-                <button
-                  key={e.value}
-                  type="button"
-                  onClick={() => setEnvironment(e.value)}
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    width: "100%",
-                    padding: "6px 8px",
-                    marginBottom: "2px",
-                    border: "none",
-                    borderRadius: "6px",
-                    background: environment === e.value ? "rgba(44, 110, 203, 0.2)" : "transparent",
-                    cursor: "pointer",
-                    fontSize: "12px",
-                    textAlign: "left",
-                  }}
-                >
-                  <span>{e.icon}</span>
-                  <span>{e.label}</span>
-                </button>
-              ))}
+            <div style={cardBase}>
+              <p style={cardTitle}>Environment</p>
+              <div style={listStyle}>
+                {ENVIRONMENTS.map((e) => (
+                  <button
+                    key={e.value}
+                    type="button"
+                    onClick={() => setEnvironment(e.value)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      width: "100%",
+                      padding: "6px 8px",
+                      marginBottom: "2px",
+                      border: "none",
+                      borderRadius: "6px",
+                      background: environment === e.value ? "rgba(44, 110, 203, 0.2)" : "transparent",
+                      cursor: "pointer",
+                      fontSize: "12px",
+                      textAlign: "left",
+                    }}
+                  >
+                    <span>{e.icon}</span>
+                    <span>{e.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
