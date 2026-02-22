@@ -95,6 +95,7 @@ export async function generateScript(voiceId: string, userId: string, shortId: s
       return { ok: false, error: "Invalid response: missing script" };
     }
     console.log(`${LOG_PREFIX} [script] success short_id=${data.short_id ?? shortId} script_length=${data.script.length} words_per_minute=${data.words_per_minute ?? "—"} target_duration_seconds=${data.target_duration_seconds ?? "—"}`);
+    console.log( data ) ;
     return {
       ok: true,
       short_id: data.short_id ?? shortId,
