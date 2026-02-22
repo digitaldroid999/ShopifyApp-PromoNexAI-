@@ -55,6 +55,213 @@ function StepDescription({ step, total, title, description }: { step: number; to
   );
 }
 
+const MOODS = [
+  { value: "energetic", label: "Energetic", icon: "⚡" },
+  { value: "friendly", label: "Friendly", icon: "🤗" },
+  { value: "inspiring", label: "Inspiring", icon: "🌟" },
+  { value: "dramatic", label: "Dramatic", icon: "🎭" },
+  { value: "bold", label: "Bold", icon: "💪" },
+  { value: "relaxed", label: "Relaxed", icon: "😌" },
+  { value: "quirky", label: "Quirky", icon: "🎪" },
+  { value: "romantic", label: "Romantic", icon: "💕" },
+  { value: "mysterious", label: "Mysterious", icon: "🌙" },
+  { value: "comic", label: "Comic", icon: "😂" },
+];
+
+const STYLES = [
+  { value: "trendy-influencer", label: "Trendy Influencer", icon: "📱", category: "Social Media Native" },
+  { value: "lifestyle-aesthetic", label: "Lifestyle Aesthetic", icon: "🌸", category: "Social Media Native" },
+  { value: "fast-cut-hype", label: "Fast-Cut Hype", icon: "⚡", category: "Social Media Native" },
+  { value: "documentary-style", label: "Documentary-Style", icon: "🎬", category: "Cinematic" },
+  { value: "cinematic-ad", label: "Cinematic Ad", icon: "🎭", category: "Cinematic" },
+  { value: "luxury-commercial", label: "Luxury Commercial", icon: "💎", category: "Cinematic" },
+  { value: "animated-mixed", label: "Animated / Mixed Media", icon: "🎨", category: "Fun & Playful" },
+  { value: "tech-review", label: "Tech Review", icon: "💻", category: "Thematic / Niche" },
+  { value: "fashion-lookbook", label: "Fashion Lookbook", icon: "👗", category: "Thematic / Niche" },
+  { value: "retro-vhs", label: "Retro VHS", icon: "📼", category: "Visual Treatments" },
+  { value: "monochrome", label: "Monochrome", icon: "⚫", category: "Visual Treatments" },
+  { value: "neon-cyberpunk", label: "Neon Cyberpunk", icon: "🤖", category: "Visual Treatments" },
+  { value: "film-grain", label: "Film Grain", icon: "🎞️", category: "Visual Treatments" },
+];
+
+const ENVIRONMENTS = [
+  { value: "indoor-studio", label: "Indoor Studio", icon: "🏢" },
+  { value: "outdoor-nature", label: "Outdoor Nature", icon: "🌳" },
+  { value: "urban-cityscape", label: "Urban Cityscape", icon: "🏙️" },
+  { value: "minimalist", label: "Minimalist", icon: "⬜" },
+  { value: "luxury-opulent", label: "Luxury Opulent", icon: "💎" },
+  { value: "vintage-retro", label: "Vintage Retro", icon: "📼" },
+  { value: "futuristic-scifi", label: "Futuristic Sci-Fi", icon: "🚀" },
+  { value: "beach-coastal", label: "Beach Coastal", icon: "🏖️" },
+  { value: "mountain-landscape", label: "Mountain Landscape", icon: "⛰️" },
+  { value: "home-cozy", label: "Home Cozy", icon: "🏠" },
+];
+
+function AIBackgroundModal({
+  open,
+  onClose,
+  onGenerate,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onGenerate: (opts: { mood: string; style: string; environment: string }) => void;
+}) {
+  const [mood, setMood] = useState<string | null>(null);
+  const [style, setStyle] = useState<string | null>(null);
+  const [environment, setEnvironment] = useState<string | null>(null);
+
+  const canGenerate = mood !== null && style !== null && environment !== null;
+
+  const handleGenerate = () => {
+    if (!canGenerate) return;
+    onGenerate({ mood: mood!, style: style!, environment: environment! });
+    onClose();
+  };
+
+  if (!open) return null;
+
+  const cardBase = {
+    flex: 1,
+    minWidth: 0,
+    display: "flex",
+    flexDirection: "column" as const,
+    border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+    borderRadius: "8px",
+    background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+    overflow: "hidden",
+  };
+  const cardTitle = { margin: 0, padding: "6px 8px", fontSize: "11px", fontWeight: 600, textTransform: "uppercase" as const, letterSpacing: "0.5px", color: "var(--p-color-text-subdued, #6d7175)", borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)" };
+  const listStyle = { flex: 1, overflowY: "auto" as const, padding: "4px", maxHeight: "140px" };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1100,
+        background: "rgba(0,0,0,0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "12px",
+      }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        style={{
+          background: "#fff",
+          borderRadius: "12px",
+          boxShadow: "0 6px 24px rgba(0,0,0,0.18)",
+          width: "100%",
+          maxWidth: "720px",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 600 }}>Generate background with AI</h3>
+          <button type="button" onClick={onClose} style={{ padding: "4px", border: "none", background: "transparent", cursor: "pointer", fontSize: "18px", lineHeight: 1, color: "#5c5f62" }} aria-label="Close">×</button>
+        </div>
+        <div style={{ display: "flex", gap: "10px", padding: "10px 12px", flex: "1 1 auto", minHeight: 0 }}>
+          <div style={cardBase}>
+            <p style={cardTitle}>Mood</p>
+            <div style={listStyle}>
+              {MOODS.map((m) => (
+                <button
+                  key={m.value}
+                  type="button"
+                  onClick={() => setMood(m.value)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    width: "100%",
+                    padding: "6px 8px",
+                    marginBottom: "2px",
+                    border: "none",
+                    borderRadius: "6px",
+                    background: mood === m.value ? "rgba(44, 110, 203, 0.2)" : "transparent",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    textAlign: "left",
+                  }}
+                >
+                  <span>{m.icon}</span>
+                  <span>{m.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={cardBase}>
+            <p style={cardTitle}>Style</p>
+            <div style={listStyle}>
+              {STYLES.map((s) => (
+                <button
+                  key={s.value}
+                  type="button"
+                  onClick={() => setStyle(s.value)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    width: "100%",
+                    padding: "6px 8px",
+                    marginBottom: "2px",
+                    border: "none",
+                    borderRadius: "6px",
+                    background: style === s.value ? "rgba(44, 110, 203, 0.2)" : "transparent",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    textAlign: "left",
+                  }}
+                >
+                  <span>{s.icon}</span>
+                  <span>{s.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div style={cardBase}>
+            <p style={cardTitle}>Environment</p>
+            <div style={listStyle}>
+              {ENVIRONMENTS.map((e) => (
+                <button
+                  key={e.value}
+                  type="button"
+                  onClick={() => setEnvironment(e.value)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    width: "100%",
+                    padding: "6px 8px",
+                    marginBottom: "2px",
+                    border: "none",
+                    borderRadius: "6px",
+                    background: environment === e.value ? "rgba(44, 110, 203, 0.2)" : "transparent",
+                    cursor: "pointer",
+                    fontSize: "12px",
+                    textAlign: "left",
+                  }}
+                >
+                  <span>{e.icon}</span>
+                  <span>{e.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div style={{ padding: "8px 12px", borderTop: "1px solid var(--p-color-border-secondary, #e1e3e5)", display: "flex", justifyContent: "flex-end", gap: "8px" }}>
+          <button type="button" onClick={onClose} style={{ padding: "6px 14px", borderRadius: "6px", border: "1px solid var(--p-color-border-secondary, #e1e3e5)", background: "#fff", cursor: "pointer", fontSize: "12px", fontWeight: 600 }}>Cancel</button>
+          <button type="button" onClick={handleGenerate} disabled={!canGenerate} style={{ padding: "6px 14px", borderRadius: "6px", border: "none", background: canGenerate ? "var(--p-color-bg-fill-info, #2c6ecb)" : "#ccc", color: "#fff", fontWeight: 600, cursor: canGenerate ? "pointer" : "not-allowed", fontSize: "12px" }}>Generate</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function FetchBackgroundModal({
   open,
   onClose,
@@ -352,6 +559,251 @@ function FetchBackgroundModal({
             </button>
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+type BgMusicTrack = { id: string | null; title: string | null; preview_url: string | null };
+
+function StoryblocksMusicModal({
+  open,
+  onClose,
+  onSelect,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSelect: (track: BgMusicTrack) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pickedTrack, setPickedTrack] = useState<BgMusicTrack | null>(null);
+  const fetcher = useFetcher<{
+    success: boolean;
+    tracks: Array<{ id: string; title: string; preview_url: string | null; duration_seconds: number | null; bpm: number | null; thumbnail_url: string | null }>;
+    total: number;
+    page: number;
+    per_page: number;
+    error?: string;
+  }>();
+  const lastLoadRef = useRef<{ query: string; page: number } | null>(null);
+
+  const isLoading = fetcher.state === "loading";
+  const data = fetcher.data;
+  const tracks = data?.success ? data.tracks : [];
+  const apiError = data && !data.success && "error" in data ? (data as { error?: string }).error : null;
+  const perPage = 12;
+
+  const loadPage = (page: number) => {
+    const q = query.trim() || "upbeat";
+    if (lastLoadRef.current?.query === q && lastLoadRef.current?.page === page) return;
+    lastLoadRef.current = { query: q, page };
+    fetcher.load(
+      `${STORYBLOCKS_MUSIC_API}?${new URLSearchParams({ query: q, page: String(page), per_page: String(perPage) }).toString()}`
+    );
+  };
+
+  const handleSearch = () => {
+    setCurrentPage(1);
+    setPickedTrack(null);
+    loadPage(1);
+  };
+
+  const handleUseTrack = () => {
+    if (pickedTrack) {
+      onSelect(pickedTrack);
+      onClose();
+    }
+  };
+
+  useEffect(() => {
+    if (!open) {
+      lastLoadRef.current = null;
+      setPickedTrack(null);
+    }
+  }, [open]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1100,
+        background: "rgba(0,0,0,0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px",
+      }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        style={{
+          background: "var(--p-color-bg-surface, #fff)",
+          borderRadius: "16px",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+          maxWidth: "640px",
+          width: "100%",
+          maxHeight: "85vh",
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div
+          style={{
+            padding: "16px 20px",
+            borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <h3 style={{ margin: 0, fontSize: "16px", fontWeight: 600 }}>Select background music</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              padding: "8px",
+              border: "none",
+              background: "transparent",
+              cursor: "pointer",
+              fontSize: "20px",
+              lineHeight: 1,
+              color: "#5c5f62",
+            }}
+            aria-label="Close"
+          >
+            ×
+          </button>
+        </div>
+
+        <div style={{ padding: "12px 20px", display: "flex", gap: "8px", alignItems: "center" }}>
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleSearch())}
+            placeholder="e.g. upbeat corporate"
+            style={{
+              flex: 1,
+              padding: "10px 12px",
+              borderRadius: "8px",
+              border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+              fontSize: "14px",
+            }}
+          />
+          <button
+            type="button"
+            onClick={handleSearch}
+            disabled={isLoading}
+            style={{
+              padding: "10px 20px",
+              borderRadius: "8px",
+              border: "none",
+              background: isLoading ? "#9ca3af" : "var(--p-color-bg-fill-secondary, #5c5f62)",
+              color: "#fff",
+              fontWeight: 600,
+              cursor: isLoading ? "not-allowed" : "pointer",
+              fontSize: "14px",
+            }}
+          >
+            {isLoading ? "Searching…" : "Search"}
+          </button>
+        </div>
+
+        {apiError && (
+          <div style={{ padding: "8px 20px", fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>
+            {apiError}
+          </div>
+        )}
+
+        <div
+          style={{
+            padding: "16px 20px",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+            gap: "12px",
+            overflow: "auto",
+            minHeight: "200px",
+          }}
+        >
+          {isLoading && tracks.length === 0 && (
+            <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "24px", color: "var(--p-color-text-subdued, #6d7175)" }}>
+              Searching…
+            </div>
+          )}
+          {!isLoading && tracks.length === 0 && data !== undefined && (
+            <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "24px", color: "var(--p-color-text-subdued, #6d7175)" }}>
+              No tracks found. Try another search.
+            </div>
+          )}
+          {tracks.map((track) => {
+            const isSelected = pickedTrack?.id === track.id;
+            return (
+              <div
+                key={track.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setPickedTrack({ id: track.id, title: track.title, preview_url: track.preview_url })}
+                onKeyDown={(e) => e.key === "Enter" && setPickedTrack({ id: track.id, title: track.title, preview_url: track.preview_url })}
+                style={{
+                  borderRadius: "10px",
+                  border: isSelected ? "2px solid var(--p-color-border-info, #2c6ecb)" : "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                  background: isSelected ? "var(--p-color-bg-fill-info-secondary, #e8f4fc)" : "#fff",
+                  padding: "12px",
+                  cursor: "pointer",
+                  transition: "border-color 0.15s, background 0.15s",
+                }}
+              >
+                <div style={{ width: "100%", aspectRatio: "1", borderRadius: "8px", background: "var(--p-color-bg-surface-secondary, #e1e3e5)", marginBottom: "8px", overflow: "hidden" }}>
+                  {track.thumbnail_url ? (
+                    <img src={track.thumbnail_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  ) : (
+                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#6d7175", fontSize: "24px" }}>♪</div>
+                  )}
+                </div>
+                <p style={{ margin: 0, fontSize: "13px", fontWeight: 600, color: "var(--p-color-text-primary, #202223)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={track.title}>
+                  {track.title}
+                </p>
+                {track.duration_seconds != null && (
+                  <p style={{ margin: "4px 0 0", fontSize: "11px", color: "var(--p-color-text-subdued, #6d7175)" }}>{Math.round(track.duration_seconds)}s</p>
+                )}
+                {track.preview_url && (
+                  <audio src={track.preview_url} controls style={{ width: "100%", marginTop: "8px", height: "32px" }} onClick={(e) => e.stopPropagation()} />
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {pickedTrack && (
+          <div
+            style={{
+              padding: "12px 20px",
+              borderTop: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              gap: "12px",
+            }}
+          >
+            <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)", marginRight: "auto" }}>{pickedTrack.title || "Selected track"}</span>
+            <button type="button" onClick={onClose} style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid var(--p-color-border-secondary, #e1e3e5)", background: "#fff", cursor: "pointer", fontSize: "14px" }}>
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleUseTrack}
+              style={{ padding: "8px 20px", borderRadius: "8px", border: "none", background: "var(--p-color-bg-fill-info, #2c6ecb)", color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: "14px" }}
+            >
+              Use this track
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -707,8 +1159,6 @@ export function WorkflowModal({
   const deleteTempFetcher = useFetcher();
   const voicesFetcher = useFetcher<{ success: boolean; voices: Array<{ voice_id: string; name: string; preview_url?: string }>; error?: string }>();
   const audioConfigFetcher = useFetcher<{ backendUrl: string }>();
-  const bgMusicFetcher = useFetcher<{ success: boolean; tracks: Array<{ id: string; title: string; preview_url: string | null; duration_seconds: number | null; bpm: number | null; thumbnail_url: string | null }>; total: number; page: number; per_page: number; error?: string }>();
-
   const shortInfo: ShortInfo | null =
     loadShortFetcher.data != null
       ? {
@@ -746,14 +1196,12 @@ export function WorkflowModal({
   const [audioSavedFeedback, setAudioSavedFeedback] = useState(false);
   const [backendUrl, setBackendUrl] = useState<string>("");
   const [audioStepTab, setAudioStepTab] = useState<"voiceover" | "bgMusic">("voiceover");
-  const [bgMusicQuery, setBgMusicQuery] = useState("");
-  const [bgMusicPage, setBgMusicPage] = useState(1);
   const [selectedBgMusic, setSelectedBgMusic] = useState<BgMusicSnapshot | null>(null);
   const [bgMusicSaveLoading, setBgMusicSaveLoading] = useState(false);
   const [bgMusicSavedFeedback, setBgMusicSavedFeedback] = useState(false);
+  const [bgMusicModalOpen, setBgMusicModalOpen] = useState(false);
   const initedAudioFromInfoRef = useRef(false);
   const voicesLoadStartedRef = useRef(false);
-  const lastBgMusicLoadRef = useRef<{ query: string; page: number } | null>(null);
 
   const [scene1Snapshot, setScene1Snapshot] = useState<WorkflowTempState["scene1"] | null>(null);
   const [scene2Snapshot, setScene2Snapshot] = useState<WorkflowTempState["scene2"] | null>(null);
@@ -1183,70 +1631,20 @@ export function WorkflowModal({
                   )}
                   {audioStepTab === "bgMusic" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                      <p style={{ margin: 0, fontSize: "13px", color: "var(--p-color-text-subdued, #6d7175)" }}>Search and select background music from Storyblocks. Preview and save your choice.</p>
-                      <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-                        <input
-                          type="text"
-                          value={bgMusicQuery}
-                          onChange={(e) => setBgMusicQuery(e.target.value)}
-                          onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), bgMusicFetcher.load(`${STORYBLOCKS_MUSIC_API}?${new URLSearchParams({ query: bgMusicQuery.trim() || "upbeat", page: "1", per_page: "12" }).toString()}`))}
-                          placeholder="e.g. upbeat corporate"
-                          style={{ flex: "1 1 200px", minWidth: "160px", padding: "10px 12px", borderRadius: "8px", border: "1px solid var(--p-color-border-secondary, #e1e3e5)", fontSize: "14px" }}
-                        />
-                        <button
-                          type="button"
-                          disabled={bgMusicFetcher.state === "loading"}
-                          onClick={() => {
-                            const q = bgMusicQuery.trim() || "upbeat";
-                            if (lastBgMusicLoadRef.current?.query === q && lastBgMusicLoadRef.current?.page === 1) return;
-                            lastBgMusicLoadRef.current = { query: q, page: 1 };
-                            setBgMusicPage(1);
-                            bgMusicFetcher.load(`${STORYBLOCKS_MUSIC_API}?${new URLSearchParams({ query: q, page: "1", per_page: "12" }).toString()}`);
-                          }}
-                          style={{ padding: "10px 20px", borderRadius: "8px", border: "none", background: bgMusicFetcher.state === "loading" ? "#9ca3af" : "var(--p-color-bg-fill-secondary, #5c5f62)", color: "#fff", fontWeight: 600, cursor: bgMusicFetcher.state === "loading" ? "wait" : "pointer", fontSize: "14px" }}
-                        >
-                          {bgMusicFetcher.state === "loading" ? "Searching…" : "Search"}
-                        </button>
-                      </div>
-                      {bgMusicFetcher.data?.error && (
-                        <div style={{ padding: "10px 12px", borderRadius: "8px", background: "#fef2f2", color: "#b91c1c", fontSize: "13px" }}>{bgMusicFetcher.data.error}</div>
-                      )}
-                      {bgMusicFetcher.data?.success && bgMusicFetcher.data.tracks && bgMusicFetcher.data.tracks.length > 0 && (
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "12px" }}>
-                          {bgMusicFetcher.data.tracks.map((track) => {
-                            const isSelected = selectedBgMusic?.id === track.id;
-                            return (
-                              <div
-                                key={track.id}
-                                style={{
-                                  borderRadius: "10px",
-                                  border: isSelected ? "2px solid var(--p-color-border-info, #2c6ecb)" : "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                                  background: isSelected ? "var(--p-color-bg-fill-info-secondary, #e8f4fc)" : "#fff",
-                                  padding: "12px",
-                                  cursor: "pointer",
-                                  transition: "border-color 0.15s, background 0.15s",
-                                }}
-                                onClick={() => setSelectedBgMusic({ id: track.id, title: track.title, preview_url: track.preview_url })}
-                              >
-                                <div style={{ width: "100%", aspectRatio: "1", borderRadius: "8px", background: "var(--p-color-bg-surface-secondary, #e1e3e5)", marginBottom: "8px", overflow: "hidden" }}>
-                                  {track.thumbnail_url ? <img src={track.thumbnail_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#6d7175", fontSize: "24px" }}>♪</div>}
-                                </div>
-                                <p style={{ margin: 0, fontSize: "13px", fontWeight: 600, color: "var(--p-color-text-primary, #202223)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={track.title}>{track.title}</p>
-                                {track.duration_seconds != null && <p style={{ margin: "4px 0 0", fontSize: "11px", color: "var(--p-color-text-subdued, #6d7175)" }}>{Math.round(track.duration_seconds)}s</p>}
-                                {track.preview_url && (
-                                  <audio src={track.preview_url} controls style={{ width: "100%", marginTop: "8px", height: "32px" }} onClick={(e) => e.stopPropagation()} />
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                      {selectedBgMusic && (selectedBgMusic.preview_url || selectedBgMusic.title) && (
+                      <p style={{ margin: 0, fontSize: "13px", color: "var(--p-color-text-subdued, #6d7175)" }}>Select background music from Storyblocks. Open the picker to search and choose a track; your selection is shown here.</p>
+                      {selectedBgMusic && (selectedBgMusic.preview_url || selectedBgMusic.title) ? (
                         <div style={{ padding: "16px", borderRadius: "10px", background: "#fff", border: "1px solid var(--p-color-border-secondary, #e1e3e5)" }}>
                           <p style={{ margin: "0 0 8px", fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>Selected track</p>
                           <p style={{ margin: 0, fontSize: "14px", fontWeight: 600, color: "var(--p-color-text-primary, #202223)" }}>{selectedBgMusic.title || "Untitled"}</p>
                           {selectedBgMusic.preview_url && <audio src={selectedBgMusic.preview_url} controls style={{ width: "100%", maxWidth: "400px", marginTop: "8px" }} />}
                           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "12px", flexWrap: "wrap" }}>
+                            <button
+                              type="button"
+                              onClick={() => setBgMusicModalOpen(true)}
+                              style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid var(--p-color-border-secondary, #e1e3e5)", background: "#fff", color: "var(--p-color-text-primary, #202223)", fontWeight: 600, cursor: "pointer", fontSize: "13px" }}
+                            >
+                              Change music
+                            </button>
                             <button
                               type="button"
                               disabled={!shortInfo?.shortId || bgMusicSaveLoading}
@@ -1266,7 +1664,32 @@ export function WorkflowModal({
                             {bgMusicSavedFeedback && <span style={{ fontSize: "14px", color: "var(--p-color-text-success, #008060)", fontWeight: 600 }}>Saved</span>}
                           </div>
                         </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setBgMusicModalOpen(true)}
+                          style={{
+                            padding: "14px 24px",
+                            borderRadius: "10px",
+                            border: "2px dashed var(--p-color-border-secondary, #e1e3e5)",
+                            background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+                            color: "var(--p-color-text-info, #2c6ecb)",
+                            fontWeight: 600,
+                            cursor: "pointer",
+                            fontSize: "14px",
+                          }}
+                        >
+                          Browse music from Storyblocks
+                        </button>
                       )}
+                      <StoryblocksMusicModal
+                        open={bgMusicModalOpen}
+                        onClose={() => setBgMusicModalOpen(false)}
+                        onSelect={(track) => {
+                          setSelectedBgMusic(track);
+                          setBgMusicModalOpen(false);
+                        }}
+                      />
                     </div>
                   )}
                 </div>
@@ -1504,6 +1927,7 @@ function Scene1Content({
   const [bgImage, setBgImage] = useState<string | null>(initialScene1?.bgImage ?? null);
   const [bgLoading, setBgLoading] = useState(false);
   const [fetchModalOpen, setFetchModalOpen] = useState(false);
+  const [aiBgModalOpen, setAiBgModalOpen] = useState(false);
   const [composited, setComposited] = useState<string | null>(initialScene1?.composited ?? null);
   const [compositeLoading, setCompositeLoading] = useState(false);
   const [compositeError, setCompositeError] = useState<string | null>(null);
@@ -1800,7 +2224,7 @@ function Scene1Content({
                 <div style={{ position: "absolute", top: "8px", right: "8px", display: "flex", gap: "6px", zIndex: 1 }}>
                   <button
                     type="button"
-                    onClick={handleGenerateBg}
+                    onClick={() => setAiBgModalOpen(true)}
                     style={{
                       padding: "6px 12px",
                       borderRadius: "6px",
@@ -1836,6 +2260,14 @@ function Scene1Content({
                 <img src={bgImage} alt="Background" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
               ) : null}
             </div>
+            <AIBackgroundModal
+              open={aiBgModalOpen}
+              onClose={() => setAiBgModalOpen(false)}
+              onGenerate={() => {
+                setAiBgModalOpen(false);
+                handleGenerateBg();
+              }}
+            />
             <FetchBackgroundModal
               open={fetchModalOpen}
               onClose={() => setFetchModalOpen(false)}
@@ -2340,6 +2772,7 @@ function Scene3Content({
   const [bgImage, setBgImage] = useState<string | null>(initialScene3?.bgImage ?? null);
   const [bgLoading, setBgLoading] = useState(false);
   const [fetchModalOpen, setFetchModalOpen] = useState(false);
+  const [aiBgModalOpen, setAiBgModalOpen] = useState(false);
   const [composited, setComposited] = useState<string | null>(initialScene3?.composited ?? null);
   const [compositeLoading, setCompositeLoading] = useState(false);
   const [compositeError, setCompositeError] = useState<string | null>(null);
@@ -2632,7 +3065,7 @@ function Scene3Content({
                 <div style={{ position: "absolute", top: "8px", right: "8px", display: "flex", gap: "6px", zIndex: 1 }}>
                   <button
                     type="button"
-                    onClick={handleGenerateBg}
+                    onClick={() => setAiBgModalOpen(true)}
                     style={{
                       padding: "6px 12px",
                       borderRadius: "6px",
@@ -2668,6 +3101,14 @@ function Scene3Content({
                 <img src={bgImage} alt="Background" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
               ) : null}
             </div>
+            <AIBackgroundModal
+              open={aiBgModalOpen}
+              onClose={() => setAiBgModalOpen(false)}
+              onGenerate={() => {
+                setAiBgModalOpen(false);
+                handleGenerateBg();
+              }}
+            />
             <FetchBackgroundModal
               open={fetchModalOpen}
               onClose={() => setFetchModalOpen(false)}
