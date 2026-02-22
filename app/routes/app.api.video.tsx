@@ -93,6 +93,4 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   return Response.json({ ok: false, error: `Unknown step: ${step}` }, { status: 400 });
 };
 
-export default function ApiVideoRoute() {
-  return null;
-}
+// No default export = resource route. POST returns the action JSON only, not the HTML document.
