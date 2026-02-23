@@ -17,7 +17,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const voice_id = typeof body.voice_id === "string" ? body.voice_id.trim() : "";
   const user_id = typeof body.user_id === "string" ? body.user_id.trim() : "";
   const short_id = typeof body.short_id === "string" ? body.short_id.trim() : "";
-  const product_description = typeof body.product_description === "string" ? body.product_description.trim() || undefined : undefined;
+  const product_description = typeof body.product_description === "string" ? body.product_description.trim() : "";
   if (!voice_id || !user_id || !short_id) {
     return Response.json(
       { error: "voice_id, user_id, and short_id are required" },
@@ -25,7 +25,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     );
   }
   console.log("[app.api.audio.generate-script] request", { voice_id, user_id, short_id, has_product_description: !!product_description });
-  const result = await generateScript(voice_id, user_id, short_id, product_description);
+  const result = await generateScript(voice_id, user_id, short_id, product_description || undefined);
   if (!result.ok) {
     return Response.json({ error: result.error }, { status: 400 });
   }

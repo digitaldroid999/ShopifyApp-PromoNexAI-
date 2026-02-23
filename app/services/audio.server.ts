@@ -75,9 +75,9 @@ export async function generateScript(
     voice_id: voiceId,
     user_id: userId,
     short_id: shortId,
-    ...(productDescription && { product_description: productDescription }),
+    productDescription: typeof productDescription === "string" ? productDescription : "",
   };
-  console.log(`${LOG_PREFIX} [script] request voice_id=${voiceId} user_id=${userId} short_id=${shortId} has_product_description=${!!productDescription} -> ${endpoint}`);
+  console.log(`${LOG_PREFIX} [script] request voice_id=${voiceId} user_id=${userId} short_id=${shortId} has_product_description=${!!payload.productDescription} -> ${endpoint}`);
   try {
     const res = await fetch(endpoint, {
       method: "POST",

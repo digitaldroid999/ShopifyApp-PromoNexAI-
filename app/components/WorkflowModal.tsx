@@ -1760,7 +1760,16 @@ export function WorkflowModal({
                               try {
                                 const res = await fetch(AUDIO_GENERATE_SCRIPT_API, {
                                   method: "POST", headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({ voice_id: selectedVoiceId, user_id: shortInfo.userId, short_id: shortInfo.shortId, product_description: typeof product?.description === "string" ? product.description.trim() || undefined : undefined }),
+                                  body: JSON.stringify({
+                                  voice_id: selectedVoiceId,
+                                  user_id: shortInfo.userId,
+                                  short_id: shortInfo.shortId,
+                                  product_description: (typeof product?.description === "string" && product.description.trim())
+                                    ? product.description.trim()
+                                    : (typeof product?.name === "string" && product.name.trim())
+                                      ? product.name.trim()
+                                      : undefined,
+                                }),
                                 });
                                 const data = await res.json();
                                 const scriptText = typeof data.script === "string" ? data.script : "";
