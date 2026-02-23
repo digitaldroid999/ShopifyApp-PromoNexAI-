@@ -718,8 +718,8 @@ function FetchBackgroundModal({
   );
 }
 
-/** Track as shown in the picker list (has duration_seconds for building save payload) */
-type BgMusicPickerTrack = { id: string; title: string; preview_url: string | null; duration_seconds: number | null };
+/** Track as shown in the picker list (has duration_seconds for building save payload; genre for local tracks) */
+type BgMusicPickerTrack = { id: string; title: string; preview_url: string | null; duration_seconds: number | null; genre?: string };
 
 function StoryblocksMusicModal({
   open,
@@ -730,9 +730,17 @@ function StoryblocksMusicModal({
   onClose: () => void;
   onSelect: (track: { id: string; name: string; genre: string; duration: number | null; previewUrl: string | null; downloadUrl: string | null }) => void;
 }) {
+  const [musicSource, setMusicSource] = useState<"local" | "storyblocks">("local");
+  const [genreFilter, setGenreFilter] = useState<string>("");
   const [query, setQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pickedTrack, setPickedTrack] = useState<BgMusicPickerTrack | null>(null);
+
+  const localFetcher = useFetcher<{
+    success: boolean;
+    tracks: Array<{ id: string; title: string; genre: string; preview_url: string; duration_seconds: number | null }>;
+    error?: string;
+  }>();
   const fetcher = useFetcher<{
     success: boolean;
     tracks: Array<{ id: string; title: string; preview_url: string | null; duration_seconds: number | null; bpm: number | null; thumbnail_url: string | null }>;
@@ -745,9 +753,15 @@ function StoryblocksMusicModal({
 
   const isLoading = fetcher.state === "loading";
   const data = fetcher.data;
-  const tracks = data?.success ? data.tracks : [];
+  const storyblocksTracks = data?.success ? data.tracks : [];
   const apiError = data && !data.success && "error" in data ? (data as { error?: string }).error : null;
   const perPage = 12;
+
+  const localData = localFetcher.data;
+  const localTracksRaw = localData?.success ? localData.tracks : [];
+  const genres = Array.from(new Set(localTracksRaw.map((t) => t.genre))).sort();
+  const localTracks = genreFilter ? localTracksRaw.filter((t) => t.genre === genreFilter) : localTracksRaw;
+  const localError = localData && !localData.success && "error" in localData ? (localData as { error?: string }).error : null;
 
   const loadPage = (page: number) => {
     const q = query.trim() || "upbeat";
@@ -769,7 +783,7 @@ function StoryblocksMusicModal({
       onSelect({
         id: pickedTrack.id,
         name: pickedTrack.title,
-        genre: "Storyblocks",
+        genre: pickedTrack.genre ?? "Storyblocks",
         duration: pickedTrack.duration_seconds != null ? Math.round(pickedTrack.duration_seconds) : null,
         previewUrl: pickedTrack.preview_url ?? null,
         downloadUrl: pickedTrack.preview_url ?? null,
@@ -785,7 +799,17 @@ function StoryblocksMusicModal({
     }
   }, [open]);
 
+  useEffect(() => {
+    if (open && musicSource === "local" && !localData) {
+      localFetcher.load(LOCAL_MUSIC_API);
+    }
+  }, [open, musicSource, localData]);
+
   if (!open) return null;
+
+  const isLocal = musicSource === "local";
+  const showLocalGrid = isLocal;
+  const showStoryblocksUI = !isLocal;
 
   return (
     <div
@@ -843,43 +867,104 @@ function StoryblocksMusicModal({
           </button>
         </div>
 
-        <div style={{ padding: "12px 20px", display: "flex", gap: "8px", alignItems: "center" }}>
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleSearch())}
-            placeholder="e.g. upbeat corporate"
-            style={{
-              flex: 1,
-              padding: "10px 12px",
-              borderRadius: "8px",
-              border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-              fontSize: "14px",
-            }}
-          />
+        {/* Tabs: Local library | Storyblocks */}
+        <div style={{ padding: "0 20px", borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)", display: "flex", gap: "0" }}>
           <button
             type="button"
-            onClick={handleSearch}
-            disabled={isLoading}
+            onClick={() => { setMusicSource("local"); setPickedTrack(null); }}
             style={{
-              padding: "10px 20px",
-              borderRadius: "8px",
+              padding: "12px 16px",
               border: "none",
-              background: isLoading ? "#9ca3af" : "var(--p-color-bg-fill-secondary, #5c5f62)",
-              color: "#fff",
-              fontWeight: 600,
-              cursor: isLoading ? "not-allowed" : "pointer",
+              borderBottom: musicSource === "local" ? "2px solid var(--p-color-border-info, #2c6ecb)" : "2px solid transparent",
+              background: "transparent",
+              cursor: "pointer",
               fontSize: "14px",
+              fontWeight: 600,
+              color: musicSource === "local" ? "var(--p-color-text-primary, #202223)" : "var(--p-color-text-subdued, #6d7175)",
             }}
           >
-            {isLoading ? "Searching…" : "Search"}
+            Local library
+          </button>
+          <button
+            type="button"
+            onClick={() => { setMusicSource("storyblocks"); setPickedTrack(null); }}
+            style={{
+              padding: "12px 16px",
+              border: "none",
+              borderBottom: musicSource === "storyblocks" ? "2px solid var(--p-color-border-info, #2c6ecb)" : "2px solid transparent",
+              background: "transparent",
+              cursor: "pointer",
+              fontSize: "14px",
+              fontWeight: 600,
+              color: musicSource === "storyblocks" ? "var(--p-color-text-primary, #202223)" : "var(--p-color-text-subdued, #6d7175)",
+            }}
+          >
+            Storyblocks
           </button>
         </div>
 
-        {apiError && (
+        {showStoryblocksUI && (
+          <div style={{ padding: "12px 20px", display: "flex", gap: "8px", alignItems: "center" }}>
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleSearch())}
+              placeholder="e.g. upbeat corporate"
+              style={{
+                flex: 1,
+                padding: "10px 12px",
+                borderRadius: "8px",
+                border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                fontSize: "14px",
+              }}
+            />
+            <button
+              type="button"
+              onClick={handleSearch}
+              disabled={isLoading}
+              style={{
+                padding: "10px 20px",
+                borderRadius: "8px",
+                border: "none",
+                background: isLoading ? "#9ca3af" : "var(--p-color-bg-fill-secondary, #5c5f62)",
+                color: "#fff",
+                fontWeight: 600,
+                cursor: isLoading ? "not-allowed" : "pointer",
+                fontSize: "14px",
+              }}
+            >
+              {isLoading ? "Searching…" : "Search"}
+            </button>
+          </div>
+        )}
+
+        {showLocalGrid && genres.length > 0 && (
+          <div style={{ padding: "8px 20px", display: "flex", alignItems: "center", gap: "8px" }}>
+            <label style={{ fontSize: "13px", color: "var(--p-color-text-subdued, #6d7175)", whiteSpace: "nowrap" }}>Genre:</label>
+            <select
+              value={genreFilter}
+              onChange={(e) => setGenreFilter(e.target.value)}
+              style={{
+                padding: "8px 12px",
+                borderRadius: "8px",
+                border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                fontSize: "14px",
+                minWidth: "140px",
+              }}
+            >
+              <option value="">All genres</option>
+              {genres.map((g) => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+            </select>
+            <span style={{ fontSize: "13px", color: "var(--p-color-text-subdued, #6d7175)" }}>{localTracks.length} track{localTracks.length !== 1 ? "s" : ""}</span>
+          </div>
+        )}
+
+        {(apiError || localError) && (
           <div style={{ padding: "8px 20px", fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>
-            {apiError}
+            {showLocalGrid ? localError : apiError}
           </div>
         )}
 
@@ -893,61 +978,114 @@ function StoryblocksMusicModal({
             minHeight: "200px",
           }}
         >
-          {isLoading && tracks.length === 0 && (
-            <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "24px", color: "var(--p-color-text-subdued, #6d7175)" }}>
-              Searching…
-            </div>
-          )}
-          {!isLoading && tracks.length === 0 && data !== undefined && (
-            <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "24px", color: "var(--p-color-text-subdued, #6d7175)" }}>
-              No tracks found. Try another search.
-            </div>
-          )}
-          {tracks.map((track) => {
-            const isSelected = pickedTrack?.id === track.id;
-            return (
-              <div
-                key={track.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => setPickedTrack({ id: track.id, title: track.title, preview_url: track.preview_url, duration_seconds: track.duration_seconds })}
-                onKeyDown={(e) => e.key === "Enter" && setPickedTrack({ id: track.id, title: track.title, preview_url: track.preview_url, duration_seconds: track.duration_seconds })}
-                style={{
-                  borderRadius: "10px",
-                  border: isSelected ? "2px solid var(--p-color-border-info, #2c6ecb)" : "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                  background: isSelected ? "var(--p-color-bg-fill-info-secondary, #e8f4fc)" : "#fff",
-                  padding: "12px",
-                  cursor: "pointer",
-                  transition: "border-color 0.15s, background 0.15s",
-                }}
-              >
-                <div style={{ width: "100%", aspectRatio: "1", borderRadius: "8px", background: "var(--p-color-bg-surface-secondary, #e1e3e5)", marginBottom: "8px", overflow: "hidden" }}>
-                  {track.thumbnail_url ? (
-                    <img src={track.thumbnail_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  ) : (
-                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#6d7175", fontSize: "24px" }}>♪</div>
-                  )}
+          {showLocalGrid && (
+            <>
+              {localFetcher.state === "loading" && localTracks.length === 0 && (
+                <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "24px", color: "var(--p-color-text-subdued, #6d7175)" }}>
+                  Loading…
                 </div>
-                <p style={{ margin: 0, fontSize: "13px", fontWeight: 600, color: "var(--p-color-text-primary, #202223)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={track.title}>
-                  {track.title}
-                </p>
-                {track.duration_seconds != null && (
-                  <p style={{ margin: "4px 0 0", fontSize: "11px", color: "var(--p-color-text-subdued, #6d7175)" }}>{Math.round(track.duration_seconds)}s</p>
-                )}
-                {track.preview_url ? (
-                  <>
-                    <p style={{ margin: "8px 0 4px", fontSize: "11px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>Listen</p>
-                    <audio src={track.preview_url} controls style={{ width: "100%", marginTop: "0", height: "32px" }} onClick={(e) => e.stopPropagation()} />
-                  </>
-                ) : (
-                  <p style={{ margin: "8px 0 0", fontSize: "11px", color: "var(--p-color-text-subdued, #6d7175)", fontStyle: "italic" }}>Preview not available</p>
-                )}
-              </div>
-            );
-          })}
+              )}
+              {showLocalGrid && localFetcher.state !== "loading" && localTracks.length === 0 && localData !== undefined && (
+                <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "24px", color: "var(--p-color-text-subdued, #6d7175)" }}>
+                  {genreFilter ? "No tracks in this genre." : "No local tracks found."}
+                </div>
+              )}
+              {showLocalGrid && localTracks.map((track) => {
+                const isSelected = pickedTrack?.id === track.id;
+                return (
+                  <div
+                    key={track.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setPickedTrack({ id: track.id, title: track.title, preview_url: track.preview_url, duration_seconds: track.duration_seconds, genre: track.genre })}
+                    onKeyDown={(e) => e.key === "Enter" && setPickedTrack({ id: track.id, title: track.title, preview_url: track.preview_url, duration_seconds: track.duration_seconds, genre: track.genre })}
+                    style={{
+                      borderRadius: "10px",
+                      border: isSelected ? "2px solid var(--p-color-border-info, #2c6ecb)" : "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                      background: isSelected ? "var(--p-color-bg-fill-info-secondary, #e8f4fc)" : "#fff",
+                      padding: "12px",
+                      cursor: "pointer",
+                      transition: "border-color 0.15s, background 0.15s",
+                    }}
+                  >
+                    <div style={{ width: "100%", aspectRatio: "1", borderRadius: "8px", background: "var(--p-color-bg-surface-secondary, #e1e3e5)", marginBottom: "8px", overflow: "hidden" }}>
+                      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#6d7175", fontSize: "24px" }}>♪</div>
+                    </div>
+                    <p style={{ margin: 0, fontSize: "13px", fontWeight: 600, color: "var(--p-color-text-primary, #202223)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={track.title}>
+                      {track.title}
+                    </p>
+                    <p style={{ margin: "4px 0 0", fontSize: "11px", color: "var(--p-color-text-subdued, #6d7175)" }}>{track.genre}</p>
+                    {track.preview_url ? (
+                      <>
+                        <p style={{ margin: "8px 0 4px", fontSize: "11px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>Listen</p>
+                        <audio src={track.preview_url} controls style={{ width: "100%", marginTop: "0", height: "32px" }} onClick={(e) => e.stopPropagation()} />
+                      </>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </>
+          )}
+
+          {showStoryblocksUI && (
+            <>
+              {isLoading && storyblocksTracks.length === 0 && (
+                <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "24px", color: "var(--p-color-text-subdued, #6d7175)" }}>
+                  Searching…
+                </div>
+              )}
+              {showStoryblocksUI && !isLoading && storyblocksTracks.length === 0 && data !== undefined && (
+                <div style={{ gridColumn: "1 / -1", textAlign: "center", padding: "24px", color: "var(--p-color-text-subdued, #6d7175)" }}>
+                  No tracks found. Try another search.
+                </div>
+              )}
+              {showStoryblocksUI && storyblocksTracks.map((track) => {
+                const isSelected = pickedTrack?.id === track.id;
+                return (
+                  <div
+                    key={track.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setPickedTrack({ id: track.id, title: track.title, preview_url: track.preview_url, duration_seconds: track.duration_seconds })}
+                    onKeyDown={(e) => e.key === "Enter" && setPickedTrack({ id: track.id, title: track.title, preview_url: track.preview_url, duration_seconds: track.duration_seconds })}
+                    style={{
+                      borderRadius: "10px",
+                      border: isSelected ? "2px solid var(--p-color-border-info, #2c6ecb)" : "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                      background: isSelected ? "var(--p-color-bg-fill-info-secondary, #e8f4fc)" : "#fff",
+                      padding: "12px",
+                      cursor: "pointer",
+                      transition: "border-color 0.15s, background 0.15s",
+                    }}
+                  >
+                    <div style={{ width: "100%", aspectRatio: "1", borderRadius: "8px", background: "var(--p-color-bg-surface-secondary, #e1e3e5)", marginBottom: "8px", overflow: "hidden" }}>
+                      {track.thumbnail_url ? (
+                        <img src={track.thumbnail_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ) : (
+                        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#6d7175", fontSize: "24px" }}>♪</div>
+                      )}
+                    </div>
+                    <p style={{ margin: 0, fontSize: "13px", fontWeight: 600, color: "var(--p-color-text-primary, #202223)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={track.title}>
+                      {track.title}
+                    </p>
+                    {track.duration_seconds != null && (
+                      <p style={{ margin: "4px 0 0", fontSize: "11px", color: "var(--p-color-text-subdued, #6d7175)" }}>{Math.round(track.duration_seconds)}s</p>
+                    )}
+                    {track.preview_url ? (
+                      <>
+                        <p style={{ margin: "8px 0 4px", fontSize: "11px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>Listen</p>
+                        <audio src={track.preview_url} controls style={{ width: "100%", marginTop: "0", height: "32px" }} onClick={(e) => e.stopPropagation()} />
+                      </>
+                    ) : (
+                      <p style={{ margin: "8px 0 0", fontSize: "11px", color: "var(--p-color-text-subdued, #6d7175)", fontStyle: "italic" }}>Preview not available</p>
+                    )}
+                  </div>
+                );
+              })}
+            </>
+          )}
         </div>
 
-        {data?.success && (data.total > 0 || tracks.length > 0) && (
+        {showStoryblocksUI && data?.success && (data.total > 0 || storyblocksTracks.length > 0) && (
           <div
             style={{
               padding: "12px 20px",
@@ -1868,20 +2006,21 @@ export function WorkflowModal({
                   {audioStepTab === "voiceover" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                       <p style={{ margin: 0, fontSize: "13px", color: "var(--p-color-text-subdued, #6d7175)" }}>Generate a voiceover from script (optional).</p>
-                      <div style={{ display: "flex", alignItems: "flex-end", gap: "16px", flexWrap: "wrap" }}>
-                        <div>
+                      <div style={{ display: "flex", alignItems: "flex-end", gap: "16px", flexWrap: "wrap", width: "100%" }}>
+                        <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                           <label style={{ display: "block", marginBottom: "4px", fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)", fontWeight: 600 }}>Voice</label>
                           <select
                             value={selectedVoiceId}
                             onChange={(e) => setSelectedVoiceId(e.target.value)}
                             disabled={!voicesFetcher.data?.success}
                             style={{
-                              minWidth: "220px",
+                              width: "100%",
                               padding: "10px 12px",
                               borderRadius: "8px",
                               border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
                               fontSize: "14px",
                               background: "#fff",
+                              boxSizing: "border-box",
                             }}
                           >
                             {voicesFetcher.state === "loading" && <option value="">Loading voices…</option>}
@@ -1926,14 +2065,8 @@ export function WorkflowModal({
                       {scriptGenerated && (
                         <div style={{ display: "flex", alignItems: "flex-start", gap: "24px", flexWrap: "wrap" }}>
                           <div style={{ flex: "1 1 280px", minWidth: "200px" }}>
-                            <label style={{ display: "block", marginBottom: "6px", fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)", fontWeight: 600 }}>Script (edit if needed)</label>
-                            <textarea
-                              value={audioScript}
-                              onChange={(e) => setAudioScript(e.target.value)}
-                              rows={4}
-                              style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid var(--p-color-border-secondary, #e1e3e5)", fontSize: "14px", lineHeight: 1.5, resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }}
-                            />
-                            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "10px", flexWrap: "wrap" }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                              <label style={{ fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)", fontWeight: 600 }}>Script (edit if needed)</label>
                               <button
                                 type="button"
                                 disabled={!shortInfo?.shortId || scriptSaveLoading}
@@ -1946,12 +2079,33 @@ export function WorkflowModal({
                                     if (data.success) { setScriptSavedFeedback(true); setTimeout(() => setScriptSavedFeedback(false), 2000); } else { alert(data.error || "Failed to save script"); }
                                   } finally { setScriptSaveLoading(false); }
                                 }}
-                                style={{ padding: "8px 16px", borderRadius: "8px", border: "none", background: scriptSaveLoading ? "#9ca3af" : "var(--p-color-bg-fill-secondary, #5c5f62)", color: "#fff", fontWeight: 600, cursor: scriptSaveLoading ? "wait" : "pointer", fontSize: "13px" }}
+                                title={scriptSaveLoading ? "Saving…" : "Save script"}
+                                style={{
+                                  padding: "6px 8px",
+                                  border: "none",
+                                  borderRadius: "6px",
+                                  background: scriptSaveLoading ? "#9ca3af" : "var(--p-color-bg-fill-secondary, #5c5f62)",
+                                  color: "#fff",
+                                  cursor: scriptSaveLoading ? "wait" : "pointer",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                }}
                               >
-                                {scriptSaveLoading ? "Saving…" : "Save script"}
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                                  <polyline points="17 21 17 13 7 13 7 21" />
+                                  <polyline points="7 3 7 8 15 8" />
+                                </svg>
                               </button>
-                              {scriptSavedFeedback && <span style={{ fontSize: "13px", color: "var(--p-color-text-success, #008060)" }}>Saved</span>}
                             </div>
+                            <textarea
+                              value={audioScript}
+                              onChange={(e) => setAudioScript(e.target.value)}
+                              rows={4}
+                              style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid var(--p-color-border-secondary, #e1e3e5)", fontSize: "14px", lineHeight: 1.5, resize: "vertical", fontFamily: "inherit", boxSizing: "border-box" }}
+                            />
+                            {scriptSavedFeedback && <span style={{ display: "block", marginTop: "6px", fontSize: "13px", color: "var(--p-color-text-success, #008060)" }}>Saved</span>}
                           </div>
                           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "10px", flex: "1 1 260px", minWidth: "200px" }}>
                             {!audioGenerated ? (
@@ -1972,29 +2126,27 @@ export function WorkflowModal({
                                 {audioGenerateLoading ? "Generating audio…" : "Generate audio"}
                               </button>
                             ) : (
-                              <>
-                                <audio src={(shortInfo?.audioInfo?.generatedAudioUrl ?? generatedAudioUrl) || undefined} controls style={{ maxWidth: "100%", minWidth: "220px" }} />
+                              <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                                <audio src={(shortInfo?.audioInfo?.generatedAudioUrl ?? generatedAudioUrl) || undefined} controls style={{ maxWidth: "100%", minWidth: "200px" }} />
                                 <span style={{ fontSize: "14px", color: "var(--p-color-text-success, #008060)", fontWeight: 600 }}>✓ Audio ready</span>
-                                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                                  <button
-                                    type="button"
-                                    disabled={!shortInfo?.shortId || audioSaveLoading}
-                                    onClick={async () => {
-                                      if (!shortInfo?.shortId || !generatedAudioUrl) return;
-                                      setAudioSaveLoading(true); setAudioSavedFeedback(false);
-                                      try {
-                                        const res = await fetch(AUDIO_SAVE_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ short_id: shortInfo.shortId, generated_audio_url: generatedAudioUrl, subtitles: lastSubtitleTiming ?? undefined, voice_id: selectedVoiceId || undefined, voice_name: voicesFetcher.data?.success ? voicesFetcher.data.voices.find((v) => v.voice_id === selectedVoiceId)?.name : undefined }) });
-                                        const data = await res.json();
-                                        if (data.success) { setAudioSavedFeedback(true); setAudioGenerated(true); setTimeout(() => setAudioSavedFeedback(false), 2000); } else { alert(data.error || "Failed to save audio"); }
-                                      } finally { setAudioSaveLoading(false); }
-                                    }}
-                                    style={{ padding: "8px 16px", borderRadius: "8px", border: "none", background: audioSaveLoading ? "#9ca3af" : "var(--p-color-bg-fill-success, #008060)", color: "#fff", fontWeight: 600, cursor: audioSaveLoading ? "wait" : "pointer", fontSize: "13px" }}
-                                  >
-                                    {audioSaveLoading ? "Saving…" : "Save audio to database"}
-                                  </button>
-                                  {audioSavedFeedback && <span style={{ fontSize: "13px", color: "var(--p-color-text-success, #008060)" }}>Saved</span>}
-                                </div>
-                              </>
+                                <button
+                                  type="button"
+                                  disabled={!shortInfo?.shortId || audioSaveLoading}
+                                  onClick={async () => {
+                                    if (!shortInfo?.shortId || !generatedAudioUrl) return;
+                                    setAudioSaveLoading(true); setAudioSavedFeedback(false);
+                                    try {
+                                      const res = await fetch(AUDIO_SAVE_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ short_id: shortInfo.shortId, generated_audio_url: generatedAudioUrl, subtitles: lastSubtitleTiming ?? undefined, voice_id: selectedVoiceId || undefined, voice_name: voicesFetcher.data?.success ? voicesFetcher.data.voices.find((v) => v.voice_id === selectedVoiceId)?.name : undefined }) });
+                                      const data = await res.json();
+                                      if (data.success) { setAudioSavedFeedback(true); setAudioGenerated(true); setTimeout(() => setAudioSavedFeedback(false), 2000); } else { alert(data.error || "Failed to save audio"); }
+                                    } finally { setAudioSaveLoading(false); }
+                                  }}
+                                  style={{ padding: "8px 16px", borderRadius: "8px", border: "none", background: audioSaveLoading ? "#9ca3af" : "var(--p-color-bg-fill-success, #008060)", color: "#fff", fontWeight: 600, cursor: audioSaveLoading ? "wait" : "pointer", fontSize: "13px" }}
+                                >
+                                  {audioSaveLoading ? "Saving…" : "Save audio to database"}
+                                </button>
+                                {audioSavedFeedback && <span style={{ fontSize: "13px", color: "var(--p-color-text-success, #008060)" }}>Saved</span>}
+                              </div>
                             )}
                           </div>
                         </div>
@@ -2193,6 +2345,7 @@ const AUDIO_SAVE_SCRIPT_API = "/app/api/audio/save-script";
 const AUDIO_SAVE_API = "/app/api/audio/save";
 const AUDIO_CONFIG_API = "/app/api/audio/config";
 const STORYBLOCKS_MUSIC_API = "/app/api/storyblocks/music";
+const LOCAL_MUSIC_API = "/app/api/music/local";
 const SHORTS_SAVE_BG_MUSIC_API = "/app/api/shorts/save-bg-music";
 const MERGE_FINALIZE_API = "/app/api/merge/finalize";
 const MERGE_STATUS_API_BASE = "/app/api/merge/status";
@@ -2828,7 +2981,7 @@ function Scene1Content({
             </div>
             <div style={{ ...boxStyle, borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }}>
               {sceneLoading ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px", minWidth: "200px" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", minWidth: "200px" }}>
                   <div style={{ width: "100%", maxWidth: "280px", height: "8px", borderRadius: "4px", background: "var(--p-color-border-secondary, #e1e3e5)", overflow: "hidden" }}>
                     <div
                       style={{
@@ -2840,9 +2993,9 @@ function Scene1Content({
                       }}
                     />
                   </div>
-                  <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Generating scene video…</span>
+                  <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)", textAlign: "center" }}>Generating scene video…</span>
                   {sceneProgress != null && (
-                    <span style={{ fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)" }}>{sceneProgress}%</span>
+                    <span style={{ fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)", textAlign: "center" }}>{sceneProgress}%</span>
                   )}
                 </div>
               ) : sceneError ? (
@@ -3773,7 +3926,7 @@ function Scene3Content({
             </div>
             <div style={{ ...boxStyle, borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }}>
               {sceneLoading ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: "12px", minWidth: "200px" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", minWidth: "200px" }}>
                   <div style={{ width: "100%", maxWidth: "280px", height: "8px", borderRadius: "4px", background: "var(--p-color-border-secondary, #e1e3e5)", overflow: "hidden" }}>
                     <div
                       style={{
@@ -3785,9 +3938,9 @@ function Scene3Content({
                       }}
                     />
                   </div>
-                  <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Generating scene video…</span>
+                  <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)", textAlign: "center" }}>Generating scene video…</span>
                   {sceneProgress != null && (
-                    <span style={{ fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)" }}>{sceneProgress}%</span>
+                    <span style={{ fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)", textAlign: "center" }}>{sceneProgress}%</span>
                   )}
                 </div>
               ) : (dbSceneVideoUrl ?? sceneVideo) ? (
