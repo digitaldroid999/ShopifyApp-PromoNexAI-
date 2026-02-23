@@ -15,6 +15,28 @@ function getProductDescription(product: { description?: string | null; descripti
   return html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() || undefined;
 }
 
+function getProductPrice(product: {
+  priceRangeV2?: { minVariantPrice?: { amount?: string; currencyCode?: string } } | null;
+}): string {
+  const min = product.priceRangeV2?.minVariantPrice;
+  if (!min?.amount) return "$0.00";
+  const amount = parseFloat(min.amount);
+  if (!Number.isFinite(amount)) return "$0.00";
+  const code = min.currencyCode ?? "USD";
+  if (code === "USD") return `$${amount.toFixed(2)}`;
+  return `${amount.toFixed(2)} ${code}`;
+}
+
+function getProductRating(product: {
+  metafield?: { value?: string } | null;
+}): number {
+  const raw = product.metafield?.value;
+  if (raw == null || raw === "") return 0;
+  const n = parseFloat(raw);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(5, Math.max(0, n));
+}
+
 const PRODUCT_QUERY = `#graphql
   query getProduct($id: ID!) {
     product(id: $id) {
@@ -24,6 +46,15 @@ const PRODUCT_QUERY = `#graphql
       status
       description
       descriptionHtml
+      priceRangeV2 {
+        minVariantPrice {
+          amount
+          currencyCode
+        }
+      }
+      metafield(namespace: "reviews", key: "rating") {
+        value
+      }
       images(first: 10) {
         edges {
           node {
@@ -48,6 +79,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         status: "ACTIVE",
         description: "Sample product description for mockup.",
         descriptionHtml: "<p>Sample product description for mockup.</p>",
+        priceRangeV2: { minVariantPrice: { amount: "0", currencyCode: "USD" } },
+        metafield: null,
         images: {
           edges: [
             { node: { id: "img1", url: `${MOCKUP_BASE}/scene1-original.jpg`, altText: "Scene 1" } },
@@ -169,6 +202,8 @@ export default function ProductDetail() {
           product={{
             name: product.title ?? "Product",
             description: getProductDescription(product),
+            price: getProductPrice(product),
+            rating: getProductRating(product),
           }}
           onClose={() => setWorkflowOpen(false)}
           onDone={(videoUrl) => setProductVideoUrl(videoUrl)}
