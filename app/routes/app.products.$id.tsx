@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs } from "react-router";
-import { Link, useLoaderData, useRouteError } from "react-router";
-import { useState } from "react";
+import { Link, useLoaderData, useRouteError, useFetcher } from "react-router";
+import { useState, useEffect } from "react";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { WorkflowModal } from "../components/WorkflowModal";
@@ -77,6 +77,15 @@ export default function ProductDetail() {
   const { product, isSample } = useLoaderData<typeof loader>();
   const [workflowOpen, setWorkflowOpen] = useState(false);
   const [productVideoUrl, setProductVideoUrl] = useState<string | null>(null);
+  const shortsFetcher = useFetcher<{ finalVideoUrl?: string | null; shortId?: string | null }>();
+
+  useEffect(() => {
+    if (!isSample && product?.id) {
+      shortsFetcher.load(`${SHORTS_API}?productId=${encodeURIComponent(product.id)}`);
+    }
+  }, [product?.id, isSample]);
+
+  const finalVideoUrl = productVideoUrl ?? (shortsFetcher.data?.finalVideoUrl?.trim() || null);
 
   const handleGenerateVideoClick = async () => {
     try {
@@ -124,11 +133,11 @@ export default function ProductDetail() {
                 ))}
               </div>
             ) : null}
-            {productVideoUrl ? (
+            {finalVideoUrl ? (
               <s-stack direction="block" gap="base">
                 <s-text type="strong">Promo video</s-text>
                 <video
-                  src={productVideoUrl}
+                  src={finalVideoUrl}
                   controls
                   style={{
                     maxWidth: "100%",
