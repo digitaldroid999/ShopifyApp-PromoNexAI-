@@ -40,7 +40,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       if (mergeStatus) {
         console.log(`${LOG_PREFIX} [Scene2 polling] backend response: status=${mergeStatus.status} video_url=${mergeStatus.video_url ?? "-"} error_message=${mergeStatus.error_message ?? "-"}`);
 
-        const updates: { status: string; videoUrl?: string | null; error?: string | null } = {
+        const updates: {
+          status: string;
+          videoUrl?: string | null;
+          error?: string | null;
+          progress?: number | null;
+        } = {
           status: mergeStatus.status,
         };
         if (mergeStatus.status === "completed" && mergeStatus.video_url) {
@@ -48,6 +53,9 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         }
         if (mergeStatus.status === "failed" && mergeStatus.error_message) {
           updates.error = mergeStatus.error_message;
+        }
+        if (mergeStatus.progress != null) {
+          updates.progress = mergeStatus.progress;
         }
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -71,9 +79,17 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
           console.log(`${LOG_PREFIX} [Scene2 polling] failed: ${mergeStatus.error_message ?? "unknown"}`);
         }
 
-        console.log(`${LOG_PREFIX} [Scene2 polling] returning: status=${updated.status} videoUrl=${updated.videoUrl ?? "-"}`);
+        console.log(`${LOG_PREFIX} [Scene2 polling] returning: status=${updated.status} progress=${mergeStatus.progress ?? "-"} message=${mergeStatus.message ?? "-"} videoUrl=${updated.videoUrl ?? "-"}`);
         return Response.json(
-          { id: updated.id, status: updated.status, stage: updated.stage, progress: updated.progress, videoUrl: updated.videoUrl, error: updated.error },
+          {
+            id: updated.id,
+            status: updated.status,
+            stage: updated.stage,
+            progress: updated.progress ?? mergeStatus.progress,
+            message: mergeStatus.message ?? undefined,
+            videoUrl: updated.videoUrl,
+            error: updated.error,
+          },
           { headers: { "Content-Type": "application/json", "Cache-Control": "no-store, no-cache, must-revalidate", Pragma: "no-cache" } }
         );
       }

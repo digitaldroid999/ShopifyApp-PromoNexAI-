@@ -181,12 +181,14 @@ export type MergeVideoTaskStatus = {
   status: string;
   video_url: string | null;
   error_message: string | null;
+  progress: number | null;
+  message: string | null;
 };
 
 /**
  * Polls merge-video task status.
  * GET {BACKEND_URL}/image/merge-video/tasks/{task_id}
- * Response: { task_id, status, video_url?, error_message?, ... }
+ * Response: { task_id, status, progress?, message?, video_url?, error_message?, ... }
  */
 export async function mergeVideoTaskStatus(taskId: string): Promise<MergeVideoTaskStatus | null> {
   const base = process.env.BACKEND_URL;
@@ -199,16 +201,26 @@ export async function mergeVideoTaskStatus(taskId: string): Promise<MergeVideoTa
       signal: AbortSignal.timeout(15000),
     });
     const raw = await response.text();
-    let data: { status?: string; video_url?: string | null; error_message?: string | null } = {};
+    let data: {
+      status?: string;
+      video_url?: string | null;
+      error_message?: string | null;
+      progress?: number | null;
+      message?: string | null;
+    } = {};
     try {
       data = raw ? JSON.parse(raw) : {};
     } catch {
       return null;
     }
+    const progress =
+      typeof data.progress === "number" && Number.isFinite(data.progress) ? Math.min(100, Math.max(0, data.progress)) : null;
     return {
       status: typeof data.status === "string" ? data.status : "pending",
       video_url: typeof data.video_url === "string" ? data.video_url : null,
       error_message: typeof data.error_message === "string" ? data.error_message : null,
+      progress,
+      message: typeof data.message === "string" ? data.message : null,
     };
   } catch {
     return null;

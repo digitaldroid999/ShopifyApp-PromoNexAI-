@@ -2661,6 +2661,8 @@ function Scene2Content({
   const [sceneVideo, setSceneVideo] = useState<string | null>(initialScene2?.sceneVideo ?? null);
   const [sceneLoading, setSceneLoading] = useState(false);
   const [sceneError, setSceneError] = useState<string | null>(null);
+  const [sceneProgress, setSceneProgress] = useState<number | null>(null);
+  const [sceneMessage, setSceneMessage] = useState<string | null>(null);
 
   useEffect(() => {
     onScene2Change?.({
@@ -2719,6 +2721,8 @@ function Scene2Content({
       return;
     }
     setSceneError(null);
+    setSceneProgress(null);
+    setSceneMessage(null);
     setSceneLoading(true);
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     try {
@@ -2766,7 +2770,16 @@ function Scene2Content({
           cache: "no-store",
           headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
         });
-        const task = await pollRes.json().catch(() => ({}));
+        const task = (await pollRes.json().catch(() => ({}))) as {
+          status?: string;
+          videoUrl?: string;
+          video_url?: string;
+          progress?: number | null;
+          message?: string | null;
+          error?: string;
+        };
+        if (task.progress != null) setSceneProgress(Number(task.progress));
+        if (task.message != null) setSceneMessage(typeof task.message === "string" ? task.message : null);
         if (!pollRes.ok) {
           console.warn("[Scene2] Poll error:", pollRes.status, task);
           if (task?.error) {
@@ -2776,10 +2789,10 @@ function Scene2Content({
           }
         }
         if (i < 3 || task.status === "completed" || task.status === "failed") {
-          console.log("[Scene2] Poll", i + 1, "status=" + (task.status ?? "?") + " videoUrl=" + (task.videoUrl ?? task.video_url ?? "-"));
+          console.log("[Scene2] Poll", i + 1, "status=" + (task.status ?? "?") + " progress=" + (task.progress ?? "-") + " videoUrl=" + (task.videoUrl ?? task.video_url ?? "-"));
         }
         if (task.status === "completed" && (task.videoUrl ?? task.video_url)) {
-          const rawUrl = task.videoUrl ?? task.video_url;
+          const rawUrl = task.videoUrl ?? task.video_url ?? "";
           const videoUrl = typeof rawUrl === "string" && rawUrl.startsWith("http") ? rawUrl : `${origin}${rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`}`;
           setSceneVideo(videoUrl);
           setSceneError(null);
@@ -2800,6 +2813,8 @@ function Scene2Content({
       setSceneError(e instanceof Error ? e.message : "Generate video failed");
     } finally {
       setSceneLoading(false);
+      setSceneProgress(null);
+      setSceneMessage(null);
     }
   };
 
@@ -2927,9 +2942,24 @@ function Scene2Content({
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               {sceneLoading ? (
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <span className="spinner" style={{ width: 24, height: 24, border: "2px solid #e1e3e5", borderTopColor: "#2c6ecb", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                  <span style={{ fontSize: "14px", color: "#6d7175" }}>Generating video…</span>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", minWidth: "280px" }}>
+                  <div style={{ width: "100%", maxWidth: "280px", height: "8px", borderRadius: "4px", background: "var(--p-color-border-secondary, #e1e3e5)", overflow: "hidden" }}>
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${Math.min(100, Math.max(0, sceneProgress ?? 0))}%`,
+                        borderRadius: "4px",
+                        background: "var(--p-color-bg-fill-info, #2c6ecb)",
+                        transition: "width 0.3s ease",
+                      }}
+                    />
+                  </div>
+                  <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)", textAlign: "center" }}>
+                    {sceneMessage ?? "Generating video…"}
+                  </span>
+                  {sceneProgress != null && (
+                    <span style={{ fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)" }}>{sceneProgress}%</span>
+                  )}
                 </div>
               ) : (dbSceneVideoUrl ?? sceneVideo) ? (
                 <video src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "400px", maxHeight: "240px", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
