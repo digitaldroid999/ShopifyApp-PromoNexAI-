@@ -718,7 +718,8 @@ function FetchBackgroundModal({
   );
 }
 
-type BgMusicTrack = { id: string | null; title: string | null; preview_url: string | null };
+/** Track as shown in the picker list (has duration_seconds for building save payload) */
+type BgMusicPickerTrack = { id: string; title: string; preview_url: string | null; duration_seconds: number | null };
 
 function StoryblocksMusicModal({
   open,
@@ -727,11 +728,11 @@ function StoryblocksMusicModal({
 }: {
   open: boolean;
   onClose: () => void;
-  onSelect: (track: BgMusicTrack) => void;
+  onSelect: (track: { id: string; name: string; genre: string; duration: number | null; previewUrl: string | null; downloadUrl: string | null }) => void;
 }) {
   const [query, setQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [pickedTrack, setPickedTrack] = useState<BgMusicTrack | null>(null);
+  const [pickedTrack, setPickedTrack] = useState<BgMusicPickerTrack | null>(null);
   const fetcher = useFetcher<{
     success: boolean;
     tracks: Array<{ id: string; title: string; preview_url: string | null; duration_seconds: number | null; bpm: number | null; thumbnail_url: string | null }>;
@@ -765,7 +766,14 @@ function StoryblocksMusicModal({
 
   const handleUseTrack = () => {
     if (pickedTrack) {
-      onSelect(pickedTrack);
+      onSelect({
+        id: pickedTrack.id,
+        name: pickedTrack.title,
+        genre: "Storyblocks",
+        duration: pickedTrack.duration_seconds != null ? Math.round(pickedTrack.duration_seconds) : null,
+        previewUrl: pickedTrack.preview_url ?? null,
+        downloadUrl: pickedTrack.preview_url ?? null,
+      });
       onClose();
     }
   };
@@ -902,8 +910,8 @@ function StoryblocksMusicModal({
                 key={track.id}
                 role="button"
                 tabIndex={0}
-                onClick={() => setPickedTrack({ id: track.id, title: track.title, preview_url: track.preview_url })}
-                onKeyDown={(e) => e.key === "Enter" && setPickedTrack({ id: track.id, title: track.title, preview_url: track.preview_url })}
+                onClick={() => setPickedTrack({ id: track.id, title: track.title, preview_url: track.preview_url, duration_seconds: track.duration_seconds })}
+                onKeyDown={(e) => e.key === "Enter" && setPickedTrack({ id: track.id, title: track.title, preview_url: track.preview_url, duration_seconds: track.duration_seconds })}
                 style={{
                   borderRadius: "10px",
                   border: isSelected ? "2px solid var(--p-color-border-info, #2c6ecb)" : "1px solid var(--p-color-border-secondary, #e1e3e5)",
@@ -1336,7 +1344,14 @@ type AudioInfoSnapshot = {
   subtitles: unknown;
 } | null;
 
-type BgMusicSnapshot = { id: string | null; title: string | null; preview_url: string | null };
+type BgMusicSnapshot = {
+  id: string | null;
+  name: string | null;
+  genre?: string | null;
+  duration?: number | null;
+  previewUrl?: string | null;
+  downloadUrl?: string | null;
+};
 
 type ShortInfo = {
   shortId: string | null;
@@ -1489,10 +1504,18 @@ export function WorkflowModal({
   // Init selected bg music from short when loaded
   useEffect(() => {
     const saved = shortInfo?.bgMusic;
-    if (saved && (saved.id || saved.preview_url)) {
-      setSelectedBgMusic({ id: saved.id ?? null, title: saved.title ?? null, preview_url: saved.preview_url ?? null });
+    if (saved && (saved.id || saved.previewUrl || (saved as { preview_url?: string }).preview_url)) {
+      const p = saved as { id?: string | null; name?: string | null; title?: string | null; genre?: string | null; duration?: number | null; previewUrl?: string | null; preview_url?: string | null; downloadUrl?: string | null };
+      setSelectedBgMusic({
+        id: p.id ?? null,
+        name: p.name ?? p.title ?? null,
+        genre: p.genre ?? "Storyblocks",
+        duration: typeof p.duration === "number" ? p.duration : null,
+        previewUrl: p.previewUrl ?? p.preview_url ?? null,
+        downloadUrl: p.downloadUrl ?? p.previewUrl ?? p.preview_url ?? null,
+      });
     }
-  }, [shortInfo?.shortId, shortInfo?.bgMusic?.id, shortInfo?.bgMusic?.preview_url]);
+  }, [shortInfo?.shortId, shortInfo?.bgMusic?.id, shortInfo?.bgMusic?.previewUrl, shortInfo?.bgMusic?.name]);
 
   // Load voices and backend config once when audio step becomes relevant (avoid re-fetch loop)
   useEffect(() => {
@@ -1981,14 +2004,19 @@ export function WorkflowModal({
                   {audioStepTab === "bgMusic" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                       <p style={{ margin: 0, fontSize: "13px", color: "var(--p-color-text-subdued, #6d7175)" }}>Select background music from Storyblocks. Open the picker to search and choose a track; your selection is shown here.</p>
-                      {selectedBgMusic && (selectedBgMusic.preview_url || selectedBgMusic.title) ? (
+                      {selectedBgMusic && (selectedBgMusic.previewUrl || selectedBgMusic.name) ? (
                         <div style={{ padding: "16px", borderRadius: "10px", background: "#fff", border: "1px solid var(--p-color-border-secondary, #e1e3e5)" }}>
                           <p style={{ margin: "0 0 8px", fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>Selected track</p>
-                          <p style={{ margin: 0, fontSize: "14px", fontWeight: 600, color: "var(--p-color-text-primary, #202223)" }}>{selectedBgMusic.title || "Untitled"}</p>
-                          {selectedBgMusic.preview_url ? (
+                          <p style={{ margin: 0, fontSize: "14px", fontWeight: 600, color: "var(--p-color-text-primary, #202223)" }}>{selectedBgMusic.name || "Untitled"}</p>
+                          {(selectedBgMusic.genre || selectedBgMusic.duration != null) && (
+                            <p style={{ margin: "4px 0 0", fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)" }}>
+                              {[selectedBgMusic.genre, selectedBgMusic.duration != null ? `${selectedBgMusic.duration}s` : null].filter(Boolean).join(" · ")}
+                            </p>
+                          )}
+                          {selectedBgMusic.previewUrl ? (
                             <>
                               <p style={{ margin: "8px 0 4px", fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>Listen</p>
-                              <audio src={selectedBgMusic.preview_url} controls style={{ width: "100%", maxWidth: "400px", marginTop: "0" }} />
+                              <audio src={selectedBgMusic.previewUrl} controls style={{ width: "100%", maxWidth: "400px", marginTop: "0" }} />
                             </>
                           ) : (
                             <p style={{ margin: "8px 0 0", fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)", fontStyle: "italic" }}>Preview not available</p>
@@ -2008,7 +2036,17 @@ export function WorkflowModal({
                                 if (!shortInfo?.shortId) return;
                                 setBgMusicSaveLoading(true); setBgMusicSavedFeedback(false);
                                 try {
-                                  const res = await fetch(SHORTS_SAVE_BG_MUSIC_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ short_id: shortInfo.shortId, bg_music: selectedBgMusic }) });
+                                  const res = await fetch(SHORTS_SAVE_BG_MUSIC_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+                                  short_id: shortInfo.shortId,
+                                  bg_music: {
+                                    id: selectedBgMusic.id,
+                                    name: selectedBgMusic.name,
+                                    genre: selectedBgMusic.genre ?? "Storyblocks",
+                                    duration: selectedBgMusic.duration ?? null,
+                                    previewUrl: selectedBgMusic.previewUrl ?? null,
+                                    downloadUrl: selectedBgMusic.downloadUrl ?? selectedBgMusic.previewUrl ?? null,
+                                  },
+                                }) });
                                   const data = await res.json();
                                   if (data.success) { setBgMusicSavedFeedback(true); setTimeout(() => setBgMusicSavedFeedback(false), 2000); if (productId) loadShortFetcher.load(`${SHORTS_API}?productId=${encodeURIComponent(productId)}`); } else { alert(data.error || "Failed to save"); }
                                 } finally { setBgMusicSaveLoading(false); }

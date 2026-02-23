@@ -2,14 +2,26 @@ import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 
-/** POST — save background music selection to Short.metadata.bgMusic */
+/** POST — save background music selection to Short.metadata.bgMusic (shape: id, name, genre, duration, previewUrl, downloadUrl) */
 export const action = async ({ request }: ActionFunctionArgs) => {
   await authenticate.admin(request);
   if (request.method !== "POST") {
     return Response.json({ error: "Method not allowed" }, { status: 405 });
   }
 
-  let body: { short_id?: string; bg_music?: { id?: string; title?: string; preview_url?: string } };
+  let body: {
+    short_id?: string;
+    bg_music?: {
+      id?: string;
+      name?: string;
+      title?: string;
+      genre?: string;
+      duration?: number;
+      previewUrl?: string;
+      preview_url?: string;
+      downloadUrl?: string;
+    };
+  };
   try {
     body = await request.json();
   } catch {
@@ -26,8 +38,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     bgMusic && typeof bgMusic === "object"
       ? {
           id: typeof bgMusic.id === "string" ? bgMusic.id.trim() || null : null,
-          title: typeof bgMusic.title === "string" ? bgMusic.title.trim() || null : null,
-          preview_url: typeof bgMusic.preview_url === "string" ? bgMusic.preview_url.trim() || null : null,
+          name: typeof bgMusic.name === "string" ? bgMusic.name.trim() || null : (typeof bgMusic.title === "string" ? bgMusic.title.trim() || null : null),
+          genre: typeof bgMusic.genre === "string" ? bgMusic.genre.trim() || null : "Storyblocks",
+          duration: typeof bgMusic.duration === "number" && Number.isFinite(bgMusic.duration) ? bgMusic.duration : null,
+          previewUrl: typeof bgMusic.previewUrl === "string" ? bgMusic.previewUrl.trim() || null : (typeof bgMusic.preview_url === "string" ? bgMusic.preview_url.trim() || null : null),
+          downloadUrl: typeof bgMusic.downloadUrl === "string" ? bgMusic.downloadUrl.trim() || null : (typeof bgMusic.preview_url === "string" ? bgMusic.preview_url.trim() || null : (typeof bgMusic.previewUrl === "string" ? bgMusic.previewUrl.trim() || null : null)),
         }
       : null;
 

@@ -24,10 +24,31 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   }
   const [s1, s2, s3] = short.scenes;
   const audioInfo = (short as { audioInfo?: { voiceId: string | null; voiceName: string | null; audioScript: string | null; generatedAudioUrl: string | null; subtitles: unknown } | null }).audioInfo;
-  const metadata = short.metadata as { bgMusic?: { id?: string; title?: string; preview_url?: string } | null } | null;
+  const metadata = short.metadata as {
+    bgMusic?: {
+      id?: string | null;
+      name?: string | null;
+      title?: string | null;
+      genre?: string | null;
+      duration?: number | null;
+      previewUrl?: string | null;
+      preview_url?: string | null;
+      downloadUrl?: string | null;
+    } | null;
+  } | null;
   const bgMusic = metadata?.bgMusic ?? null;
   const sceneWithUrl = (s: { generatedVideoUrl?: string | null } | undefined) => (s?.generatedVideoUrl?.trim() ? s.generatedVideoUrl : null) ?? null;
   const finalVideoUrl = (short as { finalVideoUrl?: string | null }).finalVideoUrl?.trim() || null;
+  const bgMusicPayload = bgMusic && typeof bgMusic === "object"
+    ? {
+        id: bgMusic.id ?? null,
+        name: bgMusic.name ?? bgMusic.title ?? null,
+        genre: bgMusic.genre ?? "Storyblocks",
+        duration: typeof bgMusic.duration === "number" ? bgMusic.duration : null,
+        previewUrl: bgMusic.previewUrl ?? bgMusic.preview_url ?? null,
+        downloadUrl: bgMusic.downloadUrl ?? bgMusic.previewUrl ?? bgMusic.preview_url ?? null,
+      }
+    : null;
   return Response.json({
     shortId: short.id,
     userId: short.userId ?? null,
@@ -47,7 +68,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
           subtitles: audioInfo.subtitles ?? null,
         }
       : null,
-    bgMusic: bgMusic ? { id: bgMusic.id ?? null, title: bgMusic.title ?? null, preview_url: bgMusic.preview_url ?? null } : null,
+    bgMusic: bgMusicPayload,
   });
 };
 
@@ -85,8 +106,29 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const [s1, s2, s3] = existing.scenes;
       const audioInfo = (existing as { audioInfo?: { voiceId: string | null; voiceName: string | null; audioScript: string | null; generatedAudioUrl: string | null; subtitles: unknown } | null }).audioInfo;
       const sceneWithUrl = (s: { generatedVideoUrl?: string | null } | undefined) => (s?.generatedVideoUrl?.trim() ? s.generatedVideoUrl : null) ?? null;
-      const meta = existing.metadata as { bgMusic?: { id?: string; title?: string; preview_url?: string } | null } | null;
-      const bgMusic = meta?.bgMusic ?? null;
+      const meta = existing.metadata as {
+        bgMusic?: {
+          id?: string | null;
+          name?: string | null;
+          title?: string | null;
+          genre?: string | null;
+          duration?: number | null;
+          previewUrl?: string | null;
+          preview_url?: string | null;
+          downloadUrl?: string | null;
+        } | null;
+      } | null;
+      const bgMusicExisting = meta?.bgMusic ?? null;
+      const bgMusicPayload = bgMusicExisting && typeof bgMusicExisting === "object"
+        ? {
+            id: bgMusicExisting.id ?? null,
+            name: bgMusicExisting.name ?? bgMusicExisting.title ?? null,
+            genre: bgMusicExisting.genre ?? "Storyblocks",
+            duration: typeof bgMusicExisting.duration === "number" ? bgMusicExisting.duration : null,
+            previewUrl: bgMusicExisting.previewUrl ?? bgMusicExisting.preview_url ?? null,
+            downloadUrl: bgMusicExisting.downloadUrl ?? bgMusicExisting.previewUrl ?? bgMusicExisting.preview_url ?? null,
+          }
+        : null;
       return Response.json({
         shortId: existing.id,
         userId: existing.userId ?? null,
@@ -99,7 +141,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         audioInfo: audioInfo
           ? { voiceId: audioInfo.voiceId ?? null, voiceName: audioInfo.voiceName ?? null, audioScript: audioInfo.audioScript ?? null, generatedAudioUrl: audioInfo.generatedAudioUrl ?? null, subtitles: audioInfo.subtitles ?? null }
           : null,
-        bgMusic: bgMusic ? { id: bgMusic.id ?? null, title: bgMusic.title ?? null, preview_url: bgMusic.preview_url ?? null } : null,
+        bgMusic: bgMusicPayload,
       });
     }
   }
