@@ -1797,10 +1797,14 @@ export function WorkflowModal({
                 style={{
                   background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
                   borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                  display: "flex",
+                  flexDirection: "column",
+                  maxHeight: "45vh",
+                  minHeight: "280px",
                   overflow: "hidden",
                 }}
               >
-                <div style={{ display: "flex", borderBottom: "2px solid var(--p-color-border-secondary, #e1e3e5)" }}>
+                <div style={{ display: "flex", borderBottom: "2px solid var(--p-color-border-secondary, #e1e3e5)", flexShrink: 0 }}>
                   {(["voiceover", "bgMusic"] as const).map((tab) => (
                     <button
                       key={tab}
@@ -1823,7 +1827,7 @@ export function WorkflowModal({
                     </button>
                   ))}
                 </div>
-                <div style={{ padding: "20px", minHeight: "350px" }}>
+                <div style={{ padding: "20px", flex: 1, minHeight: 0, overflowY: "auto" }}>
                   {audioStepTab === "voiceover" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                       <p style={{ margin: 0, fontSize: "13px", color: "var(--p-color-text-subdued, #6d7175)" }}>Generate a voiceover from script (optional).</p>
@@ -2031,42 +2035,45 @@ export function WorkflowModal({
                     </div>
                   )}
                 </div>
-                <div
+              </div>
+            )}
+
+            {allScenesComplete && (
+              <div
+                style={{
+                  padding: "12px 20px",
+                  background: "var(--p-color-bg-fill-success-secondary, #e3f1df)",
+                  borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "8px",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={handleFinalize}
+                  disabled={finalizeLoading || !shortInfo?.shortId}
                   style={{
-                    padding: "12px 20px",
-                    background: "var(--p-color-bg-fill-success-secondary, #e3f1df)",
-                    borderTop: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    gap: "8px",
+                    padding: "12px 24px",
+                    borderRadius: "8px",
+                    border: "none",
+                    background: finalizeLoading || !shortInfo?.shortId ? "#9ca3af" : "var(--p-color-bg-fill-success, #008060)",
+                    color: "#fff",
+                    fontWeight: 600,
+                    cursor: finalizeLoading || !shortInfo?.shortId ? "not-allowed" : "pointer",
+                    fontSize: "14px",
                   }}
                 >
-                  <button
-                    type="button"
-                    onClick={handleFinalize}
-                    disabled={finalizeLoading || !shortInfo?.shortId}
-                    style={{
-                      padding: "12px 24px",
-                      borderRadius: "8px",
-                      border: "none",
-                      background: finalizeLoading || !shortInfo?.shortId ? "#9ca3af" : "var(--p-color-bg-fill-success, #008060)",
-                      color: "#fff",
-                      fontWeight: 600,
-                      cursor: finalizeLoading || !shortInfo?.shortId ? "not-allowed" : "pointer",
-                      fontSize: "14px",
-                    }}
-                  >
-                    {finalizeLoading ? "Merging…" : "Finalize"}
-                  </button>
-                  {finalizeProgress != null && (
-                    <span style={{ fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)" }}>{finalizeProgress}%</span>
-                  )}
-                  {finalizeError && (
-                    <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{finalizeError}</span>
-                  )}
-                </div>
+                  {finalizeLoading ? "Merging…" : "Finalize"}
+                </button>
+                {finalizeProgress != null && (
+                  <span style={{ fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)" }}>{finalizeProgress}%</span>
+                )}
+                {finalizeError && (
+                  <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{finalizeError}</span>
+                )}
               </div>
             )}
 
