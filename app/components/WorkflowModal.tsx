@@ -939,6 +939,69 @@ function StoryblocksMusicModal({
           })}
         </div>
 
+        {data?.success && (data.total > 0 || tracks.length > 0) && (
+          <div
+            style={{
+              padding: "12px 20px",
+              borderTop: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "12px",
+              flexWrap: "wrap",
+            }}
+          >
+            <span style={{ fontSize: "13px", color: "var(--p-color-text-subdued, #6d7175)" }}>
+              Page {data.page ?? currentPage} of {Math.max(1, Math.ceil((data.total ?? 0) / perPage))}
+              {data.total != null && data.total > 0 && ` · ${data.total} track${data.total === 1 ? "" : "s"} total`}
+            </span>
+            <div style={{ display: "flex", gap: "8px" }}>
+              <button
+                type="button"
+                disabled={isLoading || (data?.page ?? currentPage) <= 1}
+                onClick={() => {
+                  const prev = Math.max(1, (data?.page ?? currentPage) - 1);
+                  setCurrentPage(prev);
+                  loadPage(prev);
+                }}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                  background: "#fff",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  cursor: (data?.page ?? currentPage) <= 1 ? "not-allowed" : "pointer",
+                  color: (data?.page ?? currentPage) <= 1 ? "#9ca3af" : "var(--p-color-text-primary, #202223)",
+                }}
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                disabled={isLoading || (data?.page ?? currentPage) >= Math.ceil((data?.total ?? 0) / perPage)}
+                onClick={() => {
+                  const next = (data?.page ?? currentPage) + 1;
+                  setCurrentPage(next);
+                  loadPage(next);
+                }}
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                  background: "#fff",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  cursor: (data?.page ?? currentPage) >= Math.ceil((data?.total ?? 0) / perPage) ? "not-allowed" : "pointer",
+                  color: (data?.page ?? currentPage) >= Math.ceil((data?.total ?? 0) / perPage) ? "#9ca3af" : "var(--p-color-text-primary, #202223)",
+                }}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+
         {pickedTrack && (
           <div
             style={{
@@ -1660,7 +1723,7 @@ export function WorkflowModal({
                     </button>
                   ))}
                 </div>
-                <div style={{ padding: "20px" }}>
+                <div style={{ padding: "20px", minHeight: "340px" }}>
                   {audioStepTab === "voiceover" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                       <p style={{ margin: 0, fontSize: "13px", color: "var(--p-color-text-subdued, #6d7175)" }}>Generate a voiceover from script (optional).</p>
@@ -2911,50 +2974,45 @@ function Scene2Content({
             title="Select stock video & generate scene"
             description="Search and pick a stock video from Pexels, Pixabay, or Coverr as the background. Then click Generate video to composite your subject onto it and create the scene (~8s)."
           />
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <button
-              type="button"
-              onClick={() => setVideoModalOpen(true)}
-              style={{
-                ...boxStyle,
-                minHeight: "60px",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              {selectedStockVideoUrl ? (
-                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                  <video
-                    src={selectedStockVideoUrl}
-                    style={{ width: "120px", height: "68px", objectFit: "cover", borderRadius: "6px" }}
-                    muted
-                    playsInline
-                  />
-                  <span style={{ fontSize: "14px", color: "var(--p-color-text-primary, #202223)" }}>Stock video selected</span>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); setVideoModalOpen(true); }}
-                    style={{ padding: "4px 8px", fontSize: "12px", borderRadius: "4px", border: "1px solid #e1e3e5", background: "#fff", cursor: "pointer" }}
-                  >
-                    Change
-                  </button>
-                </div>
-              ) : (
-                <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Search stock videos (Pexels, Pixabay, Coverr)</span>
-              )}
-            </button>
-          </div>
-          <FetchVideoModal
-            open={videoModalOpen}
-            onClose={() => setVideoModalOpen(false)}
-            onSelect={(url) => { setSelectedStockVideoUrl(url); setVideoModalOpen(false); }}
-          />
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ display: "flex", flexDirection: "row", gap: "24px", alignItems: "flex-start", flexWrap: "wrap" }}>
+            <div style={{ flex: "1 1 260px", minWidth: "240px", display: "flex", flexDirection: "column", gap: "12px" }}>
+              <button
+                type="button"
+                onClick={() => setVideoModalOpen(true)}
+                style={{
+                  ...boxStyle,
+                  minHeight: "60px",
+                  cursor: "pointer",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {selectedStockVideoUrl ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <video
+                      src={selectedStockVideoUrl}
+                      style={{ width: "120px", height: "68px", objectFit: "cover", borderRadius: "6px" }}
+                      muted
+                      playsInline
+                    />
+                    <span style={{ fontSize: "14px", color: "var(--p-color-text-primary, #202223)" }}>Stock video selected</span>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setVideoModalOpen(true); }}
+                      style={{ padding: "4px 8px", fontSize: "12px", borderRadius: "4px", border: "1px solid #e1e3e5", background: "#fff", cursor: "pointer" }}
+                    >
+                      Change
+                    </button>
+                  </div>
+                ) : (
+                  <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Search stock videos (Pexels, Pixabay, Coverr)</span>
+                )}
+              </button>
+            </div>
+            <div style={{ flex: "1 1 260px", minWidth: "240px", display: "flex", flexDirection: "column", gap: "8px" }}>
               {sceneLoading ? (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", minWidth: "280px" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", minWidth: "200px" }}>
                   <div style={{ width: "100%", maxWidth: "280px", height: "8px", borderRadius: "4px", background: "var(--p-color-border-secondary, #e1e3e5)", overflow: "hidden" }}>
                     <div
                       style={{
@@ -2974,7 +3032,7 @@ function Scene2Content({
                   )}
                 </div>
               ) : (dbSceneVideoUrl ?? sceneVideo) ? (
-                <video src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "400px", maxHeight: "240px", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
+                <video src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "100%", maxHeight: "240px", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
               ) : (
                 <button
                   type="button"
@@ -2993,11 +3051,16 @@ function Scene2Content({
                   Generate video
                 </button>
               )}
+              {sceneError && (
+                <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{sceneError}</span>
+              )}
             </div>
-            {sceneError && (
-              <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{sceneError}</span>
-            )}
           </div>
+          <FetchVideoModal
+            open={videoModalOpen}
+            onClose={() => setVideoModalOpen(false)}
+            onSelect={(url) => { setSelectedStockVideoUrl(url); setVideoModalOpen(false); }}
+          />
         </>
       )}
     </div>
