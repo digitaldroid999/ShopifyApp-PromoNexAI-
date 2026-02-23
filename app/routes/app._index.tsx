@@ -240,16 +240,6 @@ type ProductNode = {
   };
 };
 
-const SAMPLE_PRODUCT: ProductNode = {
-  id: "sample",
-  title: "Sample product (video mockup)",
-  handle: "sample-product-mockup",
-  status: "ACTIVE",
-  featuredImage: { url: "/mockup/scene1-original.jpg", altText: "Sample" },
-  images: { edges: [{ node: { url: "/mockup/scene1-original.jpg", altText: "Sample" } }] },
-  variants: { edges: [] },
-};
-
 export default function Index() {
   const fetcher = useFetcher<typeof action>();
   const loadMoreFetcher = useFetcher<{ products: ProductNode[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } }>();
@@ -356,7 +346,7 @@ export default function Index() {
           </s-stack>
           {editingProduct ? (
             <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
-              <s-text fontWeight="bold">Edit product</s-text>
+              <s-text type="strong">Edit product</s-text>
               <fetcher.Form
                 method="post"
                 style={{ marginTop: "12px" }}
@@ -397,7 +387,7 @@ export default function Index() {
                       <s-text>Variant prices</s-text>
                       {editingProduct.variants.edges.map(({ node: v }) => (
                         <label key={v.id} style={{ display: "block", marginTop: "4px" }}>
-                          <s-text tone="subdued">{v.title}:</s-text>
+                          <s-text color="subdued">{v.title}:</s-text>
                           <input type="text" name={`price_${v.id}`} defaultValue={v.price} placeholder="Price" style={{ marginLeft: "8px", padding: "4px", width: "100px" }} />
                         </label>
                       ))}
@@ -414,10 +404,10 @@ export default function Index() {
             </s-box>
           ) : null}
         {products.length === 0 && !loadMoreFetcher.state ? (
-          <s-paragraph tone="subdued">No products match. Use “Generate a product” to create one.</s-paragraph>
+          <s-paragraph color="subdued">No products match. Use “Generate a product” to create one.</s-paragraph>
           ) : (
           <s-stack direction="block" gap="base">
-            {[SAMPLE_PRODUCT, ...products].map((product) => {
+            {products.map((product) => {
               const productIdSegment = product.id === "sample" ? "sample" : product.id.split("/").pop();
               const imageUrl =
                 product.featuredImage?.url ??
@@ -465,15 +455,16 @@ export default function Index() {
                         </div>
                       )}
                     </div>
-                    <s-stack direction="block" gap="tight" style={{ flex: "1", minWidth: 0 }}>
-                      <s-text fontWeight="bold">{product.title}</s-text>
-                      <s-text tone="subdued">Handle: {product.handle} · Status: {product.status}</s-text>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                    <s-stack direction="block" gap="base">
+                      <s-text type="strong">{product.title}</s-text>
+                      <s-text color="subdued">Handle: {product.handle} · Status: {product.status}</s-text>
                       {product.variants?.edges?.length > 0 && (
-                        <s-text tone="subdued">
+                        <s-text color="subdued">
                           Variants: {product.variants.edges.map((e) => `${e.node.title} – ${e.node.price}`).join(", ")}
                         </s-text>
                       )}
-                      <s-stack direction="inline" gap="tight">
+                      <s-stack direction="inline" gap="base">
                         <Link to={`/app/products/${productIdSegment}`}>
                           <s-button variant="primary">Generate video</s-button>
                         </Link>
@@ -487,6 +478,7 @@ export default function Index() {
                         )}
                       </s-stack>
                     </s-stack>
+                  </div>
                   </div>
                 </s-box>
               );

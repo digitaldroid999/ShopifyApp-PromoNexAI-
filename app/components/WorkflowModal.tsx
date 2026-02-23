@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useFetcher } from "react-router";
+import { useAppBridge } from "@shopify/app-bridge-react";
 
 const BASE = "/mockup";
 const BACKGROUND_EXTRACT_PROMPT_API = "/app/api/background/extract-prompt";
@@ -1526,8 +1527,10 @@ export function WorkflowModal({
   /** Product info for Remotion (scene 1 video generation). */
   product?: WorkflowProduct | null;
 }) {
+  const shopify = useAppBridge();
   const productImages = productImagesProp?.length ? productImagesProp : defaultProductImages;
   const firstImageId = productImages[0]?.id ?? "s1";
+  const showSkipRemoveBgWarning = () => shopify.toast.show(SKIP_REMOVE_BG_WARNING);
 
   const loadTempFetcher = useFetcher<{ state: WorkflowTempState | null }>();
   const loadShortFetcher = useFetcher<ShortInfo>();
@@ -2294,6 +2297,7 @@ export function WorkflowModal({
                   dbSceneVideoUrl={shortInfo?.scene1GeneratedVideoUrl ?? undefined}
                   onScene1Change={setScene1Snapshot}
                   onComplete={() => setScene1Complete(true)}
+                  onSkipRemoveBgWarning={showSkipRemoveBgWarning}
                 />
               </div>
               <div style={{ display: activeTab === "scene2" ? "block" : "none" }} key={`scene2-${restoredState?.scene2 ? "restored" : "default"}`}>
@@ -2305,6 +2309,7 @@ export function WorkflowModal({
                   dbSceneVideoUrl={shortInfo?.scene2GeneratedVideoUrl ?? undefined}
                   onScene2Change={setScene2Snapshot}
                   onComplete={() => setScene2Complete(true)}
+                  onSkipRemoveBgWarning={showSkipRemoveBgWarning}
                 />
               </div>
               <div style={{ display: activeTab === "scene3" ? "block" : "none" }} key={`scene3-${restoredState?.scene3 ? "restored" : "default"}`}>
@@ -2319,6 +2324,7 @@ export function WorkflowModal({
                   dbSceneVideoUrl={shortInfo?.scene3GeneratedVideoUrl ?? undefined}
                   onScene3Change={setScene3Snapshot}
                   onComplete={() => setScene3Complete(true)}
+                  onSkipRemoveBgWarning={showSkipRemoveBgWarning}
                 />
               </div>
             </div>
@@ -2400,15 +2406,18 @@ export type WorkflowTempState = {
   showingFinal: boolean;
   scriptGenerated: boolean;
   audioGenerated: boolean;
-  scene1: { step: number; selectedImage: string | null; bgRemoved: string | null; bgImage: string | null; composited: string | null; sceneVideo: string | null };
-  scene2: { step: number; selectedImage: string | null; bgRemoved: string | null; selectedStockVideoUrl: string | null; sceneVideo: string | null };
-  scene3: { step: number; selectedImage: string | null; bgRemoved: string | null; bgImage: string | null; composited: string | null; sceneVideo: string | null };
+  scene1: { step: number; selectedImage: string | null; bgRemoved: string | null; skipRemoveBg: boolean; bgImage: string | null; composited: string | null; sceneVideo: string | null };
+  scene2: { step: number; selectedImage: string | null; bgRemoved: string | null; skipRemoveBg: boolean; selectedStockVideoUrl: string | null; sceneVideo: string | null };
+  scene3: { step: number; selectedImage: string | null; bgRemoved: string | null; skipRemoveBg: boolean; bgImage: string | null; composited: string | null; sceneVideo: string | null };
 };
+
+const SKIP_REMOVE_BG_WARNING = "Skipping background removal may reduce the quality of your final image and video.";
 
 const defaultScene1State = (firstImageId: string): WorkflowTempState["scene1"] => ({
   step: 1,
   selectedImage: firstImageId,
   bgRemoved: null,
+  skipRemoveBg: false,
   bgImage: null,
   composited: null,
   sceneVideo: null,
@@ -2417,6 +2426,7 @@ const defaultScene2State = (firstImageId: string): WorkflowTempState["scene2"] =
   step: 1,
   selectedImage: firstImageId,
   bgRemoved: null,
+  skipRemoveBg: false,
   selectedStockVideoUrl: null,
   sceneVideo: null,
 });
@@ -2424,6 +2434,7 @@ const defaultScene3State = (firstImageId: string): WorkflowTempState["scene3"] =
   step: 1,
   selectedImage: firstImageId,
   bgRemoved: null,
+  skipRemoveBg: false,
   bgImage: null,
   composited: null,
   sceneVideo: null,
@@ -2464,6 +2475,7 @@ function Scene1Content({
   dbSceneVideoUrl,
   onScene1Change,
   onComplete,
+  onSkipRemoveBgWarning,
 }: {
   productImages: ProductImageItem[];
   productId?: string | null;
@@ -2476,11 +2488,13 @@ function Scene1Content({
   dbSceneVideoUrl?: string | null;
   onScene1Change?: (s: Scene1State) => void;
   onComplete?: () => void;
+  onSkipRemoveBgWarning?: () => void;
 }) {
   const firstId = productImagesProp[0]?.id ?? "s1";
   const [step, setStep] = useState(initialScene1?.step ?? 1);
   const [selectedImage, setSelectedImage] = useState<string | null>(initialScene1?.selectedImage ?? firstId);
   const [bgRemoved, setBgRemoved] = useState<string | null>(initialScene1?.bgRemoved ?? null);
+  const [skipRemoveBg, setSkipRemoveBg] = useState(initialScene1?.skipRemoveBg ?? false);
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
   const [bgRemovedError, setBgRemovedError] = useState<string | null>(null);
   const [bgImage, setBgImage] = useState<string | null>(initialScene1?.bgImage ?? null);
@@ -2501,11 +2515,12 @@ function Scene1Content({
       step,
       selectedImage,
       bgRemoved,
+      skipRemoveBg,
       bgImage,
       composited,
       sceneVideo,
     });
-  }, [step, selectedImage, bgRemoved, bgImage, composited, sceneVideo, onScene1Change]);
+  }, [step, selectedImage, bgRemoved, skipRemoveBg, bgImage, composited, sceneVideo, onScene1Change]);
 
   const removeBgFetcher = useFetcher<{ ok: boolean; url?: string; error?: string }>();
 
@@ -2608,14 +2623,16 @@ function Scene1Content({
     }
   };
 
+  const effectiveOverlayUrl = bgRemoved ?? (skipRemoveBg ? (productImagesProp.find((i) => i.id === selectedImage)?.src ?? null) : null);
+
   const handleComposite = async () => {
-    if (!bgRemoved || !bgImage) return;
+    if (!effectiveOverlayUrl || !bgImage) return;
     setCompositeError(null);
     setCompositeLoading(true);
     const sceneLabel = "Scene 1";
     try {
       const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const overlayUrl = bgRemoved.startsWith("http") ? bgRemoved : `${origin}${bgRemoved}`;
+      const overlayUrl = effectiveOverlayUrl.startsWith("http") ? effectiveOverlayUrl : `${origin}${effectiveOverlayUrl}`;
       const backgroundUrl = bgImage.startsWith("http") ? bgImage : `${origin}${bgImage}`;
       const scene_id = videoSceneId ?? (productId ? `${productId}-scene1` : `scene1-${Date.now()}`);
       const user_id = shortUserId ?? "anonymous";
@@ -2775,7 +2792,7 @@ function Scene1Content({
               </button>
             ))}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
             <button
               type="button"
               onClick={handleRemoveBg}
@@ -2792,16 +2809,41 @@ function Scene1Content({
             >
               {bgRemovedLoading ? "Removing…" : "Remove BG"}
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSkipRemoveBg(true);
+                onSkipRemoveBgWarning?.();
+                setStep(2);
+              }}
+              disabled={bgRemovedLoading}
+              style={{
+                padding: "10px 20px",
+                borderRadius: "8px",
+                border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                background: "transparent",
+                color: "var(--p-color-text-primary, #202223)",
+                fontWeight: 600,
+                cursor: bgRemovedLoading ? "wait" : "pointer",
+              }}
+            >
+              Skip
+            </button>
             {bgRemovedError && (
               <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{bgRemovedError}</span>
             )}
-            {bgRemoved && (
+            {(bgRemoved || skipRemoveBg) && (
               <>
-                <img
-                  src={bgRemoved}
-                  alt="BG removed"
-                  style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }}
-                />
+                {bgRemoved && (
+                  <img
+                    src={bgRemoved}
+                    alt="BG removed"
+                    style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }}
+                  />
+                )}
+                {skipRemoveBg && !bgRemoved && (
+                  <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Using image as-is</span>
+                )}
                 <button
                   type="button"
                   onClick={() => setStep(2)}
@@ -2912,7 +2954,7 @@ function Scene1Content({
               <button
                 type="button"
                 onClick={handleComposite}
-                disabled={!bgImage || compositeLoading}
+                disabled={!bgImage || !effectiveOverlayUrl || compositeLoading}
                 style={{
                   padding: "12px 24px",
                   borderRadius: "8px",
@@ -2920,7 +2962,7 @@ function Scene1Content({
                   background: compositeLoading ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
                   color: "#fff",
                   fontWeight: 600,
-                  cursor: !bgImage || compositeLoading ? "not-allowed" : "pointer",
+                  cursor: !bgImage || !effectiveOverlayUrl || compositeLoading ? "not-allowed" : "pointer",
                   boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                 }}
               >
@@ -3056,6 +3098,7 @@ function Scene2Content({
   dbSceneVideoUrl,
   onScene2Change,
   onComplete,
+  onSkipRemoveBgWarning,
 }: {
   productImages: ProductImageItem[];
   sceneId?: string | null;
@@ -3065,11 +3108,13 @@ function Scene2Content({
   dbSceneVideoUrl?: string | null;
   onScene2Change?: (s: Scene2State) => void;
   onComplete?: () => void;
+  onSkipRemoveBgWarning?: () => void;
 }) {
   const firstId = productImagesProp[0]?.id ?? "s1";
   const [step, setStep] = useState(initialScene2?.step ?? 1);
   const [selectedImage, setSelectedImage] = useState<string | null>(initialScene2?.selectedImage ?? firstId);
   const [bgRemoved, setBgRemoved] = useState<string | null>(initialScene2?.bgRemoved ?? null);
+  const [skipRemoveBg, setSkipRemoveBg] = useState(initialScene2?.skipRemoveBg ?? false);
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
   const [bgRemovedError, setBgRemovedError] = useState<string | null>(null);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
@@ -3085,10 +3130,11 @@ function Scene2Content({
       step,
       selectedImage,
       bgRemoved,
+      skipRemoveBg,
       selectedStockVideoUrl,
       sceneVideo,
     });
-  }, [step, selectedImage, bgRemoved, selectedStockVideoUrl, sceneVideo, onScene2Change]);
+  }, [step, selectedImage, bgRemoved, skipRemoveBg, selectedStockVideoUrl, sceneVideo, onScene2Change]);
 
   const removeBgFetcher = useFetcher<{ ok: boolean; url?: string; error?: string }>();
 
@@ -3131,9 +3177,11 @@ function Scene2Content({
     );
   };
 
+  const effectiveOverlayUrl = bgRemoved ?? (skipRemoveBg ? (productImagesProp.find((i) => i.id === selectedImage)?.src ?? null) : null);
+
   const handleGenerateVideo = async () => {
-    if (!bgRemoved || !selectedStockVideoUrl || !scene2Id || !shortUserId) {
-      setSceneError("Missing image, video, or scene. Ensure BG is removed, a stock video is selected, and the short is loaded.");
+    if (!effectiveOverlayUrl || !selectedStockVideoUrl || !scene2Id || !shortUserId) {
+      setSceneError("Missing image, video, or scene. Ensure BG is removed or skipped, a stock video is selected, and the short is loaded.");
       return;
     }
     setSceneError(null);
@@ -3142,7 +3190,7 @@ function Scene2Content({
     setSceneLoading(true);
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     try {
-      const product_image_url = bgRemoved.startsWith("http") ? bgRemoved : `${origin}${bgRemoved}`;
+      const product_image_url = effectiveOverlayUrl.startsWith("http") ? effectiveOverlayUrl : `${origin}${effectiveOverlayUrl}`;
       const background_video_url = selectedStockVideoUrl.startsWith("http") ? selectedStockVideoUrl : `${origin}${selectedStockVideoUrl}`;
       const res = await fetch(VIDEO_API, {
         method: "POST",
@@ -3263,7 +3311,7 @@ function Scene2Content({
               </button>
             ))}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
             <button
               type="button"
               onClick={handleRemoveBg}
@@ -3280,12 +3328,37 @@ function Scene2Content({
             >
               {bgRemovedLoading ? "Removing…" : "Remove BG"}
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSkipRemoveBg(true);
+                onSkipRemoveBgWarning?.();
+                setStep(2);
+              }}
+              disabled={bgRemovedLoading}
+              style={{
+                padding: "10px 20px",
+                borderRadius: "8px",
+                border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                background: "transparent",
+                color: "var(--p-color-text-primary, #202223)",
+                fontWeight: 600,
+                cursor: bgRemovedLoading ? "wait" : "pointer",
+              }}
+            >
+              Skip
+            </button>
             {bgRemovedError && (
               <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{bgRemovedError}</span>
             )}
-            {bgRemoved && (
+            {(bgRemoved || skipRemoveBg) && (
               <>
-                <img src={bgRemoved} alt="BG removed" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
+                {bgRemoved && (
+                  <img src={bgRemoved} alt="BG removed" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
+                )}
+                {skipRemoveBg && !bgRemoved && (
+                  <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Using image as-is</span>
+                )}
                 <button
                   type="button"
                   onClick={() => setStep(2)}
@@ -3378,15 +3451,15 @@ function Scene2Content({
                 <button
                   type="button"
                   onClick={handleGenerateVideo}
-                  disabled={!selectedStockVideoUrl || !bgRemoved || !scene2Id || !shortUserId || sceneLoading}
+                  disabled={!selectedStockVideoUrl || !effectiveOverlayUrl || !scene2Id || !shortUserId || sceneLoading}
                   style={{
                     padding: "10px 20px",
                     borderRadius: "8px",
                     border: "none",
-                    background: !selectedStockVideoUrl || !bgRemoved || !scene2Id ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
+                    background: !selectedStockVideoUrl || !effectiveOverlayUrl || !scene2Id ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
                     color: "#fff",
                     fontWeight: 600,
-                    cursor: !selectedStockVideoUrl || !scene2Id ? "not-allowed" : "pointer",
+                    cursor: !selectedStockVideoUrl || !effectiveOverlayUrl || !scene2Id ? "not-allowed" : "pointer",
                   }}
                 >
                   Generate video
@@ -3421,6 +3494,7 @@ function Scene3Content({
   dbSceneVideoUrl,
   onScene3Change,
   onComplete,
+  onSkipRemoveBgWarning,
 }: {
   productImages: ProductImageItem[];
   productId?: string | null;
@@ -3433,11 +3507,13 @@ function Scene3Content({
   dbSceneVideoUrl?: string | null;
   onScene3Change?: (s: Scene3State) => void;
   onComplete?: () => void;
+  onSkipRemoveBgWarning?: () => void;
 }) {
   const firstId = productImagesProp[0]?.id ?? "s1";
   const [step, setStep] = useState(initialScene3?.step ?? 1);
   const [selectedImage, setSelectedImage] = useState<string | null>(initialScene3?.selectedImage ?? firstId);
   const [bgRemoved, setBgRemoved] = useState<string | null>(initialScene3?.bgRemoved ?? null);
+  const [skipRemoveBg, setSkipRemoveBg] = useState(initialScene3?.skipRemoveBg ?? false);
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
   const [bgRemovedError, setBgRemovedError] = useState<string | null>(null);
   const [bgImage, setBgImage] = useState<string | null>(initialScene3?.bgImage ?? null);
@@ -3458,11 +3534,12 @@ function Scene3Content({
       step,
       selectedImage,
       bgRemoved,
+      skipRemoveBg,
       bgImage,
       composited,
       sceneVideo,
     });
-  }, [step, selectedImage, bgRemoved, bgImage, composited, sceneVideo, onScene3Change]);
+  }, [step, selectedImage, bgRemoved, skipRemoveBg, bgImage, composited, sceneVideo, onScene3Change]);
 
   const removeBgFetcher = useFetcher<{ ok: boolean; url?: string; error?: string }>();
 
@@ -3492,6 +3569,8 @@ function Scene3Content({
       { method: "post", action: VIDEO_API, encType: "application/json" }
     );
   };
+
+  const effectiveOverlayUrl = bgRemoved ?? (skipRemoveBg ? (productImagesProp.find((i) => i.id === selectedImage)?.src ?? null) : null);
 
   const handleGenerateBg = async (opts: AIBackgroundGenerateOpts) => {
     const LOG_BG = "[BG Scene3]";
@@ -3566,13 +3645,13 @@ function Scene3Content({
   };
 
   const handleComposite = async () => {
-    if (!bgRemoved || !bgImage) return;
+    if (!effectiveOverlayUrl || !bgImage) return;
     setCompositeError(null);
     setCompositeLoading(true);
     const sceneLabel = "Scene 3";
     try {
       const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const overlayUrl = bgRemoved.startsWith("http") ? bgRemoved : `${origin}${bgRemoved}`;
+      const overlayUrl = effectiveOverlayUrl.startsWith("http") ? effectiveOverlayUrl : `${origin}${effectiveOverlayUrl}`;
       const backgroundUrl = bgImage.startsWith("http") ? bgImage : `${origin}${bgImage}`;
       const scene_id = videoSceneId ?? (productId ? `${productId}-scene3` : `scene3-${Date.now()}`);
       const user_id = shortUserId ?? "anonymous";
@@ -3732,7 +3811,7 @@ function Scene3Content({
               </button>
             ))}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
             <button
               type="button"
               onClick={handleRemoveBg}
@@ -3749,12 +3828,37 @@ function Scene3Content({
             >
               {bgRemovedLoading ? "Removing…" : "Remove BG"}
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSkipRemoveBg(true);
+                onSkipRemoveBgWarning?.();
+                setStep(2);
+              }}
+              disabled={bgRemovedLoading}
+              style={{
+                padding: "10px 20px",
+                borderRadius: "8px",
+                border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                background: "transparent",
+                color: "var(--p-color-text-primary, #202223)",
+                fontWeight: 600,
+                cursor: bgRemovedLoading ? "wait" : "pointer",
+              }}
+            >
+              Skip
+            </button>
             {bgRemovedError && (
               <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{bgRemovedError}</span>
             )}
-            {bgRemoved && (
+            {(bgRemoved || skipRemoveBg) && (
               <>
-                <img src={bgRemoved} alt="BG removed" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
+                {bgRemoved && (
+                  <img src={bgRemoved} alt="BG removed" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
+                )}
+                {skipRemoveBg && !bgRemoved && (
+                  <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Using image as-is</span>
+                )}
                 <button
                   type="button"
                   onClick={() => setStep(2)}
@@ -3857,7 +3961,7 @@ function Scene3Content({
               <button
                 type="button"
                 onClick={handleComposite}
-                disabled={!bgImage || compositeLoading}
+                disabled={!bgImage || !effectiveOverlayUrl || compositeLoading}
                 style={{
                   padding: "12px 24px",
                   borderRadius: "8px",
@@ -3865,7 +3969,7 @@ function Scene3Content({
                   background: compositeLoading ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
                   color: "#fff",
                   fontWeight: 600,
-                  cursor: !bgImage || compositeLoading ? "not-allowed" : "pointer",
+                  cursor: !bgImage || !effectiveOverlayUrl || compositeLoading ? "not-allowed" : "pointer",
                   boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                 }}
               >
