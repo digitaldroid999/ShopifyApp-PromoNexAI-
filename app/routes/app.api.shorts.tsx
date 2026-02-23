@@ -20,13 +20,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     },
   });
   if (!short) {
-    return Response.json({ shortId: null, userId: null, scene1Id: null, scene2Id: null, scene3Id: null, audioInfo: null, bgMusic: null, scene1GeneratedVideoUrl: null, scene2GeneratedVideoUrl: null, scene3GeneratedVideoUrl: null });
+    return Response.json({ shortId: null, userId: null, scene1Id: null, scene2Id: null, scene3Id: null, audioInfo: null, bgMusic: null, scene1GeneratedVideoUrl: null, scene2GeneratedVideoUrl: null, scene3GeneratedVideoUrl: null, finalVideoUrl: null });
   }
   const [s1, s2, s3] = short.scenes;
   const audioInfo = (short as { audioInfo?: { voiceId: string | null; voiceName: string | null; audioScript: string | null; generatedAudioUrl: string | null; subtitles: unknown } | null }).audioInfo;
   const metadata = short.metadata as { bgMusic?: { id?: string; title?: string; preview_url?: string } | null } | null;
   const bgMusic = metadata?.bgMusic ?? null;
   const sceneWithUrl = (s: { generatedVideoUrl?: string | null } | undefined) => (s?.generatedVideoUrl?.trim() ? s.generatedVideoUrl : null) ?? null;
+  const finalVideoUrl = (short as { finalVideoUrl?: string | null }).finalVideoUrl?.trim() || null;
   return Response.json({
     shortId: short.id,
     userId: short.userId ?? null,
@@ -36,6 +37,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     scene1GeneratedVideoUrl: sceneWithUrl(s1),
     scene2GeneratedVideoUrl: sceneWithUrl(s2),
     scene3GeneratedVideoUrl: sceneWithUrl(s3),
+    finalVideoUrl,
     audioInfo: audioInfo
       ? {
           voiceId: audioInfo.voiceId ?? null,

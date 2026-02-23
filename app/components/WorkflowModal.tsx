@@ -1349,6 +1349,7 @@ type ShortInfo = {
   scene3GeneratedVideoUrl: string | null;
   audioInfo: AudioInfoSnapshot;
   bgMusic: BgMusicSnapshot | null;
+  finalVideoUrl: string | null;
 };
 
 export type WorkflowProduct = { name: string; price?: string; rating?: number; description?: string };
@@ -1394,6 +1395,7 @@ export function WorkflowModal({
           scene3GeneratedVideoUrl: (loadShortFetcher.data as { scene3GeneratedVideoUrl?: string | null }).scene3GeneratedVideoUrl ?? null,
           audioInfo: (loadShortFetcher.data as { audioInfo?: AudioInfoSnapshot }).audioInfo ?? null,
           bgMusic: (loadShortFetcher.data as { bgMusic?: BgMusicSnapshot | null }).bgMusic ?? null,
+          finalVideoUrl: (loadShortFetcher.data as { finalVideoUrl?: string | null }).finalVideoUrl ?? null,
         }
       : null;
 
@@ -1428,8 +1430,16 @@ export function WorkflowModal({
   const [scene1Snapshot, setScene1Snapshot] = useState<WorkflowTempState["scene1"] | null>(null);
   const [scene2Snapshot, setScene2Snapshot] = useState<WorkflowTempState["scene2"] | null>(null);
   const [scene3Snapshot, setScene3Snapshot] = useState<WorkflowTempState["scene3"] | null>(null);
+  const [finalizeLoading, setFinalizeLoading] = useState(false);
+  const [finalizeError, setFinalizeError] = useState<string | null>(null);
+  const [finalizeProgress, setFinalizeProgress] = useState<number | null>(null);
+  /** Final video URL from merge (set after finalize completes; used when showing final view) */
+  const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
 
   const allScenesComplete = scene1Complete && scene2Complete && scene3Complete;
+
+  /** Resolved final video URL: from merge result or from short (e.g. after reload) */
+  const displayedFinalVideoUrl = finalVideoUrl ?? shortInfo?.finalVideoUrl ?? null;
 
   /** Restored state from temp (null while loading or when none saved) */
   const restoredState: WorkflowTempState | null =
@@ -1555,6 +1565,75 @@ export function WorkflowModal({
     return () => clearTimeout(timer);
   }, [productId, loadedState, activeTab, scene1Complete, scene2Complete, scene3Complete, showingFinal, scriptGenerated, audioGenerated, scene1Snapshot, scene2Snapshot, scene3Snapshot, firstImageId]);
 
+  const handleFinalize = async () => {
+    if (!shortInfo?.shortId) {
+      setFinalizeError("Short not loaded. Please close and reopen the workflow.");
+      return;
+    }
+    if (displayedFinalVideoUrl) {
+      setShowingFinal(true);
+      return;
+    }
+    setFinalizeError(null);
+    setFinalizeLoading(true);
+    setFinalizeProgress(0);
+    try {
+      const startRes = await fetch(MERGE_FINALIZE_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ short_id: shortInfo.shortId }),
+      });
+      const startData = await startRes.json().catch(() => ({}));
+      const taskId = startData.task_id;
+      if (!taskId) {
+        setFinalizeError(startData.error ?? "Failed to start finalize");
+        return;
+      }
+      let done = false;
+      for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
+        await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+        const pollRes = await fetch(`${MERGE_STATUS_API_BASE}/${encodeURIComponent(taskId)}`, {
+          credentials: "include",
+          cache: "no-store",
+          headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
+        });
+        const statusData = await pollRes.json().catch(() => ({}));
+        setFinalizeProgress(typeof statusData.progress === "number" ? statusData.progress : null);
+        if (statusData.status === "completed" && statusData.final_video_url) {
+          const url = statusData.final_video_url;
+          setFinalVideoUrl(url);
+          try {
+            await fetch(SHORTS_SAVE_FINAL_VIDEO_API, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify({ short_id: shortInfo.shortId, final_video_url: url }),
+            });
+          } catch (e) {
+            console.error("[Finalize] Failed to save final video URL:", e);
+          }
+          setShowingFinal(true);
+          done = true;
+          break;
+        }
+        if (statusData.status === "failed") {
+          setFinalizeError(statusData.error_message ?? "Finalize failed");
+          done = true;
+          break;
+        }
+      }
+      if (!done) {
+        setFinalizeError("Finalize timed out. Please try again.");
+      }
+    } catch (e) {
+      setFinalizeError(e instanceof Error ? e.message : "Finalize failed");
+    } finally {
+      setFinalizeLoading(false);
+      setFinalizeProgress(null);
+    }
+  };
+
   return (
     <div
       style={{
@@ -1615,11 +1694,31 @@ export function WorkflowModal({
 
         {showingFinal ? (
           <div style={{ padding: "24px", display: "flex", flexDirection: "column", alignItems: "center", gap: "16px", flex: 1 }}>
-            <video
-              src={`${BASE}/final.mp4`}
-              controls
-              style={{ maxWidth: "100%", maxHeight: "60vh", borderRadius: "12px", border: "1px solid #e1e3e5" }}
-            />
+            {displayedFinalVideoUrl ? (
+              <video
+                src={displayedFinalVideoUrl}
+                controls
+                style={{ maxWidth: "100%", maxHeight: "60vh", borderRadius: "12px", border: "1px solid #e1e3e5" }}
+              />
+            ) : (
+              <>
+                <p style={{ color: "var(--p-color-text-subdued, #6d7175)", margin: 0 }}>No final video yet. Go back and click Finalize to merge all scenes.</p>
+                <button
+                  type="button"
+                  onClick={() => setShowingFinal(false)}
+                  style={{
+                    padding: "8px 16px",
+                    borderRadius: "8px",
+                    border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                    background: "transparent",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                  }}
+                >
+                  Back
+                </button>
+              </>
+            )}
             <button
               type="button"
               onClick={() => {
@@ -1629,17 +1728,18 @@ export function WorkflowModal({
                     action: `${WORKFLOW_TEMP_API}?productId=${encodeURIComponent(productId.trim())}`,
                   });
                 }
-                onDone?.(`${BASE}/final.mp4`);
+                if (displayedFinalVideoUrl) onDone?.(displayedFinalVideoUrl);
                 onClose();
               }}
+              disabled={!displayedFinalVideoUrl}
               style={{
                 padding: "12px 24px",
                 borderRadius: "8px",
                 border: "none",
-                background: "var(--p-color-bg-fill-info, #2c6ecb)",
+                background: displayedFinalVideoUrl ? "var(--p-color-bg-fill-info, #2c6ecb)" : "#9ca3af",
                 color: "#fff",
                 fontWeight: 600,
-                cursor: "pointer",
+                cursor: displayedFinalVideoUrl ? "pointer" : "not-allowed",
               }}
             >
               Done
@@ -1723,7 +1823,7 @@ export function WorkflowModal({
                     </button>
                   ))}
                 </div>
-                <div style={{ padding: "20px", minHeight: "300px" }}>
+                <div style={{ padding: "20px", minHeight: "350px" }}>
                   {audioStepTab === "voiceover" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                       <p style={{ margin: 0, fontSize: "13px", color: "var(--p-color-text-subdued, #6d7175)" }}>Generate a voiceover from script (optional).</p>
@@ -1844,7 +1944,7 @@ export function WorkflowModal({
                                       try {
                                         const res = await fetch(AUDIO_SAVE_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ short_id: shortInfo.shortId, generated_audio_url: generatedAudioUrl, subtitles: lastSubtitleTiming ?? undefined, voice_id: selectedVoiceId || undefined, voice_name: voicesFetcher.data?.success ? voicesFetcher.data.voices.find((v) => v.voice_id === selectedVoiceId)?.name : undefined }) });
                                         const data = await res.json();
-                                        if (data.success) { setAudioSavedFeedback(true); setTimeout(() => setAudioSavedFeedback(false), 2000); } else { alert(data.error || "Failed to save audio"); }
+                                        if (data.success) { setAudioSavedFeedback(true); setAudioGenerated(true); setTimeout(() => setAudioSavedFeedback(false), 2000); } else { alert(data.error || "Failed to save audio"); }
                                       } finally { setAudioSaveLoading(false); }
                                     }}
                                     style={{ padding: "8px 16px", borderRadius: "8px", border: "none", background: audioSaveLoading ? "#9ca3af" : "var(--p-color-bg-fill-success, #008060)", color: "#fff", fontWeight: 600, cursor: audioSaveLoading ? "wait" : "pointer", fontSize: "13px" }}
@@ -1931,36 +2031,42 @@ export function WorkflowModal({
                     </div>
                   )}
                 </div>
-              </div>
-            )}
-
-            {allScenesComplete && (
-              <div
-                style={{
-                  padding: "12px 20px",
-                  background: "var(--p-color-bg-fill-success-secondary, #e3f1df)",
-                  borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => setShowingFinal(true)}
+                <div
                   style={{
-                    padding: "12px 24px",
-                    borderRadius: "8px",
-                    border: "none",
-                    background: "var(--p-color-bg-fill-success, #008060)",
-                    color: "#fff",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                    fontSize: "14px",
+                    padding: "12px 20px",
+                    background: "var(--p-color-bg-fill-success-secondary, #e3f1df)",
+                    borderTop: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
                   }}
                 >
-                  Finalize
-                </button>
+                  <button
+                    type="button"
+                    onClick={handleFinalize}
+                    disabled={finalizeLoading || !shortInfo?.shortId}
+                    style={{
+                      padding: "12px 24px",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: finalizeLoading || !shortInfo?.shortId ? "#9ca3af" : "var(--p-color-bg-fill-success, #008060)",
+                      color: "#fff",
+                      fontWeight: 600,
+                      cursor: finalizeLoading || !shortInfo?.shortId ? "not-allowed" : "pointer",
+                      fontSize: "14px",
+                    }}
+                  >
+                    {finalizeLoading ? "Merging…" : "Finalize"}
+                  </button>
+                  {finalizeProgress != null && (
+                    <span style={{ fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)" }}>{finalizeProgress}%</span>
+                  )}
+                  {finalizeError && (
+                    <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{finalizeError}</span>
+                  )}
+                </div>
               </div>
             )}
 
@@ -2029,6 +2135,9 @@ const AUDIO_SAVE_API = "/app/api/audio/save";
 const AUDIO_CONFIG_API = "/app/api/audio/config";
 const STORYBLOCKS_MUSIC_API = "/app/api/storyblocks/music";
 const SHORTS_SAVE_BG_MUSIC_API = "/app/api/shorts/save-bg-music";
+const MERGE_FINALIZE_API = "/app/api/merge/finalize";
+const MERGE_STATUS_API_BASE = "/app/api/merge/status";
+const SHORTS_SAVE_FINAL_VIDEO_API = "/app/api/shorts/save-final-video";
 const PER_PAGE = 12;
 const POLL_INTERVAL_MS = 5000;
 const POLL_MAX_ATTEMPTS = 60; // 5 min at 5s

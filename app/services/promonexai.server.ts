@@ -848,3 +848,120 @@ export async function getBackgroundGenerationStatus(taskId: string): Promise<Bac
     return { status: "failed", image_url: null, error: message };
   }
 }
+
+// --- Merge finalize: combine all scenes/audio into final video (BACKEND_URL/merge) ---
+
+export type FinalizeShortStartResult =
+  | { ok: true; task_id: string; status: string; short_id: string; user_id: string; message?: string }
+  | { ok: false; error: string };
+
+/**
+ * Start finalize (merge) for a short.
+ * POST {BACKEND_URL}/merge/finalize
+ * Body: { user_id, short_id }
+ * Response: { task_id, status, short_id, user_id, message, created_at, ... }
+ */
+export async function finalizeShortStart(userId: string, shortId: string): Promise<FinalizeShortStartResult> {
+  const base = process.env.BACKEND_URL;
+  if (!base?.trim()) {
+    return { ok: false, error: "BACKEND_URL is not set in .env" };
+  }
+  const endpoint = `${base.replace(/\/$/, "")}/merge/finalize`;
+  const body = { user_id: userId, short_id: shortId };
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(30000),
+    });
+    const raw = await response.text();
+    let data: { task_id?: string; status?: string; short_id?: string; user_id?: string; message?: string } = {};
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch {
+      return { ok: false, error: `Backend returned invalid JSON (${response.status})` };
+    }
+    if (!response.ok) {
+      const err = (data as { message?: string; error_message?: string }).message ?? (data as { error_message?: string }).error_message ?? raw?.slice(0, 200) ?? response.statusText;
+      return { ok: false, error: String(err) };
+    }
+    const task_id = typeof data.task_id === "string" ? data.task_id.trim() : "";
+    if (!task_id) {
+      return { ok: false, error: "Backend did not return task_id" };
+    }
+    return {
+      ok: true,
+      task_id,
+      status: typeof data.status === "string" ? data.status : "pending",
+      short_id: typeof data.short_id === "string" ? data.short_id : shortId,
+      user_id: typeof data.user_id === "string" ? data.user_id : userId,
+      message: typeof data.message === "string" ? data.message : undefined,
+    };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    return { ok: false, error: `finalizeShortStart failed: ${message}` };
+  }
+}
+
+export type FinalizeShortStatusResult = {
+  task_id: string;
+  status: string;
+  message?: string | null;
+  progress: number | null;
+  current_step?: string | null;
+  error_message?: string | null;
+  thumbnail_url?: string | null;
+  final_video_url?: string | null;
+  completed_at?: string | null;
+};
+
+/**
+ * Get status of a finalize (merge) task.
+ * GET {BACKEND_URL}/merge/status/{task_id}
+ * When status === "completed", final_video_url is set.
+ */
+export async function finalizeShortStatus(taskId: string): Promise<FinalizeShortStatusResult | null> {
+  const base = process.env.BACKEND_URL;
+  if (!base?.trim()) return null;
+  const endpoint = `${base.replace(/\/$/, "")}/merge/status/${encodeURIComponent(taskId)}`;
+  try {
+    const response = await fetch(endpoint, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      signal: AbortSignal.timeout(15000),
+    });
+    const raw = await response.text();
+    let data: {
+      task_id?: string;
+      status?: string;
+      message?: string | null;
+      progress?: number | null;
+      current_step?: string | null;
+      error_message?: string | null;
+      thumbnail_url?: string | null;
+      final_video_url?: string | null;
+      completed_at?: string | null;
+    } = {};
+    try {
+      data = raw ? JSON.parse(raw) : {};
+    } catch {
+      return null;
+    }
+    const progress =
+      typeof data.progress === "number" && Number.isFinite(data.progress) ? Math.min(100, Math.max(0, data.progress)) : null;
+    return {
+      task_id: typeof data.task_id === "string" ? data.task_id : taskId,
+      status: typeof data.status === "string" ? data.status : "pending",
+      message: typeof data.message === "string" ? data.message : null,
+      progress,
+      current_step: typeof data.current_step === "string" ? data.current_step : null,
+      error_message: typeof data.error_message === "string" ? data.error_message : null,
+      thumbnail_url: typeof data.thumbnail_url === "string" ? data.thumbnail_url : null,
+      final_video_url: typeof data.final_video_url === "string" ? data.final_video_url : null,
+      completed_at: typeof data.completed_at === "string" ? data.completed_at : null,
+    };
+  } catch {
+    return null;
+  }
+}
