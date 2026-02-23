@@ -1723,7 +1723,7 @@ export function WorkflowModal({
                     </button>
                   ))}
                 </div>
-                <div style={{ padding: "20px", minHeight: "340px" }}>
+                <div style={{ padding: "20px", minHeight: "300px" }}>
                   {audioStepTab === "voiceover" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                       <p style={{ margin: 0, fontSize: "13px", color: "var(--p-color-text-subdued, #6d7175)" }}>Generate a voiceover from script (optional).</p>
