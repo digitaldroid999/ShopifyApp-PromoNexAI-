@@ -6,7 +6,7 @@ export default function App() {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } } @keyframes bgLoadingBar { 0% { transform: translateX(-100%); } 100% { transform: translateX(400%); } }`}</style>
         <link rel="preconnect" href="https://cdn.shopify.com/" />
         <link
           rel="stylesheet"

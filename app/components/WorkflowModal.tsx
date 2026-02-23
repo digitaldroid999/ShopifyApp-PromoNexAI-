@@ -2434,9 +2434,11 @@ function Scene1Content({
             </div>
             <div style={{ ...boxStyle, borderTopLeftRadius: 0, borderBottomLeftRadius: 0, position: "relative" }}>
               {bgLoading ? (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
-                  <span className="spinner" style={{ width: 32, height: 32, border: "3px solid #e1e3e5", borderTopColor: "#2c6ecb", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                  <span style={{ fontSize: "14px", color: "#6d7175" }}>Generating background…</span>
+                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", background: "var(--p-color-bg-surface-secondary, #f6f6f7)", zIndex: 2 }}>
+                  <div style={{ width: "70%", maxWidth: "220px", height: "6px", borderRadius: "3px", background: "var(--p-color-border-secondary, #e1e3e5)", overflow: "hidden" }}>
+                    <div style={{ width: "40%", height: "100%", borderRadius: "3px", background: "var(--p-color-bg-fill-info, #2c6ecb)", animation: "bgLoadingBar 1.2s ease-in-out infinite" }} />
+                  </div>
+                  <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Generating background…</span>
                 </div>
               ) : null}
               {!bgLoading && (
@@ -3344,9 +3346,11 @@ function Scene3Content({
             </div>
             <div style={{ ...boxStyle, borderTopLeftRadius: 0, borderBottomLeftRadius: 0, position: "relative" }}>
               {bgLoading ? (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
-                  <span className="spinner" style={{ width: 32, height: 32, border: "3px solid #e1e3e5", borderTopColor: "#2c6ecb", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                  <span style={{ fontSize: "14px", color: "#6d7175" }}>Generating background…</span>
+                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: "12px", background: "var(--p-color-bg-surface-secondary, #f6f6f7)", zIndex: 2 }}>
+                  <div style={{ width: "70%", maxWidth: "220px", height: "6px", borderRadius: "3px", background: "var(--p-color-border-secondary, #e1e3e5)", overflow: "hidden" }}>
+                    <div style={{ width: "40%", height: "100%", borderRadius: "3px", background: "var(--p-color-bg-fill-info, #2c6ecb)", animation: "bgLoadingBar 1.2s ease-in-out infinite" }} />
+                  </div>
+                  <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Generating background…</span>
                 </div>
               ) : null}
               {!bgLoading && (
