@@ -2828,11 +2828,22 @@ function Scene1Content({
             </div>
             <div style={{ ...boxStyle, borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }}>
               {sceneLoading ? (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
-                  <span className="spinner" style={{ width: 32, height: 32, border: "3px solid #e1e3e5", borderTopColor: "#2c6ecb", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                  <span style={{ fontSize: "14px", color: "#6d7175" }}>
-                    Generating scene video…{sceneProgress != null ? ` ${sceneProgress}%` : ""}
-                  </span>
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px", minWidth: "200px" }}>
+                  <div style={{ width: "100%", maxWidth: "280px", height: "8px", borderRadius: "4px", background: "var(--p-color-border-secondary, #e1e3e5)", overflow: "hidden" }}>
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${Math.min(100, Math.max(0, sceneProgress ?? 0))}%`,
+                        borderRadius: "4px",
+                        background: "var(--p-color-bg-fill-info, #2c6ecb)",
+                        transition: "width 0.3s ease",
+                      }}
+                    />
+                  </div>
+                  <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Generating scene video…</span>
+                  {sceneProgress != null && (
+                    <span style={{ fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)" }}>{sceneProgress}%</span>
+                  )}
                 </div>
               ) : sceneError ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -3762,11 +3773,21 @@ function Scene3Content({
             </div>
             <div style={{ ...boxStyle, borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }}>
               {sceneLoading ? (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
-                  <span className="spinner" style={{ width: 32, height: 32, border: "3px solid #e1e3e5", borderTopColor: "#2c6ecb", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />
-                  <span style={{ fontSize: "14px", color: "#6d7175" }}>Generating scene video…</span>
+                <div style={{ display: "flex", flexDirection: "column", gap: "12px", minWidth: "200px" }}>
+                  <div style={{ width: "100%", maxWidth: "280px", height: "8px", borderRadius: "4px", background: "var(--p-color-border-secondary, #e1e3e5)", overflow: "hidden" }}>
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${Math.min(100, Math.max(0, sceneProgress ?? 0))}%`,
+                        borderRadius: "4px",
+                        background: "var(--p-color-bg-fill-info, #2c6ecb)",
+                        transition: "width 0.3s ease",
+                      }}
+                    />
+                  </div>
+                  <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Generating scene video…</span>
                   {sceneProgress != null && (
-                    <span style={{ fontSize: "12px", color: "#6d7175" }}>{sceneProgress}%</span>
+                    <span style={{ fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)" }}>{sceneProgress}%</span>
                   )}
                 </div>
               ) : (dbSceneVideoUrl ?? sceneVideo) ? (
