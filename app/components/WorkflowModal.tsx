@@ -2875,8 +2875,8 @@ function Scene1Content({
           />
           <div style={twoPartLayout}>
             <div style={{ ...boxStyle, borderRight: "none", borderTopRightRadius: 0, borderBottomRightRadius: 0 }}>
-              {bgRemoved ? (
-                <img src={bgRemoved} alt="BG removed" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
+              {effectiveOverlayUrl ? (
+                <img src={effectiveOverlayUrl} alt="Subject" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
               ) : null}
             </div>
             <div style={{ ...boxStyle, borderTopLeftRadius: 0, borderBottomLeftRadius: 0, position: "relative" }}>
@@ -3890,8 +3890,8 @@ function Scene3Content({
           />
           <div style={twoPartLayout}>
             <div style={{ ...boxStyle, borderRight: "none", borderTopRightRadius: 0, borderBottomRightRadius: 0 }}>
-              {bgRemoved ? (
-                <img src={bgRemoved} alt="BG removed" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
+              {effectiveOverlayUrl ? (
+                <img src={effectiveOverlayUrl} alt="Subject" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
               ) : null}
             </div>
             <div style={{ ...boxStyle, borderTopLeftRadius: 0, borderBottomLeftRadius: 0, position: "relative" }}>
