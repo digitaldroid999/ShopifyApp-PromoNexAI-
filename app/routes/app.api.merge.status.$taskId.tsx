@@ -14,8 +14,11 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   }
   const result = await finalizeShortStatus(taskId);
   if (!result) {
-    console.log(`${LOG} No result for taskId=${taskId}`);
+    console.log(`${LOG} No result taskId=${taskId} (backend error or invalid JSON)`);
     return Response.json({ error: "Status unavailable" }, { status: 502 });
+  }
+  if (result.status === "completed" || result.status === "failed") {
+    console.log(`${LOG} taskId=${taskId} status=${result.status} progress=${result.progress ?? "-"} final_video_url=${result.final_video_url ? "set" : "-"} error_message=${result.error_message ?? "-"}`);
   }
   return Response.json(result, {
     headers: { "Content-Type": "application/json", "Cache-Control": "no-store, no-cache, must-revalidate", Pragma: "no-cache" },

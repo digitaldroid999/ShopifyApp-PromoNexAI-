@@ -859,15 +859,21 @@ export type FinalizeShortStartResult =
  * Start finalize (merge) for a short.
  * POST {BACKEND_URL}/merge/finalize
  * Body: { user_id, short_id }
- * Response: { task_id, status, short_id, user_id, message, created_at, ... }
+ * Response: { task_id, status, short_id, user_id, message?, ... }
+ * Backend must return message as a string (e.g. "Started"); if it returns a number (e.g. progress 0.1)
+ * you get FinalizeShortResponse validation error.
  */
+const LOG_FINALIZE = "[finalize/start]";
+
 export async function finalizeShortStart(userId: string, shortId: string): Promise<FinalizeShortStartResult> {
   const base = process.env.BACKEND_URL;
   if (!base?.trim()) {
+    console.log(`${LOG_FINALIZE} BACKEND_URL not set`);
     return { ok: false, error: "BACKEND_URL is not set in .env" };
   }
   const endpoint = `${base.replace(/\/$/, "")}/merge/finalize`;
   const body = { user_id: userId, short_id: shortId };
+  console.log(`${LOG_FINALIZE} POST ${endpoint} body=${JSON.stringify(body)}`);
   try {
     const response = await fetch(endpoint, {
       method: "POST",
@@ -876,20 +882,31 @@ export async function finalizeShortStart(userId: string, shortId: string): Promi
       signal: AbortSignal.timeout(30000),
     });
     const raw = await response.text();
-    let data: { task_id?: string; status?: string; short_id?: string; user_id?: string; message?: string } = {};
+    console.log(`${LOG_FINALIZE} response status=${response.status} body_length=${raw.length} body_preview=${raw.slice(0, 300)}`);
+    let data: { task_id?: string; status?: string; short_id?: string; user_id?: string; message?: string; detail?: string | unknown } = {};
     try {
       data = raw ? JSON.parse(raw) : {};
     } catch {
+      console.log(`${LOG_FINALIZE} invalid JSON status=${response.status}`);
       return { ok: false, error: `Backend returned invalid JSON (${response.status})` };
     }
     if (!response.ok) {
-      const err = (data as { message?: string; error_message?: string }).message ?? (data as { error_message?: string }).error_message ?? raw?.slice(0, 200) ?? response.statusText;
+      const detail = data.detail;
+      const err =
+        typeof detail === "string"
+          ? detail
+          : Array.isArray(detail)
+            ? detail.map((e: { msg?: string; type?: string; loc?: unknown }) => e?.msg ?? JSON.stringify(e)).join("; ")
+            : (data as { message?: string }).message ?? (data as { error_message?: string }).error_message ?? (typeof detail === "object" && detail !== null ? JSON.stringify(detail) : null) ?? raw?.slice(0, 200) ?? response.statusText;
+      console.log(`${LOG_FINALIZE} backend error status=${response.status} detail=${JSON.stringify(detail)} error=${err}`);
       return { ok: false, error: String(err) };
     }
     const task_id = typeof data.task_id === "string" ? data.task_id.trim() : "";
     if (!task_id) {
+      console.log(`${LOG_FINALIZE} missing task_id in response keys=${Object.keys(data).join(",")}`);
       return { ok: false, error: "Backend did not return task_id" };
     }
+    console.log(`${LOG_FINALIZE} success task_id=${task_id} status=${data.status ?? "-"} short_id=${data.short_id ?? shortId}`);
     return {
       ok: true,
       task_id,
@@ -900,6 +917,7 @@ export async function finalizeShortStart(userId: string, shortId: string): Promi
     };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+    console.log(`${LOG_FINALIZE} fetch failed:`, message);
     return { ok: false, error: `finalizeShortStart failed: ${message}` };
   }
 }
@@ -921,6 +939,8 @@ export type FinalizeShortStatusResult = {
  * GET {BACKEND_URL}/merge/status/{task_id}
  * When status === "completed", final_video_url is set.
  */
+const LOG_FINALIZE_STATUS = "[finalize/status]";
+
 export async function finalizeShortStatus(taskId: string): Promise<FinalizeShortStatusResult | null> {
   const base = process.env.BACKEND_URL;
   if (!base?.trim()) return null;
@@ -946,22 +966,33 @@ export async function finalizeShortStatus(taskId: string): Promise<FinalizeShort
     try {
       data = raw ? JSON.parse(raw) : {};
     } catch {
+      console.log(`${LOG_FINALIZE_STATUS} task_id=${taskId} invalid JSON status=${response.status}`);
+      return null;
+    }
+    if (!response.ok) {
+      console.log(`${LOG_FINALIZE_STATUS} task_id=${taskId} status=${response.status} body=${raw.slice(0, 200)}`);
       return null;
     }
     const progress =
       typeof data.progress === "number" && Number.isFinite(data.progress) ? Math.min(100, Math.max(0, data.progress)) : null;
+    const status = typeof data.status === "string" ? data.status : "pending";
+    const finalUrl = typeof data.final_video_url === "string" ? data.final_video_url : null;
+    if (status === "completed" || status === "failed" || (progress != null && Number.isInteger(progress) && progress > 0 && progress % 25 === 0)) {
+      console.log(`${LOG_FINALIZE_STATUS} task_id=${taskId} status=${status} progress=${progress ?? "-"} final_video_url=${finalUrl ? "set" : "-"} error_message=${(data as { error_message?: string }).error_message ?? "-"}`);
+    }
     return {
       task_id: typeof data.task_id === "string" ? data.task_id : taskId,
-      status: typeof data.status === "string" ? data.status : "pending",
+      status,
       message: typeof data.message === "string" ? data.message : null,
       progress,
       current_step: typeof data.current_step === "string" ? data.current_step : null,
       error_message: typeof data.error_message === "string" ? data.error_message : null,
       thumbnail_url: typeof data.thumbnail_url === "string" ? data.thumbnail_url : null,
-      final_video_url: typeof data.final_video_url === "string" ? data.final_video_url : null,
+      final_video_url: finalUrl,
       completed_at: typeof data.completed_at === "string" ? data.completed_at : null,
     };
-  } catch {
+  } catch (e) {
+    console.log(`${LOG_FINALIZE_STATUS} task_id=${taskId} fetch failed:`, e instanceof Error ? e.message : e);
     return null;
   }
 }

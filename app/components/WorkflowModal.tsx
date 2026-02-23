@@ -1577,19 +1577,23 @@ export function WorkflowModal({
     setFinalizeError(null);
     setFinalizeLoading(true);
     setFinalizeProgress(0);
+    const shortId = shortInfo.shortId;
+    console.log("[Finalize] Starting short_id=", shortId);
     try {
       const startRes = await fetch(MERGE_FINALIZE_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ short_id: shortInfo.shortId }),
+        body: JSON.stringify({ short_id: shortId }),
       });
       const startData = await startRes.json().catch(() => ({}));
       const taskId = startData.task_id;
       if (!taskId) {
+        console.log("[Finalize] Start failed short_id=", shortId, "error=", startData.error);
         setFinalizeError(startData.error ?? "Failed to start finalize");
         return;
       }
+      console.log("[Finalize] Started task_id=", taskId, "short_id=", shortId);
       let done = false;
       for (let i = 0; i < POLL_MAX_ATTEMPTS; i++) {
         await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
@@ -1599,17 +1603,23 @@ export function WorkflowModal({
           headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
         });
         const statusData = await pollRes.json().catch(() => ({}));
-        setFinalizeProgress(typeof statusData.progress === "number" ? statusData.progress : null);
+        const progress = typeof statusData.progress === "number" ? statusData.progress : null;
+        setFinalizeProgress(progress);
+        if (i % 6 === 0 || statusData.status === "completed" || statusData.status === "failed") {
+          console.log("[Finalize] poll attempt=", i + 1, "task_id=", taskId, "status=", statusData.status, "progress=", progress);
+        }
         if (statusData.status === "completed" && statusData.final_video_url) {
           const url = statusData.final_video_url;
+          console.log("[Finalize] completed task_id=", taskId, "final_video_url=", url?.slice(0, 80), "...");
           setFinalVideoUrl(url);
           try {
             await fetch(SHORTS_SAVE_FINAL_VIDEO_API, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               credentials: "include",
-              body: JSON.stringify({ short_id: shortInfo.shortId, final_video_url: url }),
+              body: JSON.stringify({ short_id: shortId, final_video_url: url }),
             });
+            console.log("[Finalize] saved final_video_url to short_id=", shortId);
           } catch (e) {
             console.error("[Finalize] Failed to save final video URL:", e);
           }
@@ -1618,15 +1628,19 @@ export function WorkflowModal({
           break;
         }
         if (statusData.status === "failed") {
-          setFinalizeError(statusData.error_message ?? "Finalize failed");
+          const errMsg = statusData.error_message ?? "Finalize failed";
+          console.log("[Finalize] failed task_id=", taskId, "error_message=", errMsg);
+          setFinalizeError(errMsg);
           done = true;
           break;
         }
       }
       if (!done) {
+        console.log("[Finalize] timeout task_id=", taskId, "after", POLL_MAX_ATTEMPTS, "attempts");
         setFinalizeError("Finalize timed out. Please try again.");
       }
     } catch (e) {
+      console.error("[Finalize] exception short_id=", shortId, e);
       setFinalizeError(e instanceof Error ? e.message : "Finalize failed");
     } finally {
       setFinalizeLoading(false);

@@ -15,9 +15,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     body = await request.json();
   } catch {
+    console.log(`${LOG} Invalid JSON body`);
     return Response.json({ error: "Invalid JSON" }, { status: 400 });
   }
   const shortId = typeof body.short_id === "string" ? body.short_id.trim() : "";
+  console.log(`${LOG} Request body short_id=${shortId || "(missing)"}`);
   if (!shortId) {
     return Response.json({ error: "short_id is required" }, { status: 400 });
   }
@@ -28,19 +30,22 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     select: { id: true, userId: true },
   });
   if (!short) {
+    console.log(`${LOG} Short not found short_id=${shortId}`);
     return Response.json({ error: "Short not found" }, { status: 404 });
   }
   const userId = short.userId ?? "";
   if (!userId) {
+    console.log(`${LOG} Short has no user_id short_id=${shortId}`);
     return Response.json({ error: "Short has no user_id; cannot finalize" }, { status: 400 });
   }
+  console.log(`${LOG} Starting finalize short_id=${shortId} user_id=${userId}`);
 
   const result = await finalizeShortStart(userId, short.id);
   if (!result.ok) {
-    console.log(`${LOG} Backend error:`, result.error);
+    console.log(`${LOG} Backend error short_id=${shortId}:`, result.error);
     return Response.json({ error: result.error }, { status: 400 });
   }
-  console.log(`${LOG} Started finalize task_id=${result.task_id} short_id=${shortId}`);
+  console.log(`${LOG} Started OK short_id=${shortId} task_id=${result.task_id} status=${result.status} message=${result.message ?? "-"}`);
   return Response.json({
     task_id: result.task_id,
     status: result.status,
