@@ -926,8 +926,13 @@ function StoryblocksMusicModal({
                 {track.duration_seconds != null && (
                   <p style={{ margin: "4px 0 0", fontSize: "11px", color: "var(--p-color-text-subdued, #6d7175)" }}>{Math.round(track.duration_seconds)}s</p>
                 )}
-                {track.preview_url && (
-                  <audio src={track.preview_url} controls style={{ width: "100%", marginTop: "8px", height: "32px" }} onClick={(e) => e.stopPropagation()} />
+                {track.preview_url ? (
+                  <>
+                    <p style={{ margin: "8px 0 4px", fontSize: "11px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>Listen</p>
+                    <audio src={track.preview_url} controls style={{ width: "100%", marginTop: "0", height: "32px" }} onClick={(e) => e.stopPropagation()} />
+                  </>
+                ) : (
+                  <p style={{ margin: "8px 0 0", fontSize: "11px", color: "var(--p-color-text-subdued, #6d7175)", fontStyle: "italic" }}>Preview not available</p>
                 )}
               </div>
             );
@@ -1790,7 +1795,14 @@ export function WorkflowModal({
                         <div style={{ padding: "16px", borderRadius: "10px", background: "#fff", border: "1px solid var(--p-color-border-secondary, #e1e3e5)" }}>
                           <p style={{ margin: "0 0 8px", fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>Selected track</p>
                           <p style={{ margin: 0, fontSize: "14px", fontWeight: 600, color: "var(--p-color-text-primary, #202223)" }}>{selectedBgMusic.title || "Untitled"}</p>
-                          {selectedBgMusic.preview_url && <audio src={selectedBgMusic.preview_url} controls style={{ width: "100%", maxWidth: "400px", marginTop: "8px" }} />}
+                          {selectedBgMusic.preview_url ? (
+                            <>
+                              <p style={{ margin: "8px 0 4px", fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>Listen</p>
+                              <audio src={selectedBgMusic.preview_url} controls style={{ width: "100%", maxWidth: "400px", marginTop: "0" }} />
+                            </>
+                          ) : (
+                            <p style={{ margin: "8px 0 0", fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)", fontStyle: "italic" }}>Preview not available</p>
+                          )}
                           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "12px", flexWrap: "wrap" }}>
                             <button
                               type="button"
