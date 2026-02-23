@@ -2132,12 +2132,14 @@ function Scene1Content({
   };
 
   const handleGenerateBg = async (opts: AIBackgroundGenerateOpts) => {
+    const LOG_BG = "[BG Scene1]";
     const product_description = typeof productProp?.description === "string" ? productProp.description.trim() : "";
     const user_id = shortUserId ?? "anonymous";
     const scene_id = videoSceneId ?? (productId ? `${productId}-scene1` : `scene1-${Date.now()}`);
     const short_id = shortId ?? undefined;
     setBgError(null);
     setBgLoading(true);
+    console.log(`${LOG_BG} [1] Start background generation`, { mode: opts.mode, scene_id, short_id });
     try {
       const body: Record<string, string> = {
         product_description: product_description || "Product",
@@ -2152,6 +2154,7 @@ function Scene1Content({
         body.style = opts.style;
         body.environment = opts.environment;
       }
+      console.log(`${LOG_BG} [2] POST ${BACKGROUND_GENERATE_API}`, { keys: Object.keys(body) });
       const res = await fetch(BACKGROUND_GENERATE_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -2159,11 +2162,13 @@ function Scene1Content({
         body: JSON.stringify(body),
       });
       const data = (await res.json()) as { ok?: boolean; task_id?: string; error?: string };
+      console.log(`${LOG_BG} [3] Generate response`, { ok: data.ok, task_id: data.task_id ?? null, error: data.error ?? null });
       if (!data.ok || !data.task_id) {
         setBgError(data.error ?? "Failed to start background generation");
         return;
       }
       const origin = typeof window !== "undefined" ? window.location.origin : "";
+      console.log(`${LOG_BG} [4] Polling status (max ${BACKGROUND_POLL_MAX_ATTEMPTS} attempts, interval ${BACKGROUND_POLL_INTERVAL_MS}ms)`);
       for (let i = 0; i < BACKGROUND_POLL_MAX_ATTEMPTS; i++) {
         await new Promise((r) => setTimeout(r, BACKGROUND_POLL_INTERVAL_MS));
         const statusRes = await fetch(`${BACKGROUND_STATUS_API_BASE}/${encodeURIComponent(data.task_id)}`, {
@@ -2171,20 +2176,28 @@ function Scene1Content({
           headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
         });
         const statusData = (await statusRes.json()) as { status?: string; image_url?: string | null; error?: string | null };
+        if (i === 0 || statusData.status === "completed" || statusData.status === "failed") {
+          console.log(`${LOG_BG} [5] Poll #${i + 1} status=${statusData.status}`, statusData.image_url ? "image_url present" : "", statusData.error ?? "");
+        }
         if (statusData.status === "completed" && statusData.image_url) {
           const url = statusData.image_url.startsWith("http") ? statusData.image_url : `${origin}${statusData.image_url}`;
           setBgImage(url);
           setBgError(null);
+          console.log(`${LOG_BG} [6] Completed → image set`);
           return;
         }
         if (statusData.status === "failed") {
           setBgError(statusData.error ?? "Background generation failed");
+          console.log(`${LOG_BG} [6] Failed:`, statusData.error);
           return;
         }
       }
       setBgError("Background generation timed out. Please try again.");
+      console.log(`${LOG_BG} [6] Timeout after ${BACKGROUND_POLL_MAX_ATTEMPTS} polls`);
     } catch (e) {
-      setBgError(e instanceof Error ? e.message : "Background generation failed");
+      const msg = e instanceof Error ? e.message : "Background generation failed";
+      setBgError(msg);
+      console.log(`${LOG_BG} [6] Error:`, msg);
     } finally {
       setBgLoading(false);
     }
@@ -3033,12 +3046,14 @@ function Scene3Content({
   };
 
   const handleGenerateBg = async (opts: AIBackgroundGenerateOpts) => {
+    const LOG_BG = "[BG Scene3]";
     const product_description = typeof productProp?.description === "string" ? productProp.description.trim() : "";
     const user_id = shortUserId ?? "anonymous";
     const scene_id = videoSceneId ?? (productId ? `${productId}-scene3` : `scene3-${Date.now()}`);
     const short_id = shortId ?? undefined;
     setBgError(null);
     setBgLoading(true);
+    console.log(`${LOG_BG} [1] Start background generation`, { mode: opts.mode, scene_id, short_id });
     try {
       const body: Record<string, string> = {
         product_description: product_description || "Product",
@@ -3053,6 +3068,7 @@ function Scene3Content({
         body.style = opts.style;
         body.environment = opts.environment;
       }
+      console.log(`${LOG_BG} [2] POST ${BACKGROUND_GENERATE_API}`, { keys: Object.keys(body) });
       const res = await fetch(BACKGROUND_GENERATE_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -3060,11 +3076,13 @@ function Scene3Content({
         body: JSON.stringify(body),
       });
       const data = (await res.json()) as { ok?: boolean; task_id?: string; error?: string };
+      console.log(`${LOG_BG} [3] Generate response`, { ok: data.ok, task_id: data.task_id ?? null, error: data.error ?? null });
       if (!data.ok || !data.task_id) {
         setBgError(data.error ?? "Failed to start background generation");
         return;
       }
       const origin = typeof window !== "undefined" ? window.location.origin : "";
+      console.log(`${LOG_BG} [4] Polling status (max ${BACKGROUND_POLL_MAX_ATTEMPTS} attempts, interval ${BACKGROUND_POLL_INTERVAL_MS}ms)`);
       for (let i = 0; i < BACKGROUND_POLL_MAX_ATTEMPTS; i++) {
         await new Promise((r) => setTimeout(r, BACKGROUND_POLL_INTERVAL_MS));
         const statusRes = await fetch(`${BACKGROUND_STATUS_API_BASE}/${encodeURIComponent(data.task_id)}`, {
@@ -3072,20 +3090,28 @@ function Scene3Content({
           headers: { Pragma: "no-cache", "Cache-Control": "no-cache" },
         });
         const statusData = (await statusRes.json()) as { status?: string; image_url?: string | null; error?: string | null };
+        if (i === 0 || statusData.status === "completed" || statusData.status === "failed") {
+          console.log(`${LOG_BG} [5] Poll #${i + 1} status=${statusData.status}`, statusData.image_url ? "image_url present" : "", statusData.error ?? "");
+        }
         if (statusData.status === "completed" && statusData.image_url) {
           const url = statusData.image_url.startsWith("http") ? statusData.image_url : `${origin}${statusData.image_url}`;
           setBgImage(url);
           setBgError(null);
+          console.log(`${LOG_BG} [6] Completed → image set`);
           return;
         }
         if (statusData.status === "failed") {
           setBgError(statusData.error ?? "Background generation failed");
+          console.log(`${LOG_BG} [6] Failed:`, statusData.error);
           return;
         }
       }
       setBgError("Background generation timed out. Please try again.");
+      console.log(`${LOG_BG} [6] Timeout after ${BACKGROUND_POLL_MAX_ATTEMPTS} polls`);
     } catch (e) {
-      setBgError(e instanceof Error ? e.message : "Background generation failed");
+      const msg = e instanceof Error ? e.message : "Background generation failed";
+      setBgError(msg);
+      console.log(`${LOG_BG} [6] Error:`, msg);
     } finally {
       setBgLoading(false);
     }

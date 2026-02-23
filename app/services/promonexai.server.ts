@@ -706,6 +706,8 @@ export async function extractBackgroundPrompt(params: {
 
 // --- Background: generate (async task) ---
 
+const LOG_BG = "[Background Gen]";
+
 export type StartBackgroundGenerationResult =
   | { ok: true; task_id: string }
   | { ok: false; error: string };
@@ -727,6 +729,7 @@ export async function startBackgroundGeneration(params: {
 }): Promise<StartBackgroundGenerationResult> {
   const base = process.env.BACKEND_URL;
   if (!base?.trim()) {
+    console.log(`${LOG_BG} [1] BACKEND_URL is not set — skipping request`);
     return { ok: false, error: "BACKEND_URL is not set in .env" };
   }
   const endpoint = `${base.replace(/\/$/, "")}/background/generate`;
@@ -743,6 +746,7 @@ export async function startBackgroundGeneration(params: {
     if (params.style?.trim()) body.style = params.style.trim();
     if (params.environment?.trim()) body.environment = params.environment.trim();
   }
+  console.log(`${LOG_BG} [1] Sending POST ${endpoint}`, { keys: Object.keys(body), scene_id: body.scene_id, short_id: body.short_id, mode: body.manual_prompt ? "manual_prompt" : "mood/style/environment" });
   try {
     const response = await fetch(endpoint, {
       method: "POST",
@@ -751,23 +755,29 @@ export async function startBackgroundGeneration(params: {
       signal: AbortSignal.timeout(30000),
     });
     const raw = await response.text();
+    console.log(`${LOG_BG} [2] Response status=${response.status}`, raw?.slice(0, 300));
     let data: { success?: boolean; task_id?: string; error?: string; message?: string } = {};
     try {
       data = raw ? JSON.parse(raw) : {};
     } catch {
+      console.log(`${LOG_BG} [2] Backend returned invalid JSON`);
       return { ok: false, error: `Backend returned invalid JSON (${response.status})` };
     }
     if (!response.ok) {
       const err = data.error ?? data.message ?? raw?.slice(0, 200) ?? response.statusText;
+      console.log(`${LOG_BG} [2] Request failed:`, err);
       return { ok: false, error: String(err) };
     }
     const task_id = typeof data.task_id === "string" ? data.task_id.trim() : "";
     if (!task_id) {
+      console.log(`${LOG_BG} [2] Backend did not return task_id`);
       return { ok: false, error: data.error ?? "Backend did not return task_id" };
     }
+    console.log(`${LOG_BG} [2] Success → task_id=${task_id}`);
     return { ok: true, task_id };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+    console.log(`${LOG_BG} [2] Request error:`, message);
     return { ok: false, error: message };
   }
 }
@@ -785,9 +795,11 @@ export type BackgroundGenerationStatusResult = {
 export async function getBackgroundGenerationStatus(taskId: string): Promise<BackgroundGenerationStatusResult> {
   const base = process.env.BACKEND_URL;
   if (!base?.trim()) {
+    console.log(`${LOG_BG} [Poll] BACKEND_URL is not set`);
     return { status: "failed", image_url: null, error: "BACKEND_URL is not set" };
   }
   const endpoint = `${base.replace(/\/$/, "")}/background/status/${encodeURIComponent(taskId)}`;
+  console.log(`${LOG_BG} [Poll] GET ${endpoint}`);
   try {
     const response = await fetch(endpoint, {
       method: "GET",
@@ -805,6 +817,7 @@ export async function getBackgroundGenerationStatus(taskId: string): Promise<Bac
     try {
       data = raw ? JSON.parse(raw) : {};
     } catch {
+      console.log(`${LOG_BG} [Poll] Invalid JSON response`);
       return { status: "failed", image_url: null, error: "Invalid response" };
     }
     const status = typeof data.status === "string" ? data.status : "unknown";
@@ -815,9 +828,11 @@ export async function getBackgroundGenerationStatus(taskId: string): Promise<Bac
           ? data.result_image_url
           : null;
     const error = typeof data.error === "string" ? data.error : typeof data.error_message === "string" ? data.error_message : null;
+    console.log(`${LOG_BG} [Poll] status=${status}`, image_url ? "image_url present" : "", error ? `error=${error}` : "");
     return { status, image_url, error };
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e);
+    console.log(`${LOG_BG} [Poll] Request error:`, message);
     return { status: "failed", image_url: null, error: message };
   }
 }
