@@ -115,8 +115,6 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
             status: true,
             finalVideoUrl: true,
             updatedAt: true,
-          },
-          include: {
             scenes: {
               take: 1,
               orderBy: { sceneNumber: "asc" },
