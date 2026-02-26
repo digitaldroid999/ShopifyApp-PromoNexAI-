@@ -15,8 +15,12 @@ if (
   delete process.env.HOST;
 }
 
-const host = new URL(process.env.SHOPIFY_APP_URL || "http://localhost")
-  .hostname;
+const appUrlRaw = process.env.SHOPIFY_APP_URL || "http://localhost";
+const appUrlWithScheme =
+  appUrlRaw.startsWith("http://") || appUrlRaw.startsWith("https://")
+    ? appUrlRaw
+    : `https://${appUrlRaw}`;
+const host = new URL(appUrlWithScheme).hostname;
 
 // Remotion API (VideoGenerationServer/Remotion-api) – proxy so /shopify/videos and /tasks hit the API
 const REMOTION_API_TARGET =
