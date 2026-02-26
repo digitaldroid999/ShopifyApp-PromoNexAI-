@@ -1,6 +1,10 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useFetcher } from "react-router";
-import { LEGAL_DOCUMENTS } from "../lib/legal-content";
+import {
+  LEGAL_DOCUMENTS,
+  isDocumentWithSections,
+  type LegalSection,
+} from "../lib/legal-content";
 
 const LEGAL_AGREE_API = "/app/api/legal/agree";
 
@@ -11,6 +15,62 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "privacy", label: "Privacy Policy" },
   { id: "dataProcessing", label: "Data Processing Agreement" },
 ];
+
+const tableStyle: React.CSSProperties = {
+  width: "100%",
+  borderCollapse: "collapse",
+  fontSize: "13px",
+  marginTop: "8px",
+  marginBottom: "16px",
+};
+const thStyle: React.CSSProperties = {
+  textAlign: "left",
+  padding: "8px 10px",
+  borderBottom: "2px solid var(--p-color-border-secondary, #e1e3e5)",
+  background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+  fontWeight: 600,
+};
+const tdStyle: React.CSSProperties = {
+  padding: "8px 10px",
+  borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+};
+
+function renderLegalContent(tabId: TabId) {
+  const doc = LEGAL_DOCUMENTS[tabId];
+  if (isDocumentWithSections(doc)) {
+    return doc.sections.map((sec: LegalSection, i: number) =>
+      sec.type === "text" ? (
+        <div key={i} style={{ whiteSpace: "pre-wrap", marginBottom: "12px" }}>
+          {sec.content}
+        </div>
+      ) : (
+        <table key={i} style={tableStyle}>
+          <thead>
+            <tr>
+              {sec.headers.map((h, j) => (
+                <th key={j} style={thStyle}>
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {sec.rows.map((row, ri) => (
+              <tr key={ri}>
+                {row.map((cell, ci) => (
+                  <td key={ci} style={tdStyle}>
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )
+    );
+  }
+  return doc.content;
+}
 
 export function LegalModal({
   open,
@@ -182,7 +242,7 @@ export function LegalModal({
               }}
               onScroll={handleScroll(tab.id)}
             >
-              {LEGAL_DOCUMENTS[tab.id].content}
+              {renderLegalContent(tab.id)}
             </div>
           ))}
         </div>

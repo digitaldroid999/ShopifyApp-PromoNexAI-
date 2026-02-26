@@ -3,6 +3,30 @@
  * Source: PromoNexAI Terms of Service, Privacy Policy, and Data Processing Agreement (DPA).
  */
 
+export type LegalTableSection = {
+  type: "table";
+  headers: string[];
+  rows: string[][];
+};
+
+export type LegalTextSection = {
+  type: "text";
+  content: string;
+};
+
+export type LegalSection = LegalTextSection | LegalTableSection;
+
+/** Document with optional plain content or sections (for Privacy Policy with tables) */
+export type LegalDocument =
+  | { title: string; content: string }
+  | { title: string; sections: LegalSection[] };
+
+export function isDocumentWithSections(
+  doc: LegalDocument
+): doc is { title: string; sections: LegalSection[] } {
+  return "sections" in doc && Array.isArray(doc.sections);
+}
+
 export const LEGAL_DOCUMENTS = {
   terms: {
     title: "Terms of Service",
@@ -119,7 +143,10 @@ By using PromoNexAI, you acknowledge that you have read, understood, and agree t
   },
   privacy: {
     title: "Privacy Policy",
-    content: `Privacy Policy
+    sections: [
+      {
+        type: "text",
+        content: `Privacy Policy
 Last Updated: February 24, 2026
 
 Important: This Privacy Policy explains how PromoNexAI B.V. ('we,' 'us,' or 'our') collects, uses, and protects your information when you use our Shopify app.
@@ -140,29 +167,44 @@ When you install our app, we collect the following information from your Shopify
 • Cookies: Session cookies for authentication and app functionality
 
 2. How We Use Your Information
-We use your information for the following purposes:
-Purpose                    Data Used                    Legal Basis (GDPR)
-Generate marketing videos  Product titles, images, prices  Contract performance
-Provide customer support  Contact information, usage data  Contract performance
-Process payments          Billing info via Shopify         Contract performance
-Improve our services      Usage analytics                  Legitimate interest
-Security and fraud prevention  Technical data, logs    Legitimate interest
-Legal compliance          All data as required             Legal obligation
-
-3. Data Sharing and Third-Party Services
+We use your information for the following purposes:`,
+      },
+      {
+        type: "table",
+        headers: ["Purpose", "Data Used", "Legal Basis (GDPR)"],
+        rows: [
+          ["Generate marketing videos", "Product titles, images, prices", "Contract performance"],
+          ["Provide customer support", "Contact information, usage data", "Contract performance"],
+          ["Process payments", "Billing info via Shopify", "Contract performance"],
+          ["Improve our services", "Usage analytics", "Legitimate interest"],
+          ["Security and fraud prevention", "Technical data, logs", "Legitimate interest"],
+          ["Legal compliance", "All data as required", "Legal obligation"],
+        ],
+      },
+      {
+        type: "text",
+        content: `3. Data Sharing and Third-Party Services
 3.1 Service Providers (Sub-processors)
-We use the following trusted third-party services to operate our app:
-Service              Purpose                      Location
-Shopify             E-commerce platform, billing  US, Canada, EU
-AWS                 Cloud hosting, storage       EU, US
-Google Cloud        Data processing, AI services EU, US
-Storyblocks         Stock video footage          US
-Runway ML           AI video processing          US
-Remove.bg/PhotoRoom Background removal          EU, US
-Pixabay/Pexels/Coverr Stock media               Various
-Stripe              Payment processing           US, EU
-Google Analytics    Usage analytics              US
-3.2 Data Protection Measures
+We use the following trusted third-party services to operate our app:`,
+      },
+      {
+        type: "table",
+        headers: ["Service", "Purpose", "Location"],
+        rows: [
+          ["Shopify", "E-commerce platform, billing", "US, Canada, EU"],
+          ["AWS", "Cloud hosting, storage", "EU, US"],
+          ["Google Cloud", "Data processing, AI services", "EU, US"],
+          ["Storyblocks", "Stock video footage", "US"],
+          ["Runway ML", "AI video processing", "US"],
+          ["Remove.bg/PhotoRoom", "Background removal", "EU, US"],
+          ["Pixabay/Pexels/Coverr", "Stock media", "Various"],
+          ["Stripe", "Payment processing", "US, EU"],
+          ["Google Analytics", "Usage analytics", "US"],
+        ],
+      },
+      {
+        type: "text",
+        content: `3.2 Data Protection Measures
 All third-party services we use:
 • Are GDPR compliant with appropriate data protection agreements
 • Use industry-standard encryption for data transmission and storage
@@ -175,15 +217,23 @@ We do NOT sell, rent, or trade your personal information to third parties for ma
 • Primary storage: European Union (AWS EU regions, Google Cloud EU)
 • Backup storage: United States (encrypted)
 • Video processing: Temporarily in US servers, then deleted after delivery
-4.2 Data Retention
-Data Type                    Retention Period
-Product data (active users)  While you use the service
-Product data (after uninstall) 30 days, then permanently deleted
-Generated videos             Until you delete or uninstall
-Usage logs                   90 days
-Support communications      3 years
-Financial records            7 years (legal requirement)
-4.3 Security Measures
+4.2 Data Retention`,
+      },
+      {
+        type: "table",
+        headers: ["Data Type", "Retention Period"],
+        rows: [
+          ["Product data (active users)", "While you use the service"],
+          ["Product data (after uninstall)", "30 days, then permanently deleted"],
+          ["Generated videos", "Until you delete or uninstall"],
+          ["Usage logs", "90 days"],
+          ["Support communications", "3 years"],
+          ["Financial records", "7 years (legal requirement)"],
+        ],
+      },
+      {
+        type: "text",
+        content: `4.3 Security Measures
 • Encryption: All data in transit uses TLS 1.3, data at rest uses AES-256
 • Access Control: Role-based access, multi-factor authentication for staff
 • Regular Audits: Security audits and penetration testing
@@ -201,11 +251,19 @@ You have the following rights regarding your personal data:
 5.7 Right to Withdraw Consent — Withdraw consent at any time.
 How to Exercise Your Rights: Email us at support@promonexai.com with your request. We will respond within 30 days.
 
-6. Cookies and Tracking
-Cookie Type          Purpose                        Duration
-Essential/Session    Authentication, app functionality  Session only
-Analytics            Understand app usage          2 years
-You can control cookies through your browser settings. Note that disabling essential cookies may prevent the app from functioning properly.
+6. Cookies and Tracking`,
+      },
+      {
+        type: "table",
+        headers: ["Cookie Type", "Purpose", "Duration"],
+        rows: [
+          ["Essential/Session", "Authentication, app functionality", "Session only"],
+          ["Analytics", "Understand app usage", "2 years"],
+        ],
+      },
+      {
+        type: "text",
+        content: `You can control cookies through your browser settings. Note that disabling essential cookies may prevent the app from functioning properly.
 
 7. International Data Transfers
 We transfer data between the EU and US using the following safeguards:
@@ -246,10 +304,15 @@ We may update this Privacy Policy from time to time. When we do:
 • We will update the 'Last Updated' date at the top
 • For material changes, we will notify you via email or app notification
 • Continued use of the app after changes constitutes acceptance`,
+      },
+    ],
   },
   dataProcessing: {
     title: "Data Processing Agreement (DPA)",
-    content: `Data Processing Agreement (DPA)
+    sections: [
+      {
+        type: "text",
+        content: `Data Processing Agreement (DPA)
 Effective Date: February 24, 2026
 
 This Data Processing Agreement ('DPA') forms part of the Terms of Service between you ('Data Controller') and PromoNexAI B.V. ('Data Processor') and governs the processing of personal data under GDPR.
@@ -287,16 +350,24 @@ Shopify store owners and their authorized users.
 • Make available all information necessary to demonstrate compliance
 
 4. Sub-processors
-The Controller authorizes the Processor to engage the following Sub-processors:
-Sub-processor           Service              Location
-Amazon Web Services     Cloud hosting        EU, US
-Google Cloud Platform   Data processing      EU, US
-Shopify                E-commerce platform  CA, US, EU
-Stripe                 Payment processing   US, EU
-Storyblocks            Stock media          US
-Runway ML              AI processing        US
-Remove.bg/PhotoRoom    Image processing      EU, US
-The Processor will notify the Controller of any intended changes concerning addition or replacement of Sub-processors, giving the Controller the opportunity to object.
+The Controller authorizes the Processor to engage the following Sub-processors:`,
+      },
+      {
+        type: "table",
+        headers: ["Sub-processor", "Service", "Location"],
+        rows: [
+          ["Amazon Web Services", "Cloud hosting", "EU, US"],
+          ["Google Cloud Platform", "Data processing", "EU, US"],
+          ["Shopify", "E-commerce platform", "CA, US, EU"],
+          ["Stripe", "Payment processing", "US, EU"],
+          ["Storyblocks", "Stock media", "US"],
+          ["Runway ML", "AI processing", "US"],
+          ["Remove.bg/PhotoRoom", "Image processing", "EU, US"],
+        ],
+      },
+      {
+        type: "text",
+        content: `The Processor will notify the Controller of any intended changes concerning addition or replacement of Sub-processors, giving the Controller the opportunity to object.
 
 5. Security Measures
 The Processor implements the following technical and organizational measures:
@@ -354,5 +425,7 @@ Email: support@promonexai.com
 Data Protection Contact: support@promonexai.com — Response time: Within 48 hours
 
 This Data Processing Agreement is incorporated into and forms part of the Terms of Service between the Controller and the Processor.`,
+      },
+    ],
   },
 } as const;
