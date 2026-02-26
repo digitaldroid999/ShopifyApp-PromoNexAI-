@@ -140,58 +140,193 @@ export default function ProductDetail() {
     label: img.altText ?? `Image ${i + 1}`,
   }));
 
+  const price = getProductPrice(product);
+  const descriptionSnippet = getProductDescription(product);
+  const firstImage = images[0];
+
   return (
     <>
       <s-page heading={product.title}>
-        <s-section heading="Product detail">
-          <s-stack direction="block" gap="base">
-            <s-paragraph color="subdued">
-              Handle: {product.handle} · Status: {product.status}
-            </s-paragraph>
-            {images.length > 0 ? (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "16px" }}>
-                {images.map((img: { id: string; url: string; altText: string | null }) => (
-                  <img
-                    key={img.id}
-                    src={img.url}
-                    alt={img.altText ?? ""}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr) minmax(280px, 380px)",
+            gap: "24px",
+            alignItems: "start",
+            marginTop: "16px",
+          }}
+        >
+          <div>
+            <s-section heading="Media">
+              {images.length > 0 ? (
+                <div style={{ marginBottom: "16px" }}>
+                  <div
                     style={{
-                      width: "160px",
-                      height: "160px",
-                      objectFit: "cover",
+                      width: "100%",
+                      maxWidth: "480px",
+                      aspectRatio: "1",
+                      borderRadius: "12px",
+                      overflow: "hidden",
+                      border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                      background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+                      marginBottom: "12px",
+                    }}
+                  >
+                    <img
+                      src={firstImage.url}
+                      alt={firstImage.altText ?? product.title ?? ""}
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                    />
+                  </div>
+                  {images.length > 1 ? (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                      {images.slice(0, 6).map((img: { id: string; url: string; altText: string | null }) => (
+                        <img
+                          key={img.id}
+                          src={img.url}
+                          alt={img.altText ?? ""}
+                          style={{
+                            width: "72px",
+                            height: "72px",
+                            objectFit: "cover",
+                            borderRadius: "8px",
+                            border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                          }}
+                        />
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : (
+                <div
+                  style={{
+                    padding: "48px 24px",
+                    textAlign: "center",
+                    background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+                    borderRadius: "12px",
+                    border: "1px dashed var(--p-color-border-secondary, #e1e3e5)",
+                    color: "var(--p-color-text-subdued, #6d7175)",
+                    fontSize: "14px",
+                  }}
+                >
+                  No product images
+                </div>
+              )}
+            </s-section>
+            <div style={{ marginTop: "24px" }}>
+              <s-section heading="Promo video">
+              {finalVideoUrl ? (
+                <div>
+                  <video
+                    src={finalVideoUrl}
+                    controls
+                    style={{
+                      width: "100%",
+                      maxWidth: "480px",
                       borderRadius: "12px",
                       border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                      background: "#000",
                     }}
                   />
-                ))}
-              </div>
-            ) : null}
-            {finalVideoUrl ? (
-              <s-stack direction="block" gap="base">
-                <s-text type="strong">Promo video</s-text>
-                <video
-                  src={finalVideoUrl}
-                  controls
+                  <div style={{ marginTop: "8px" }}>
+                    <s-paragraph color="subdued">Your promo video is ready. Create a new one to replace it.</s-paragraph>
+                  </div>
+                </div>
+              ) : (
+                <div
                   style={{
-                    maxWidth: "100%",
-                    width: "400px",
-                    maxHeight: "280px",
+                    padding: "32px 24px",
+                    textAlign: "center",
+                    background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
                     borderRadius: "12px",
-                    border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                    border: "1px dashed var(--p-color-border-secondary, #e1e3e5)",
                   }}
-                />
+                >
+                  <s-text type="strong">No promo video yet</s-text>
+                  <div style={{ marginTop: "8px" }}>
+                    <s-paragraph color="subdued">Create a short promo video for this product.</s-paragraph>
+                  </div>
+                </div>
+              )}
+              </s-section>
+            </div>
+          </div>
+          <div>
+            <div
+              style={{
+                padding: "20px",
+                background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+                borderRadius: "12px",
+                border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+              }}
+            >
+              <s-stack direction="block" gap="base">
+                <div>
+                  <s-text color="subdued">Price</s-text>
+                  <div style={{ fontSize: "18px", fontWeight: 600, marginTop: "4px" }}>{price}</div>
+                </div>
+                <div>
+                  <s-text color="subdued">Handle</s-text>
+                  <div style={{ marginTop: "4px" }}>{product.handle}</div>
+                </div>
+                <div>
+                  <span
+                    style={{
+                      display: "inline-block",
+                      padding: "2px 8px",
+                      borderRadius: "999px",
+                      fontSize: "12px",
+                      fontWeight: 500,
+                      background:
+                        product.status === "ACTIVE"
+                          ? "var(--p-color-bg-fill-success-secondary, #d3f0d9)"
+                          : product.status === "DRAFT"
+                            ? "var(--p-color-bg-fill-secondary, #e1e3e5)"
+                            : "var(--p-color-bg-fill-tertiary, #f0f0f0)",
+                      color:
+                        product.status === "ACTIVE"
+                          ? "var(--p-color-text-success, #008060)"
+                          : "var(--p-color-text-subdued, #6d7175)",
+                    }}
+                  >
+                    {product.status}
+                  </span>
+                </div>
+                {descriptionSnippet ? (
+                  <div>
+                    <s-text color="subdued">Description</s-text>
+                    <p
+                      style={{
+                        margin: "4px 0 0",
+                        fontSize: "14px",
+                        lineHeight: 1.4,
+                        color: "var(--p-color-text-primary, #202223)",
+                        overflow: "hidden",
+                        display: "-webkit-box",
+                        WebkitLineClamp: 4,
+                        WebkitBoxOrient: "vertical",
+                      }}
+                    >
+                      {descriptionSnippet}
+                    </p>
+                  </div>
+                ) : null}
+                <div style={{ marginTop: "8px", paddingTop: "16px", borderTop: "1px solid var(--p-color-border-secondary, #e1e3e5)" }}>
+                  <div style={{ width: "100%" }}>
+                    <s-button variant="primary" onClick={handleGenerateVideoClick}>
+                      {finalVideoUrl ? "Create new video" : "Generate video"}
+                    </s-button>
+                  </div>
+                  <div style={{ marginTop: "8px" }}>
+                    <Link to="/app" style={{ display: "block" }}>
+                      <s-button variant="tertiary">Back to products</s-button>
+                    </Link>
+                  </div>
+                </div>
               </s-stack>
-            ) : null}
-            <s-stack direction="inline" gap="base">
-              <s-button variant="primary" onClick={handleGenerateVideoClick}>
-                Generate video
-              </s-button>
-              <Link to="/app">
-                <s-button variant="tertiary">← Back to products</s-button>
-              </Link>
-            </s-stack>
-          </s-stack>
-        </s-section>
+            </div>
+          </div>
+        </div>
       </s-page>
 
       {workflowOpen && (

@@ -1929,6 +1929,53 @@ export function WorkflowModal({
           </div>
         ) : (
           <>
+            {/* Stepper: Scene 1 → Scene 2 → Scene 3 → Audio → Final (visual only) */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "4px",
+                padding: "12px 20px",
+                borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+              }}
+            >
+              {[
+                { key: "scene1", label: "Scene 1", done: scene1Complete, active: !allScenesComplete && activeTab === "scene1" },
+                { key: "scene2", label: "Scene 2", done: scene2Complete, active: !allScenesComplete && activeTab === "scene2" },
+                { key: "scene3", label: "Scene 3", done: scene3Complete, active: !allScenesComplete && activeTab === "scene3" },
+                { key: "audio", label: "Audio", done: false, active: allScenesComplete },
+                { key: "final", label: "Final", done: false, active: false },
+              ].map((item, index) => (
+                <div key={item.key} style={{ display: "flex", alignItems: "center" }}>
+                  <span
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: "999px",
+                      fontSize: "12px",
+                      fontWeight: 600,
+                      background: item.active ? "var(--p-color-bg-fill-info, #2c6ecb)" : item.done ? "var(--p-color-bg-fill-success-secondary, #d3f0d9)" : "transparent",
+                      color: item.active ? "#fff" : item.done ? "var(--p-color-text-success, #008060)" : "var(--p-color-text-subdued, #6d7175)",
+                      border: item.active || item.done ? "none" : "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                    }}
+                  >
+                    {item.done ? "✓ " : ""}{item.label}
+                  </span>
+                  {index < 4 && (
+                    <span
+                      style={{
+                        width: "20px",
+                        height: "2px",
+                        margin: "0 2px",
+                        background: item.done ? "var(--p-color-border-success, #008060)" : "var(--p-color-border-secondary, #e1e3e5)",
+                      }}
+                      aria-hidden
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
             <div
               style={{
                 display: "flex",
@@ -1956,15 +2003,13 @@ export function WorkflowModal({
                       marginBottom: "-1px",
                       display: "flex",
                       alignItems: "center",
-                      gap: "6px",
+                      gap: "8px",
                     }}
                   >
+                    {complete ? (
+                      <span style={{ color: "var(--p-color-text-success, #008060)", fontSize: "16px" }} title="Complete" aria-hidden>✓</span>
+                    ) : null}
                     {label}
-                    {complete && (
-                      <span style={{ color: "var(--p-color-text-success, #008060)", fontSize: "16px" }} title="Complete">
-                        ✓
-                      </span>
-                    )}
                   </button>
                 );
               })}
@@ -2284,7 +2329,7 @@ export function WorkflowModal({
               </div>
             )}
 
-            <div style={{ padding: "20px", overflow: "auto", flex: 1 }}>
+            <div style={{ padding: "24px", overflow: "auto", flex: 1 }}>
               <div style={{ display: activeTab === "scene1" ? "block" : "none" }} key={`scene1-${restoredState?.scene1 ? "restored" : "default"}`}>
                 <Scene1Content
                   productImages={productImages}

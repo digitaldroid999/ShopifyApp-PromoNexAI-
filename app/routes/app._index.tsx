@@ -9,6 +9,7 @@ import { Link } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
+import prisma from "../db.server";
 
 const PRODUCTS_QUERY = `#graphql
   query getProducts($first: Int!, $query: String, $after: String) {
@@ -61,8 +62,16 @@ function buildProductsQuery(search: string | null, status: string | null): strin
   return parts.length > 0 ? parts.join(" ") : undefined;
 }
 
+function toProductIdSegment(productId: string | null): string | null {
+  if (!productId?.trim()) return null;
+  const id = productId.trim();
+  if (id.startsWith("gid://shopify/Product/")) return id.replace("gid://shopify/Product/", "");
+  return id;
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
+  const shop = (session as { shop?: string }).shop?.trim() ?? "";
   const url = new URL(request.url);
   const search = url.searchParams.get("search") ?? "";
   const status = url.searchParams.get("status") ?? "all";
@@ -82,7 +91,77 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const products = connection?.edges?.map((e: { node: unknown }) => e.node) ?? [];
   const pageInfo = connection?.pageInfo ?? { hasNextPage: false, endCursor: null };
 
-  return { products, pageInfo, search, status };
+  let stats = { totalShorts: 0, readyCount: 0, generatingCount: 0, draftCount: 0 };
+  let recentShorts: { id: string; title: string; productId: string | null; status: string; finalVideoUrl: string | null; updatedAt: Date; thumbnailUrl: string | null }[] = [];
+  let productIdToShortStatus: Record<string, string> = {};
+
+  if (shop) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const shortDelegate = (prisma as any).short;
+    if (shortDelegate) {
+      const [totalShorts, readyCount, generatingCount, draftCount, recentList, allShortsForMap] = await Promise.all([
+        shortDelegate.count({ where: { userId: shop } }),
+        shortDelegate.count({ where: { userId: shop, status: "ready" } }),
+        shortDelegate.count({ where: { userId: shop, status: "generating" } }),
+        shortDelegate.count({ where: { userId: shop, status: "draft" } }),
+        shortDelegate.findMany({
+          where: { userId: shop },
+          orderBy: { updatedAt: "desc" },
+          take: 8,
+          select: {
+            id: true,
+            title: true,
+            productId: true,
+            status: true,
+            finalVideoUrl: true,
+            updatedAt: true,
+          },
+          include: {
+            scenes: {
+              take: 1,
+              orderBy: { sceneNumber: "asc" },
+              select: { imageUrl: true, generatedVideoUrl: true },
+            },
+          },
+        }) as Promise<{ id: string; title: string; productId: string | null; status: string; finalVideoUrl: string | null; updatedAt: Date; scenes: { imageUrl: string | null; generatedVideoUrl: string | null }[] }[]>,
+        shortDelegate.findMany({
+          where: { userId: shop },
+          select: { productId: true, status: true },
+        }) as Promise<{ productId: string | null; status: string }[]>,
+      ]);
+
+      stats = { totalShorts, readyCount, generatingCount, draftCount };
+      recentShorts = (recentList ?? []).map((s: { id: string; title: string; productId: string | null; status: string; finalVideoUrl: string | null; updatedAt: Date; scenes: { imageUrl: string | null; generatedVideoUrl: string | null }[] }) => {
+        const thumb = s.finalVideoUrl?.trim() || s.scenes?.[0]?.generatedVideoUrl?.trim() || s.scenes?.[0]?.imageUrl?.trim() || null;
+        return {
+          id: s.id,
+          title: s.title,
+          productId: s.productId,
+          status: s.status,
+          finalVideoUrl: s.finalVideoUrl?.trim() || null,
+          updatedAt: s.updatedAt,
+          thumbnailUrl: thumb,
+        };
+      });
+      for (const row of allShortsForMap ?? []) {
+        if (row.productId) {
+          const pid = row.productId.trim();
+          productIdToShortStatus[pid] = row.status;
+          if (!pid.startsWith("gid://")) productIdToShortStatus[`gid://shopify/Product/${pid}`] = row.status;
+        }
+      }
+    }
+  }
+
+  return {
+    products,
+    pageInfo,
+    search,
+    status,
+    stats,
+    recentShorts,
+    productIdToShortStatus,
+  };
 };
 
 const PRODUCT_UPDATE_MUTATION = `#graphql
@@ -244,7 +323,7 @@ export default function Index() {
   const fetcher = useFetcher<typeof action>();
   const loadMoreFetcher = useFetcher<{ products: ProductNode[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } }>();
   const revalidator = useRevalidator();
-  const { products: loaderProducts, pageInfo: loaderPageInfo } = useLoaderData<typeof loader>();
+  const { products: loaderProducts, pageInfo: loaderPageInfo, stats, recentShorts, productIdToShortStatus } = useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<ProductNode[]>(loaderProducts as ProductNode[]);
   const [pageInfo, setPageInfo] = useState(loaderPageInfo);
@@ -316,6 +395,140 @@ export default function Index() {
           Create short promo videos for your store products.
         </s-paragraph>
       </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(140px, 1fr))",
+          gap: "12px",
+          marginBottom: "24px",
+        }}
+      >
+        <div
+          style={{
+            padding: "16px",
+            background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+            borderRadius: "8px",
+            border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+          }}
+        >
+          <s-text color="subdued">Products</s-text>
+          <div style={{ fontSize: "24px", fontWeight: 600, marginTop: "4px" }}>{loaderProducts?.length ?? 0}</div>
+        </div>
+        <div
+          style={{
+            padding: "16px",
+            background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+            borderRadius: "8px",
+            border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+          }}
+        >
+          <s-text color="subdued">Videos created</s-text>
+          <div style={{ fontSize: "24px", fontWeight: 600, marginTop: "4px" }}>{stats?.readyCount ?? 0}</div>
+        </div>
+        <div
+          style={{
+            padding: "16px",
+            background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+            borderRadius: "8px",
+            border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+          }}
+        >
+          <s-text color="subdued">In progress</s-text>
+          <div style={{ fontSize: "24px", fontWeight: 600, marginTop: "4px" }}>{stats?.generatingCount ?? 0}</div>
+        </div>
+        <div
+          style={{
+            padding: "16px",
+            background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+            borderRadius: "8px",
+            border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+          }}
+        >
+          <s-text color="subdued">Drafts</s-text>
+          <div style={{ fontSize: "24px", fontWeight: 600, marginTop: "4px" }}>{stats?.draftCount ?? 0}</div>
+        </div>
+      </div>
+
+      {stats?.totalShorts === 0 && (
+        <div
+          style={{
+            padding: "24px",
+            marginBottom: "24px",
+            background: "var(--p-color-bg-surface-primary, #fff)",
+            borderRadius: "8px",
+            border: "1px solid var(--p-color-border-info, #2c6ecb)",
+          }}
+        >
+          <s-text type="strong">Create your first promo video</s-text>
+          <div style={{ marginTop: "8px" }}>
+            <s-paragraph color="subdued">
+              Choose a product below and click Generate video to get started.
+            </s-paragraph>
+          </div>
+        </div>
+      )}
+
+      {recentShorts?.length > 0 && (
+        <div style={{ marginBottom: "24px" }}>
+          <s-section heading="Recent videos">
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
+              gap: "12px",
+            }}
+          >
+            {recentShorts.map((s) => {
+              const segment = toProductIdSegment(s.productId);
+              return (
+                <Link key={s.id} to={segment ? `/app/products/${segment}` : "/app"} style={{ textDecoration: "none", color: "inherit" }}>
+                  <div
+                    style={{
+                      border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                      borderRadius: "8px",
+                      overflow: "hidden",
+                      background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+                    }}
+                  >
+                    <div style={{ aspectRatio: "16/9", background: "var(--p-color-bg-fill-tertiary, #f0f0f0)" }}>
+                      {s.thumbnailUrl ? (
+                        s.thumbnailUrl.match(/\.(mp4|webm|mov)$/i) ? (
+                          <video src={s.thumbnailUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} muted />
+                        ) : (
+                          <img src={s.thumbnailUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        )
+                      ) : (
+                        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)" }}>No preview</div>
+                      )}
+                    </div>
+                    <div style={{ padding: "8px 10px" }}>
+                      <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <s-text type="strong">{s.title}</s-text>
+                      </div>
+                      <span
+                        style={{
+                          display: "inline-block",
+                          marginTop: "4px",
+                          padding: "2px 6px",
+                          borderRadius: "999px",
+                          fontSize: "11px",
+                          fontWeight: 500,
+                          background: s.status === "ready" ? "var(--p-color-bg-fill-success-secondary, #d3f0d9)" : s.status === "generating" ? "var(--p-color-bg-fill-caution-secondary, #fcf1e0)" : "var(--p-color-bg-fill-secondary, #e1e3e5)",
+                          color: s.status === "ready" ? "var(--p-color-text-success, #008060)" : s.status === "generating" ? "var(--p-color-text-caution, #b98900)" : "var(--p-color-text-subdued, #6d7175)",
+                        }}
+                      >
+                        {s.status}
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+          </s-section>
+        </div>
+      )}
 
       <s-section heading="Your products">
         <div style={{ marginTop: "8px", marginBottom: "12px" }}>
@@ -541,6 +754,45 @@ export default function Index() {
                           {product.status}
                         </span>
                         <s-text color="subdued">Handle: {product.handle}</s-text>
+                        {productIdToShortStatus?.[product.id] ? (
+                          <span
+                            style={{
+                              display: "inline-block",
+                              padding: "2px 6px",
+                              borderRadius: "999px",
+                              fontSize: "11px",
+                              fontWeight: 500,
+                              background:
+                                productIdToShortStatus[product.id] === "ready"
+                                  ? "var(--p-color-bg-fill-success-secondary, #d3f0d9)"
+                                  : productIdToShortStatus[product.id] === "generating"
+                                    ? "var(--p-color-bg-fill-caution-secondary, #fcf1e0)"
+                                    : "var(--p-color-bg-fill-secondary, #e1e3e5)",
+                              color:
+                                productIdToShortStatus[product.id] === "ready"
+                                  ? "var(--p-color-text-success, #008060)"
+                                  : productIdToShortStatus[product.id] === "generating"
+                                    ? "var(--p-color-text-caution, #b98900)"
+                                    : "var(--p-color-text-subdued, #6d7175)",
+                            }}
+                          >
+                            Video {productIdToShortStatus[product.id] === "ready" ? "ready" : productIdToShortStatus[product.id] === "generating" ? "in progress" : "draft"}
+                          </span>
+                        ) : (
+                          <span
+                            style={{
+                              display: "inline-block",
+                              padding: "2px 6px",
+                              borderRadius: "999px",
+                              fontSize: "11px",
+                              fontWeight: 500,
+                              background: "var(--p-color-bg-fill-tertiary, #f0f0f0)",
+                              color: "var(--p-color-text-subdued, #6d7175)",
+                            }}
+                          >
+                            No video
+                          </span>
+                        )}
                       </div>
                       {product.variants?.edges?.length > 0 && (
                         <s-text color="subdued">
