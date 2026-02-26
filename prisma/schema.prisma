@@ -121,3 +121,15 @@ model Task {
 
   @@map("tasks")
 }
+
+// Legal agreement: one record per shop; updated when user agrees to new terms version
+model LegalAgreement {
+  id           String   @id @default(cuid())
+  shop         String   @unique
+  agreedAt     DateTime @map("agreed_at")
+  termsVersion String   @map("terms_version")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("legal_agreements")
+}
