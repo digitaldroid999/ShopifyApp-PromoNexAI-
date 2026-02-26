@@ -60,8 +60,11 @@ export default function App() {
       >
         <s-stack direction="inline" gap="base">
           <s-text>PromoNexAI</s-text>
+          <span style={{ margin: "0 4px", color: "var(--p-color-text-subdued, #6d7175)" }}>·</span>
           <s-link href="/legal/terms">Terms of Service</s-link>
+          <span style={{ margin: "0 4px", color: "var(--p-color-text-subdued, #6d7175)" }}>·</span>
           <s-link href="/legal/privacy">Privacy Policy</s-link>
+          <span style={{ margin: "0 4px", color: "var(--p-color-text-subdued, #6d7175)" }}>·</span>
           <s-link href="/legal/data-processing">Data Processing Agreement</s-link>
         </s-stack>
       </footer>

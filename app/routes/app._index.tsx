@@ -318,11 +318,25 @@ export default function Index() {
       </div>
 
       <s-section heading="Your products">
-        <s-paragraph>
-          Select a product to create a promo video.
-        </s-paragraph>
+        <div style={{ marginTop: "8px", marginBottom: "12px" }}>
+          <s-paragraph>
+            Select a product to create a promo video.
+          </s-paragraph>
+        </div>
         <s-stack direction="block" gap="base">
-          <s-stack direction="inline" gap="base">
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              alignItems: "center",
+              gap: "12px",
+              padding: "12px 16px",
+              background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+              borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+              borderRadius: "8px",
+              marginBottom: "16px",
+            }}
+          >
             <label style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <s-text>Search:</s-text>
               <input
@@ -336,12 +350,27 @@ export default function Index() {
                   return next;
                 }, { replace: true })}
                 onKeyDown={(e) => e.key === "Enter" && applyFilters((e.target as HTMLInputElement).value, status)}
-                style={{ padding: "6px 10px", minWidth: "180px" }}
+                style={{
+                  padding: "8px 12px",
+                  minWidth: "180px",
+                  border: "1px solid var(--p-color-border, #8c9196)",
+                  borderRadius: "8px",
+                  fontSize: "14px",
+                }}
               />
             </label>
             <label style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <s-text>Status:</s-text>
-              <select value={status} onChange={(e) => applyFilters(search, e.target.value)} style={{ padding: "6px 10px" }}>
+              <select
+                value={status}
+                onChange={(e) => applyFilters(search, e.target.value)}
+                style={{
+                  padding: "8px 12px",
+                  border: "1px solid var(--p-color-border, #8c9196)",
+                  borderRadius: "8px",
+                  fontSize: "14px",
+                }}
+              >
                 <option value="all">All</option>
                 <option value="ACTIVE">Active</option>
                 <option value="DRAFT">Draft</option>
@@ -349,11 +378,12 @@ export default function Index() {
               </select>
             </label>
             <s-button onClick={() => applyFilters(search, status)}>Apply</s-button>
-          </s-stack>
+          </div>
           {editingProduct ? (
-            <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
-              <s-text type="strong">Edit product</s-text>
-              <fetcher.Form
+            <div style={{ borderLeft: "4px solid var(--p-color-border-info, #2c6ecb)", paddingLeft: "16px" }}>
+              <s-box padding="base" borderWidth="base" borderRadius="base" background="subdued">
+                <s-text type="strong">Edit product</s-text>
+                <fetcher.Form
                 method="post"
                 style={{ marginTop: "12px" }}
                 onSubmit={(e) => {
@@ -407,12 +437,34 @@ export default function Index() {
                   </s-stack>
                 </s-stack>
               </fetcher.Form>
-            </s-box>
+              </s-box>
+            </div>
           ) : null}
         {products.length === 0 && !loadMoreFetcher.state ? (
-          <s-paragraph color="subdued">No products match. Use “Generate a product” to create one.</s-paragraph>
+          <div
+            style={{
+              padding: "48px 24px",
+              textAlign: "center",
+              background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+              borderRadius: "8px",
+              border: "1px dashed var(--p-color-border-secondary, #e1e3e5)",
+            }}
+          >
+            <div style={{ marginBottom: "16px" }}>
+              <s-paragraph color="subdued">No products match. Use “Generate a product” to create one.</s-paragraph>
+            </div>
+            <s-button onClick={generateProduct} variant="primary" {...(isLoading ? { loading: true } : {})}>
+              Generate a product
+            </s-button>
+          </div>
           ) : (
-          <s-stack direction="block" gap="base">
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))",
+              gap: "16px",
+            }}
+          >
             {products.map((product) => {
               const productIdSegment = product.id === "sample" ? "sample" : product.id.split("/").pop();
               const imageUrl =
@@ -431,8 +483,8 @@ export default function Index() {
                   <div style={{ display: "flex", gap: "16px", alignItems: "flex-start", flexWrap: "wrap" }}>
                     <div
                       style={{
-                        width: "80px",
-                        height: "80px",
+                        width: "96px",
+                        height: "96px",
                         flexShrink: 0,
                         borderRadius: "8px",
                         overflow: "hidden",
@@ -464,37 +516,66 @@ export default function Index() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                     <s-stack direction="block" gap="base">
                       <s-text type="strong">{product.title}</s-text>
-                      <s-text color="subdued">Handle: {product.handle} · Status: {product.status}</s-text>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            padding: "2px 8px",
+                            borderRadius: "999px",
+                            fontSize: "12px",
+                            fontWeight: 500,
+                            background:
+                              product.status === "ACTIVE"
+                                ? "var(--p-color-bg-fill-success-secondary, #d3f0d9)"
+                                : product.status === "DRAFT"
+                                  ? "var(--p-color-bg-fill-secondary, #e1e3e5)"
+                                  : "var(--p-color-bg-fill-tertiary, #f0f0f0)",
+                            color:
+                              product.status === "ACTIVE"
+                                ? "var(--p-color-text-success, #008060)"
+                                : product.status === "DRAFT"
+                                  ? "var(--p-color-text-subdued, #6d7175)"
+                                  : "var(--p-color-text-subdued, #6d7175)",
+                          }}
+                        >
+                          {product.status}
+                        </span>
+                        <s-text color="subdued">Handle: {product.handle}</s-text>
+                      </div>
                       {product.variants?.edges?.length > 0 && (
                         <s-text color="subdued">
                           Variants: {product.variants.edges.map((e) => `${e.node.title} – ${e.node.price}`).join(", ")}
                         </s-text>
                       )}
-                      <s-stack direction="inline" gap="base">
-                        <Link to={`/app/products/${productIdSegment}`}>
-                          <s-button variant="primary">Generate video</s-button>
-                        </Link>
-                        {product.id !== "sample" && (
-                          <s-button
-                            variant="tertiary"
-                            onClick={() => shopify.intents.invoke?.("edit:shopify/Product", { value: product.id })}
-                          >
-                            Edit in Shopify
-                          </s-button>
-                        )}
-                      </s-stack>
+                      <div style={{ marginTop: "12px" }}>
+                        <s-stack direction="inline" gap="base">
+                          <Link to={`/app/products/${productIdSegment}`}>
+                            <s-button variant="primary">Generate video</s-button>
+                          </Link>
+                          {product.id !== "sample" && (
+                            <s-button
+                              variant="tertiary"
+                              onClick={() => shopify.intents.invoke?.("edit:shopify/Product", { value: product.id })}
+                            >
+                              Edit in Shopify
+                            </s-button>
+                          )}
+                        </s-stack>
+                      </div>
                     </s-stack>
                   </div>
                   </div>
                 </s-box>
               );
             })}
-          </s-stack>
+          </div>
         )}
           {pageInfo.hasNextPage && pageInfo.endCursor ? (
-            <s-button onClick={loadMore} {...(isLoadMoreLoading ? { loading: true } : {})}>
+            <div style={{ marginTop: "16px" }}>
+              <s-button onClick={loadMore} {...(isLoadMoreLoading ? { loading: true } : {})}>
               Load more
             </s-button>
+            </div>
           ) : null}
         </s-stack>
       </s-section>
