@@ -153,6 +153,7 @@ export function LegalModal({
             <p style={{ margin: "8px 0 0", fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>
               Our terms, privacy policy, or data processing agreement have been updated. Please review and accept to continue.
             </p>
+          )}
         </div>
 
         <div style={tabBarStyle}>
