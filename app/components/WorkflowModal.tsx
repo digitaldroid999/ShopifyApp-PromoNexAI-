@@ -1586,6 +1586,12 @@ export function WorkflowModal({
   const [scene1Snapshot, setScene1Snapshot] = useState<WorkflowTempState["scene1"] | null>(null);
   const [scene2Snapshot, setScene2Snapshot] = useState<WorkflowTempState["scene2"] | null>(null);
   const [scene3Snapshot, setScene3Snapshot] = useState<WorkflowTempState["scene3"] | null>(null);
+  const [scene1ResetKey, setScene1ResetKey] = useState(0);
+  const [scene2ResetKey, setScene2ResetKey] = useState(0);
+  const [scene3ResetKey, setScene3ResetKey] = useState(0);
+  const [scene1Regenerated, setScene1Regenerated] = useState(false);
+  const [scene2Regenerated, setScene2Regenerated] = useState(false);
+  const [scene3Regenerated, setScene3Regenerated] = useState(false);
   const [finalizeLoading, setFinalizeLoading] = useState(false);
   const [finalizeError, setFinalizeError] = useState<string | null>(null);
   const [finalizeProgress, setFinalizeProgress] = useState<number | null>(null);
@@ -1812,6 +1818,111 @@ export function WorkflowModal({
     }
   };
 
+  const handleRegenerateScene1 = async () => {
+    if (shortInfo?.scene1Id) {
+      try {
+        await fetch(SHORTS_SCENES_API, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ sceneId: shortInfo.scene1Id, reset: true }),
+        });
+      } catch {
+        // continue with UI reset
+      }
+    }
+    setScene1Complete(false);
+    setScene1Snapshot(null);
+    setScene1ResetKey((k) => k + 1);
+    setScene1Regenerated(true);
+    if (productId?.trim()) {
+      loadShortFetcher.load(`${SHORTS_API}?productId=${encodeURIComponent(productId.trim())}`);
+    }
+  };
+  const handleRegenerateScene2 = async () => {
+    if (shortInfo?.scene2Id) {
+      try {
+        await fetch(SHORTS_SCENES_API, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ sceneId: shortInfo.scene2Id, reset: true }),
+        });
+      } catch {
+        // continue with UI reset
+      }
+    }
+    setScene2Complete(false);
+    setScene2Snapshot(null);
+    setScene2ResetKey((k) => k + 1);
+    setScene2Regenerated(true);
+    if (productId?.trim()) {
+      loadShortFetcher.load(`${SHORTS_API}?productId=${encodeURIComponent(productId.trim())}`);
+    }
+  };
+  const handleRegenerateScene3 = async () => {
+    if (shortInfo?.scene3Id) {
+      try {
+        await fetch(SHORTS_SCENES_API, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ sceneId: shortInfo.scene3Id, reset: true }),
+        });
+      } catch {
+        // continue with UI reset
+      }
+    }
+    setScene3Complete(false);
+    setScene3Snapshot(null);
+    setScene3ResetKey((k) => k + 1);
+    setScene3Regenerated(true);
+    if (productId?.trim()) {
+      loadShortFetcher.load(`${SHORTS_API}?productId=${encodeURIComponent(productId.trim())}`);
+    }
+  };
+
+  const handleStartFromScratch = async () => {
+    if (shortInfo?.shortId) {
+      try {
+        await fetch(SHORTS_RESET_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ shortId: shortInfo.shortId }),
+        });
+      } catch {
+        // continue with UI reset
+      }
+      if (productId?.trim()) {
+        loadShortFetcher.load(`${SHORTS_API}?productId=${encodeURIComponent(productId.trim())}`);
+      }
+    }
+    setShowingFinal(false);
+    setScene1Complete(false);
+    setScene2Complete(false);
+    setScene3Complete(false);
+    setScene1Snapshot(null);
+    setScene2Snapshot(null);
+    setScene3Snapshot(null);
+    setScriptGenerated(false);
+    setAudioGenerated(false);
+    setScene1Regenerated(true);
+    setScene2Regenerated(true);
+    setScene3Regenerated(true);
+    setScene1ResetKey((k) => k + 1);
+    setScene2ResetKey((k) => k + 1);
+    setScene3ResetKey((k) => k + 1);
+    setActiveTab("scene1");
+    setFinalVideoUrl(null);
+    if (productId?.trim()) {
+      deleteTempFetcher.submit(null, {
+        method: "delete",
+        action: `${WORKFLOW_TEMP_API}?productId=${encodeURIComponent(productId.trim())}`,
+      });
+    }
+  };
+
   return (
     <div
       style={{
@@ -1873,11 +1984,29 @@ export function WorkflowModal({
         {showingFinal ? (
           <div style={{ padding: "24px", display: "flex", flexDirection: "column", alignItems: "center", gap: "16px", flex: 1 }}>
             {displayedFinalVideoUrl ? (
-              <video
-                src={displayedFinalVideoUrl}
-                controls
-                style={{ maxWidth: "100%", maxHeight: "60vh", borderRadius: "12px", border: "1px solid #e1e3e5" }}
-              />
+              <>
+                <video
+                  src={displayedFinalVideoUrl}
+                  controls
+                  style={{ maxWidth: "100%", maxHeight: "60vh", borderRadius: "12px", border: "1px solid #e1e3e5" }}
+                />
+                <button
+                  type="button"
+                  onClick={handleStartFromScratch}
+                  style={{
+                    padding: "10px 20px",
+                    borderRadius: "8px",
+                    border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                    background: "transparent",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    fontWeight: 600,
+                    color: "var(--p-color-text-primary, #202223)",
+                  }}
+                >
+                  Start from scratch
+                </button>
+              </>
             ) : (
               <>
                 <p style={{ color: "var(--p-color-text-subdued, #6d7175)", margin: 0 }}>No final video yet. Go back and click Finalize to merge all scenes.</p>
@@ -2330,7 +2459,7 @@ export function WorkflowModal({
             )}
 
             <div style={{ padding: "24px", overflow: "auto", flex: 1 }}>
-              <div style={{ display: activeTab === "scene1" ? "block" : "none" }} key={`scene1-${restoredState?.scene1 ? "restored" : "default"}`}>
+              <div style={{ display: activeTab === "scene1" ? "block" : "none" }} key={`scene1-${scene1ResetKey}`}>
                 <Scene1Content
                   productImages={productImages}
                   productId={productId ?? undefined}
@@ -2338,26 +2467,34 @@ export function WorkflowModal({
                   sceneId={shortInfo?.scene1Id ?? undefined}
                   shortId={shortInfo?.shortId ?? undefined}
                   shortUserId={shortInfo?.userId ?? undefined}
-                  initialScene1={restoredState?.scene1}
-                  dbSceneVideoUrl={shortInfo?.scene1GeneratedVideoUrl ?? undefined}
+                  initialScene1={scene1Regenerated ? undefined : (restoredState?.scene1 ?? scene1Snapshot)}
+                  dbSceneVideoUrl={scene1Regenerated ? undefined : (shortInfo?.scene1GeneratedVideoUrl ?? undefined)}
                   onScene1Change={setScene1Snapshot}
-                  onComplete={() => setScene1Complete(true)}
+                  onComplete={() => {
+                    setScene1Complete(true);
+                    setScene1Regenerated(false);
+                  }}
+                  onRegenerate={handleRegenerateScene1}
                   onSkipRemoveBgWarning={showSkipRemoveBgWarning}
                 />
               </div>
-              <div style={{ display: activeTab === "scene2" ? "block" : "none" }} key={`scene2-${restoredState?.scene2 ? "restored" : "default"}`}>
+              <div style={{ display: activeTab === "scene2" ? "block" : "none" }} key={`scene2-${scene2ResetKey}`}>
                 <Scene2Content
                   productImages={productImages}
                   sceneId={shortInfo?.scene2Id ?? undefined}
                   shortUserId={shortInfo?.userId ?? undefined}
-                  initialScene2={restoredState?.scene2}
-                  dbSceneVideoUrl={shortInfo?.scene2GeneratedVideoUrl ?? undefined}
+                  initialScene2={scene2Regenerated ? undefined : (restoredState?.scene2 ?? scene2Snapshot)}
+                  dbSceneVideoUrl={scene2Regenerated ? undefined : (shortInfo?.scene2GeneratedVideoUrl ?? undefined)}
                   onScene2Change={setScene2Snapshot}
-                  onComplete={() => setScene2Complete(true)}
+                  onComplete={() => {
+                    setScene2Complete(true);
+                    setScene2Regenerated(false);
+                  }}
+                  onRegenerate={handleRegenerateScene2}
                   onSkipRemoveBgWarning={showSkipRemoveBgWarning}
                 />
               </div>
-              <div style={{ display: activeTab === "scene3" ? "block" : "none" }} key={`scene3-${restoredState?.scene3 ? "restored" : "default"}`}>
+              <div style={{ display: activeTab === "scene3" ? "block" : "none" }} key={`scene3-${scene3ResetKey}`}>
                 <Scene3Content
                   productImages={productImages}
                   productId={productId ?? undefined}
@@ -2365,10 +2502,14 @@ export function WorkflowModal({
                   sceneId={shortInfo?.scene3Id ?? undefined}
                   shortId={shortInfo?.shortId ?? undefined}
                   shortUserId={shortInfo?.userId ?? undefined}
-                  initialScene3={restoredState?.scene3}
-                  dbSceneVideoUrl={shortInfo?.scene3GeneratedVideoUrl ?? undefined}
+                  initialScene3={scene3Regenerated ? undefined : (restoredState?.scene3 ?? scene3Snapshot)}
+                  dbSceneVideoUrl={scene3Regenerated ? undefined : (shortInfo?.scene3GeneratedVideoUrl ?? undefined)}
                   onScene3Change={setScene3Snapshot}
-                  onComplete={() => setScene3Complete(true)}
+                  onComplete={() => {
+                    setScene3Complete(true);
+                    setScene3Regenerated(false);
+                  }}
+                  onRegenerate={handleRegenerateScene3}
                   onSkipRemoveBgWarning={showSkipRemoveBgWarning}
                 />
               </div>
@@ -2387,6 +2528,7 @@ const WORKFLOW_TEMP_API = "/app/api/promo-workflow-temp";
 const COMPOSITE_API = "/app/api/image/composite";
 const SHORTS_API = "/app/api/shorts";
 const SHORTS_SCENES_API = "/app/api/shorts/scenes";
+const SHORTS_RESET_API = "/app/api/shorts/reset";
 const REMOTION_START_API = "/app/api/remotion/start";
 const TASKS_API_BASE = "/app/api/tasks";
 const AUDIO_VOICES_API = "/app/api/audio/voices";
@@ -2520,6 +2662,7 @@ function Scene1Content({
   dbSceneVideoUrl,
   onScene1Change,
   onComplete,
+  onRegenerate,
   onSkipRemoveBgWarning,
 }: {
   productImages: ProductImageItem[];
@@ -2533,6 +2676,7 @@ function Scene1Content({
   dbSceneVideoUrl?: string | null;
   onScene1Change?: (s: Scene1State) => void;
   onComplete?: () => void;
+  onRegenerate?: () => void;
   onSkipRemoveBgWarning?: () => void;
 }) {
   const firstId = productImagesProp[0]?.id ?? "s1";
@@ -3106,7 +3250,27 @@ function Scene1Content({
                   </button>
                 </div>
               ) : (dbSceneVideoUrl ?? sceneVideo) ? (
-                <video src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <video src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
+                  {onRegenerate && (
+                    <button
+                      type="button"
+                      onClick={onRegenerate}
+                      style={{
+                        padding: "8px 16px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                        background: "transparent",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        alignSelf: "flex-start",
+                      }}
+                    >
+                      Regenerate
+                    </button>
+                  )}
+                </div>
               ) : (
                 <button
                   type="button"
@@ -3143,6 +3307,7 @@ function Scene2Content({
   dbSceneVideoUrl,
   onScene2Change,
   onComplete,
+  onRegenerate,
   onSkipRemoveBgWarning,
 }: {
   productImages: ProductImageItem[];
@@ -3153,6 +3318,7 @@ function Scene2Content({
   dbSceneVideoUrl?: string | null;
   onScene2Change?: (s: Scene2State) => void;
   onComplete?: () => void;
+  onRegenerate?: () => void;
   onSkipRemoveBgWarning?: () => void;
 }) {
   const firstId = productImagesProp[0]?.id ?? "s1";
@@ -3491,7 +3657,27 @@ function Scene2Content({
                   )}
                 </div>
               ) : (dbSceneVideoUrl ?? sceneVideo) ? (
-                <video src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "100%", maxHeight: "240px", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <video src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "100%", maxHeight: "240px", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
+                  {onRegenerate && (
+                    <button
+                      type="button"
+                      onClick={onRegenerate}
+                      style={{
+                        padding: "8px 16px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                        background: "transparent",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        alignSelf: "flex-start",
+                      }}
+                    >
+                      Regenerate
+                    </button>
+                  )}
+                </div>
               ) : (
                 <button
                   type="button"
@@ -3539,6 +3725,7 @@ function Scene3Content({
   dbSceneVideoUrl,
   onScene3Change,
   onComplete,
+  onRegenerate,
   onSkipRemoveBgWarning,
 }: {
   productImages: ProductImageItem[];
@@ -3552,6 +3739,7 @@ function Scene3Content({
   dbSceneVideoUrl?: string | null;
   onScene3Change?: (s: Scene3State) => void;
   onComplete?: () => void;
+  onRegenerate?: () => void;
   onSkipRemoveBgWarning?: () => void;
 }) {
   const firstId = productImagesProp[0]?.id ?? "s1";
@@ -4093,7 +4281,27 @@ function Scene3Content({
                   )}
                 </div>
               ) : (dbSceneVideoUrl ?? sceneVideo) ? (
-                <video src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
+                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <video src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
+                  {onRegenerate && (
+                    <button
+                      type="button"
+                      onClick={onRegenerate}
+                      style={{
+                        padding: "8px 16px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                        background: "transparent",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        alignSelf: "flex-start",
+                      }}
+                    >
+                      Regenerate
+                    </button>
+                  )}
+                </div>
               ) : (
                 <button
                   type="button"

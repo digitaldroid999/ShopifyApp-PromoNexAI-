@@ -2,7 +2,7 @@
 
 client_id = "1165f928e69a1ff534eddf5024757853"
 name = "PromoNexAI"
-application_url = "https://app.promonexai.com"
+application_url = "https://shopify.promonexai.com"
 embedded = true
 
 [build]
@@ -25,4 +25,4 @@ api_version = "2026-04"
 scopes = "read_products,write_products"
 
 [auth]
-redirect_urls = [ "https://app.promonexai.com/auth/callback" ]
+redirect_urls = [ "https://shopify.promonexai.com/auth/callback", "https://shopify.promonexai.com/auth" ]
