@@ -40,8 +40,8 @@ export default function App() {
   return (
     <AppProvider embedded apiKey={apiKey}>
       <s-app-nav>
-        <s-link href="/app">Home</s-link>
-        <s-link href="/app/additional">Additional page</s-link>
+        <s-link href="/app">Dashboard</s-link>
+        <s-link href="/app/additional">Resources</s-link>
       </s-app-nav>
       <Outlet />
       <LegalModal
@@ -59,6 +59,7 @@ export default function App() {
         }}
       >
         <s-stack direction="inline" gap="base">
+          <s-text>PromoNexAI</s-text>
           <s-link href="/legal/terms">Terms of Service</s-link>
           <s-link href="/legal/privacy">Privacy Policy</s-link>
           <s-link href="/legal/data-processing">Data Processing Agreement</s-link>
