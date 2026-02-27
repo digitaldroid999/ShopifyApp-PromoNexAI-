@@ -1,28 +1,21 @@
 # Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
 
-client_id = "1165f928e69a1ff534eddf5024757853"
-name = "PromoNexAI"
-application_url = "https://shopify.promonexai.com"
+client_id = "8fc98a55cd37bbf33edfbda31d8234d6"
+name = "PromoNexAI_App"
+application_url = "https://shopify.promonexai.com/"
 embedded = true
 
-[build]
-automatically_update_urls_on_dev = true
-include_config_on_deploy = true
-
 [webhooks]
-api_version = "2026-04"
-
-  [[webhooks.subscriptions]]
-  topics = [ "app/uninstalled" ]
-  uri = "/webhooks/app/uninstalled"
-
-  [[webhooks.subscriptions]]
-  topics = [ "app/scopes_update" ]
-  uri = "/webhooks/app/scopes_update"
+api_version = "2026-01"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = "read_products,write_products"
+scopes = ""
+optional_scopes = [ ]
+use_legacy_install_flow = false
 
 [auth]
-redirect_urls = [ "https://shopify.promonexai.com/auth/callback", "https://shopify.promonexai.com/auth" ]
+redirect_urls = [
+  "https://shopify.promonexai.com/auth/callback",
+  "https://shopify.promonexai.com/auth/shopify/callback"
+]
