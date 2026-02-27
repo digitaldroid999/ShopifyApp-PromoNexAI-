@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { LoaderFunctionArgs } from "react-router";
 import { useLoaderData, useSearchParams } from "react-router";
 import { Link } from "react-router";
@@ -118,10 +119,19 @@ function formatDate(d: Date): string {
   });
 }
 
+/** Safe filename from product name + extension from URL (e.g. "My Product.mp4") */
+function downloadFileName(productName: string, videoUrl: string | null): string {
+  const base = (productName || "video").replace(/[<>:"/\\|?*\x00-\x1f]/g, "").trim() || "video";
+  const truncated = base.slice(0, 200);
+  const ext = videoUrl?.match(/\.(mp4|webm|mov)(?=[#?]|$)/i)?.[1]?.toLowerCase() ?? "mp4";
+  return `${truncated}.${ext}`;
+}
+
 export default function MyVideosPage() {
   const { videos, productFilterOptions, currentProductId } =
     useLoaderData<typeof loader>();
   const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedVideo, setSelectedVideo] = useState<VideoItem | null>(null);
 
   const handleFilterChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
@@ -199,11 +209,16 @@ export default function MyVideosPage() {
             {videos.map((v) => (
               <div
                 key={v.id}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedVideo(v)}
+                onKeyDown={(e) => e.key === "Enter" && setSelectedVideo(v)}
                 style={{
                   border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
                   borderRadius: "8px",
                   overflow: "hidden",
                   background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+                  cursor: "pointer",
                 }}
               >
                 <div
@@ -270,9 +285,10 @@ export default function MyVideosPage() {
                   {v.finalVideoUrl && (
                     <a
                       href={v.finalVideoUrl}
-                      download
+                      download={downloadFileName(v.title, v.finalVideoUrl)}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
                       style={{ textDecoration: "none", marginTop: "8px", display: "inline-block" }}
                     >
                       <s-button variant="primary" size="slim">
@@ -286,6 +302,85 @@ export default function MyVideosPage() {
           </div>
         )}
       </s-section>
+
+      {selectedVideo && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Video preview"
+          onClick={() => setSelectedVideo(null)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            background: "rgba(0,0,0,0.8)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "24px",
+            boxSizing: "border-box",
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: "var(--p-color-bg-surface-primary, #fff)",
+              borderRadius: "12px",
+              overflow: "hidden",
+              maxWidth: "90vw",
+              maxHeight: "90vh",
+              display: "flex",
+              flexDirection: "column",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
+            }}
+          >
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+              <s-text type="strong">{selectedVideo.title}</s-text>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                {selectedVideo.finalVideoUrl && (
+                  <a
+                    href={selectedVideo.finalVideoUrl}
+                    download={downloadFileName(selectedVideo.title, selectedVideo.finalVideoUrl)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ textDecoration: "none" }}
+                  >
+                    <s-button variant="primary" size="slim">Download</s-button>
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSelectedVideo(null)}
+                  aria-label="Close"
+                  style={{
+                    padding: "8px",
+                    border: "none",
+                    borderRadius: "8px",
+                    background: "var(--p-color-bg-fill-secondary, #e1e3e5)",
+                    cursor: "pointer",
+                    fontSize: "18px",
+                    lineHeight: 1,
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+            <div style={{ flex: 1, minHeight: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "#000" }}>
+              {selectedVideo.finalVideoUrl ? (
+                <video
+                  src={selectedVideo.finalVideoUrl}
+                  controls
+                  autoPlay
+                  style={{ maxWidth: "100%", maxHeight: "calc(90vh - 60px)", width: "auto", height: "auto" }}
+                />
+              ) : (
+                <s-text color="subdued">No video URL</s-text>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </s-page>
   );
 }
