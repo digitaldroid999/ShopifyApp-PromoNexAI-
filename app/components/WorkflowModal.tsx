@@ -2242,39 +2242,80 @@ export function WorkflowModal({
                       {scriptGenerated && (
                         <div style={{ display: "flex", alignItems: "flex-start", gap: "24px", flexWrap: "wrap" }}>
                           <div style={{ flex: "1 1 280px", minWidth: "200px" }}>
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px", flexWrap: "wrap", gap: "8px" }}>
                               <label style={{ fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)", fontWeight: 600 }}>Script (edit if needed)</label>
-                              <button
-                                type="button"
-                                disabled={!shortInfo?.shortId || scriptSaveLoading}
-                                onClick={async () => {
-                                  if (!shortInfo?.shortId) return;
-                                  setScriptSaveLoading(true); setScriptSavedFeedback(false);
-                                  try {
-                                    const res = await fetch(AUDIO_SAVE_SCRIPT_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ short_id: shortInfo.shortId, audio_script: audioScript, voice_id: selectedVoiceId || undefined, voice_name: voicesFetcher.data?.success ? voicesFetcher.data.voices.find((v) => v.voice_id === selectedVoiceId)?.name : undefined }) });
-                                    const data = await res.json();
-                                    if (data.success) { setScriptSavedFeedback(true); setTimeout(() => setScriptSavedFeedback(false), 2000); } else { alert(data.error || "Failed to save script"); }
-                                  } finally { setScriptSaveLoading(false); }
+                              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <button
+                                  type="button"
+                                  disabled={!shortInfo?.shortId || !shortInfo?.userId || !selectedVoiceId || scriptGenerateLoading}
+                                  onClick={async () => {
+                                    if (!shortInfo?.shortId || !shortInfo?.userId || !selectedVoiceId) return;
+                                    setScriptGenerateLoading(true);
+                                    try {
+                                      const res = await fetch(AUDIO_GENERATE_SCRIPT_API, {
+                                        method: "POST", headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({
+                                          voice_id: selectedVoiceId,
+                                          user_id: shortInfo.userId,
+                                          short_id: shortInfo.shortId,
+                                          product_description: (typeof product?.description === "string" && product.description.trim())
+                                            ? product.description.trim()
+                                            : (typeof product?.name === "string" && product.name.trim())
+                                              ? product.name.trim()
+                                              : undefined,
+                                        }),
+                                      });
+                                      const data = await res.json();
+                                      const scriptText = typeof data.script === "string" ? data.script : "";
+                                      if (scriptText) { setAudioScript(scriptText); setScriptGenerated(true); } else { alert(data.error || "Failed to regenerate script"); }
+                                    } finally { setScriptGenerateLoading(false); }
+                                  }}
+                                  title={scriptGenerateLoading ? "Regenerating…" : "Regenerate script"}
+                                  style={{
+                                    padding: "6px 10px",
+                                    border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                                    borderRadius: "6px",
+                                    background: scriptGenerateLoading ? "#9ca3af" : "#fff",
+                                    color: "var(--p-color-text-primary, #202223)",
+                                    cursor: scriptGenerateLoading || !selectedVoiceId ? "not-allowed" : "pointer",
+                                    fontSize: "12px",
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {scriptGenerateLoading ? "Regenerating…" : "Regenerate script"}
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={!shortInfo?.shortId || scriptSaveLoading}
+                                  onClick={async () => {
+                                    if (!shortInfo?.shortId) return;
+                                    setScriptSaveLoading(true); setScriptSavedFeedback(false);
+                                    try {
+                                      const res = await fetch(AUDIO_SAVE_SCRIPT_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ short_id: shortInfo.shortId, audio_script: audioScript, voice_id: selectedVoiceId || undefined, voice_name: voicesFetcher.data?.success ? voicesFetcher.data.voices.find((v) => v.voice_id === selectedVoiceId)?.name : undefined }) });
+                                      const data = await res.json();
+                                      if (data.success) { setScriptSavedFeedback(true); setTimeout(() => setScriptSavedFeedback(false), 2000); } else { alert(data.error || "Failed to save script"); }
+                                    } finally { setScriptSaveLoading(false); }
                                 }}
-                                title={scriptSaveLoading ? "Saving…" : "Save script"}
-                                style={{
-                                  padding: "6px 8px",
-                                  border: "none",
-                                  borderRadius: "6px",
-                                  background: scriptSaveLoading ? "#9ca3af" : "var(--p-color-bg-fill-secondary, #5c5f62)",
-                                  color: "#fff",
-                                  cursor: scriptSaveLoading ? "wait" : "pointer",
-                                  display: "flex",
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                }}
-                              >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-                                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-                                  <polyline points="17 21 17 13 7 13 7 21" />
-                                  <polyline points="7 3 7 8 15 8" />
-                                </svg>
-                              </button>
+                                  title={scriptSaveLoading ? "Saving…" : "Save script"}
+                                  style={{
+                                    padding: "6px 8px",
+                                    border: "none",
+                                    borderRadius: "6px",
+                                    background: scriptSaveLoading ? "#9ca3af" : "var(--p-color-bg-fill-secondary, #5c5f62)",
+                                    color: "#fff",
+                                    cursor: scriptSaveLoading ? "wait" : "pointer",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                  }}
+                                >
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
+                                    <polyline points="17 21 17 13 7 13 7 21" />
+                                    <polyline points="7 3 7 8 15 8" />
+                                  </svg>
+                                </button>
+                              </div>
                             </div>
                             <textarea
                               value={audioScript}
@@ -2303,26 +2344,44 @@ export function WorkflowModal({
                                 {audioGenerateLoading ? "Generating audio…" : "Generate audio"}
                               </button>
                             ) : (
-                              <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-                                <audio src={(shortInfo?.audioInfo?.generatedAudioUrl ?? generatedAudioUrl) || undefined} controls style={{ maxWidth: "100%", minWidth: "200px" }} />
-                                <span style={{ fontSize: "14px", color: "var(--p-color-text-success, #008060)", fontWeight: 600 }}>✓ Audio ready</span>
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "12px" }}>
+                                <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                                  <audio src={(shortInfo?.audioInfo?.generatedAudioUrl ?? generatedAudioUrl) || undefined} controls style={{ maxWidth: "100%", minWidth: "200px" }} />
+                                  <span style={{ fontSize: "14px", color: "var(--p-color-text-success, #008060)", fontWeight: 600 }}>✓ Audio ready</span>
+                                  <button
+                                    type="button"
+                                    disabled={!shortInfo?.shortId || audioSaveLoading}
+                                    onClick={async () => {
+                                      if (!shortInfo?.shortId || !generatedAudioUrl) return;
+                                      setAudioSaveLoading(true); setAudioSavedFeedback(false);
+                                      try {
+                                        const res = await fetch(AUDIO_SAVE_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ short_id: shortInfo.shortId, generated_audio_url: generatedAudioUrl, subtitles: lastSubtitleTiming ?? undefined, voice_id: selectedVoiceId || undefined, voice_name: voicesFetcher.data?.success ? voicesFetcher.data.voices.find((v) => v.voice_id === selectedVoiceId)?.name : undefined }) });
+                                        const data = await res.json();
+                                        if (data.success) { setAudioSavedFeedback(true); setAudioGenerated(true); setTimeout(() => setAudioSavedFeedback(false), 2000); } else { alert(data.error || "Failed to save audio"); }
+                                      } finally { setAudioSaveLoading(false); }
+                                    }}
+                                    style={{ padding: "8px 16px", borderRadius: "8px", border: "none", background: audioSaveLoading ? "#9ca3af" : "var(--p-color-bg-fill-success, #008060)", color: "#fff", fontWeight: 600, cursor: audioSaveLoading ? "wait" : "pointer", fontSize: "13px" }}
+                                  >
+                                    {audioSaveLoading ? "Saving…" : "Save audio to database"}
+                                  </button>
+                                  {audioSavedFeedback && <span style={{ fontSize: "13px", color: "var(--p-color-text-success, #008060)" }}>Saved</span>}
+                                </div>
                                 <button
                                   type="button"
-                                  disabled={!shortInfo?.shortId || audioSaveLoading}
+                                  disabled={!shortInfo?.shortId || !shortInfo?.userId || !selectedVoiceId || !audioScript.trim() || audioGenerateLoading}
                                   onClick={async () => {
-                                    if (!shortInfo?.shortId || !generatedAudioUrl) return;
-                                    setAudioSaveLoading(true); setAudioSavedFeedback(false);
+                                    if (!shortInfo?.shortId || !shortInfo?.userId || !selectedVoiceId || !audioScript.trim()) return;
+                                    setAudioGenerateLoading(true);
                                     try {
-                                      const res = await fetch(AUDIO_SAVE_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ short_id: shortInfo.shortId, generated_audio_url: generatedAudioUrl, subtitles: lastSubtitleTiming ?? undefined, voice_id: selectedVoiceId || undefined, voice_name: voicesFetcher.data?.success ? voicesFetcher.data.voices.find((v) => v.voice_id === selectedVoiceId)?.name : undefined }) });
+                                      const res = await fetch(AUDIO_GENERATE_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ voice_id: selectedVoiceId, user_id: shortInfo.userId, short_id: shortInfo.shortId, script: audioScript.trim() }) });
                                       const data = await res.json();
-                                      if (data.success) { setAudioSavedFeedback(true); setAudioGenerated(true); setTimeout(() => setAudioSavedFeedback(false), 2000); } else { alert(data.error || "Failed to save audio"); }
-                                    } finally { setAudioSaveLoading(false); }
+                                      if (data.audio_url) { setGeneratedAudioUrl(data.audio_url); setLastSubtitleTiming(Array.isArray(data.subtitle_timing) ? data.subtitle_timing : null); setAudioGenerated(true); } else { alert(data.error || "Failed to regenerate audio"); }
+                                    } finally { setAudioGenerateLoading(false); }
                                   }}
-                                  style={{ padding: "8px 16px", borderRadius: "8px", border: "none", background: audioSaveLoading ? "#9ca3af" : "var(--p-color-bg-fill-success, #008060)", color: "#fff", fontWeight: 600, cursor: audioSaveLoading ? "wait" : "pointer", fontSize: "13px" }}
+                                  style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid var(--p-color-border-secondary, #e1e3e5)", background: "#fff", color: "var(--p-color-text-primary, #202223)", fontWeight: 600, cursor: audioGenerateLoading || !audioScript.trim() ? "not-allowed" : "pointer", fontSize: "13px" }}
                                 >
-                                  {audioSaveLoading ? "Saving…" : "Save audio to database"}
+                                  {audioGenerateLoading ? "Regenerating audio…" : "Regenerate audio"}
                                 </button>
-                                {audioSavedFeedback && <span style={{ fontSize: "13px", color: "var(--p-color-text-success, #008060)" }}>Saved</span>}
                               </div>
                             )}
                           </div>
