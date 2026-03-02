@@ -43,6 +43,7 @@ export default function App() {
         <s-link href="/app">Dashboard</s-link>
         <s-link href="/app/videos">My Videos</s-link>
         <s-link href="/app/additional">Resources</s-link>
+        <s-link href="/app/subscription">Subscription</s-link>
       </s-app-nav>
       <Outlet />
       <LegalModal
