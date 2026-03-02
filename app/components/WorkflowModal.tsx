@@ -2436,7 +2436,7 @@ export function WorkflowModal({
               {[
                 { phase: "scenes" as const, label: "1. Scenes", done: allScenesComplete, enabled: true },
                 { phase: "audio" as const, label: "2. Audio", done: audioComplete, enabled: allScenesComplete },
-                { phase: "finalize" as const, label: "3. Finalize", done: workflowPhase === "finalView", enabled: audioComplete },
+                { phase: "finalize" as const, label: "3. Finalize", done: workflowPhase === "finalView", enabled: allScenesComplete },
               ].map((item, index) => {
                 const active = activePhase === item.phase;
                 return (
@@ -2680,7 +2680,7 @@ export function WorkflowModal({
                                     padding: "6px 10px",
                                     border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
                                     borderRadius: "6px",
-                                    background: scriptGenerateLoading ? "#9ca3af" : "#fff",
+                                    b ackground: scriptGenerateLoading ? "#9ca3af" : "#fff",
                                     color: "var(--p-color-text-primary, #202223)",
                                     cursor: scriptGenerateLoading || !selectedVoiceId ? "not-allowed" : "pointer",
                                     fontSize: "12px",
