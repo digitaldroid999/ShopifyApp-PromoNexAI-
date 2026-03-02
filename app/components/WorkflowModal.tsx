@@ -2465,22 +2465,6 @@ export function WorkflowModal({
                                 <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
                                   <audio src={(shortInfo?.audioInfo?.generatedAudioUrl ?? generatedAudioUrl) || undefined} controls style={{ maxWidth: "100%", minWidth: "200px" }} />
                                   <span style={{ fontSize: "14px", color: "var(--p-color-text-success, #008060)", fontWeight: 600 }}>✓ Audio ready</span>
-                                  <button
-                                    type="button"
-                                    disabled={!shortInfo?.shortId || audioSaveLoading}
-                                    onClick={async () => {
-                                      if (!shortInfo?.shortId || !generatedAudioUrl) return;
-                                      setAudioSaveLoading(true); setAudioSavedFeedback(false);
-                                      try {
-                                        const res = await fetch(AUDIO_SAVE_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ short_id: shortInfo.shortId, generated_audio_url: generatedAudioUrl, subtitles: lastSubtitleTiming ?? undefined, voice_id: selectedVoiceId || undefined, voice_name: voicesFetcher.data?.success ? voicesFetcher.data.voices.find((v) => v.voice_id === selectedVoiceId)?.name : undefined }) });
-                                        const data = await res.json();
-                                        if (data.success) { setAudioSavedFeedback(true); setAudioGenerated(true); setTimeout(() => setAudioSavedFeedback(false), 2000); } else { alert(data.error || "Failed to save audio"); }
-                                      } finally { setAudioSaveLoading(false); }
-                                    }}
-                                    style={{ padding: "8px 16px", borderRadius: "8px", border: "none", background: audioSaveLoading ? "#9ca3af" : "var(--p-color-bg-fill-success, #008060)", color: "#fff", fontWeight: 600, cursor: audioSaveLoading ? "wait" : "pointer", fontSize: "13px" }}
-                                  >
-                                    {audioSaveLoading ? "Saving…" : "Save audio to database"}
-                                  </button>
                                   {audioSavedFeedback && <span style={{ fontSize: "13px", color: "var(--p-color-text-success, #008060)" }}>Saved</span>}
                                 </div>
                                 <button
@@ -2556,32 +2540,6 @@ export function WorkflowModal({
                               style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid var(--p-color-border-secondary, #e1e3e5)", background: "#fff", color: "var(--p-color-text-primary, #202223)", fontWeight: 600, cursor: "pointer", fontSize: "13px" }}
                             >
                               Change music
-                            </button>
-                            <button
-                              type="button"
-                              disabled={!shortInfo?.shortId || bgMusicSaveLoading}
-                              onClick={async () => {
-                                if (!shortInfo?.shortId) return;
-                                setBgMusicSaveLoading(true); setBgMusicSavedFeedback(false);
-                                try {
-                                  const res = await fetch(SHORTS_SAVE_BG_MUSIC_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
-                                  short_id: shortInfo.shortId,
-                                  bg_music: {
-                                    id: selectedBgMusic.id,
-                                    name: selectedBgMusic.name,
-                                    genre: selectedBgMusic.genre ?? "Storyblocks",
-                                    duration: selectedBgMusic.duration ?? null,
-                                    previewUrl: selectedBgMusic.previewUrl ?? null,
-                                    downloadUrl: selectedBgMusic.downloadUrl ?? selectedBgMusic.previewUrl ?? null,
-                                  },
-                                }) });
-                                  const data = await res.json();
-                                  if (data.success) { setBgMusicSavedFeedback(true); setTimeout(() => setBgMusicSavedFeedback(false), 2000); if (productId) loadShortFetcher.load(`${SHORTS_API}?productId=${encodeURIComponent(productId)}`); } else { alert(data.error || "Failed to save"); }
-                                } finally { setBgMusicSaveLoading(false); }
-                              }}
-                              style={{ padding: "10px 20px", borderRadius: "8px", border: "none", background: bgMusicSaveLoading ? "#9ca3af" : "var(--p-color-bg-fill-success, #008060)", color: "#fff", fontWeight: 600, cursor: bgMusicSaveLoading ? "wait" : "pointer", fontSize: "14px" }}
-                            >
-                              {bgMusicSaveLoading ? "Saving…" : "Save background music"}
                             </button>
                             {bgMusicSavedFeedback && <span style={{ fontSize: "14px", color: "var(--p-color-text-success, #008060)", fontWeight: 600 }}>Saved</span>}
                           </div>
@@ -3253,6 +3211,7 @@ function Scene1Content({
               <>
                 {bgRemoved && (
                   <img
+                    key={bgRemoved}
                     src={bgRemoved}
                     alt="BG removed"
                     style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }}
@@ -3261,21 +3220,38 @@ function Scene1Content({
                 {skipRemoveBg && !bgRemoved && (
                   <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Using image as-is</span>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setStep(2)}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: "8px",
-                    border: "none",
-                    background: "var(--p-color-bg-fill-info, #2c6ecb)",
-                    color: "#fff",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Next step →
-                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <button
+                    type="button"
+                    onClick={() => { setBgRemoved(null); setSkipRemoveBg(false); }}
+                    style={{
+                      padding: "10px 20px",
+                      borderRadius: "8px",
+                      border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                      background: "transparent",
+                      color: "var(--p-color-text-primary, #202223)",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Undo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    style={{
+                      padding: "10px 20px",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: "var(--p-color-bg-fill-info, #2c6ecb)",
+                      color: "#fff",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Next step →
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -3290,6 +3266,24 @@ function Scene1Content({
             title="Add a background"
             description="Generate a new background with AI or fetch one from the library. Then click Composite to combine the subject with the chosen background."
           />
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "8px",
+                border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                background: "transparent",
+                color: "var(--p-color-text-primary, #202223)",
+                fontWeight: 600,
+                cursor: "pointer",
+                fontSize: "14px",
+              }}
+            >
+              ← Previous
+            </button>
+          </div>
           <div style={twoPartLayout}>
             <div style={{ ...boxStyle, borderRight: "none", borderTopRightRadius: 0, borderBottomRightRadius: 0 }}>
               {effectiveOverlayUrl ? (
@@ -3401,11 +3395,11 @@ function Scene1Content({
           )}
           {composited && (
             <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-              <img src={composited} alt="Composited" style={{ width: "200px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
+              <img key={composited} src={composited} alt="Composited" style={{ width: "200px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <button
                   type="button"
-                  onClick={() => setStep(1)}
+                  onClick={() => setComposited(null)}
                   style={{
                     padding: "10px 20px",
                     borderRadius: "8px",
@@ -3416,7 +3410,7 @@ function Scene1Content({
                     cursor: "pointer",
                   }}
                 >
-                  ← Previous step
+                  Undo
                 </button>
                 <button
                   type="button"
@@ -3447,10 +3441,28 @@ function Scene1Content({
             title="Generate scene video"
             description="Create the final ~8 second video for this scene from the composited image using Remotion. Click Generate scene to start."
           />
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "8px",
+                border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                background: "transparent",
+                color: "var(--p-color-text-primary, #202223)",
+                fontWeight: 600,
+                cursor: "pointer",
+                fontSize: "14px",
+              }}
+            >
+              ← Previous
+            </button>
+          </div>
           <div style={twoPartLayout}>
             <div style={{ ...boxStyle, borderRight: "none", borderTopRightRadius: 0, borderBottomRightRadius: 0 }}>
               {composited ? (
-                <img src={composited} alt="Composited" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
+                <img key={composited} src={composited} alt="Composited" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
               ) : (
                 <img src={`${BASE}/scene1-composited.png`} alt="Composited" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
               )}
@@ -3496,7 +3508,7 @@ function Scene1Content({
                 </div>
               ) : (dbSceneVideoUrl ?? sceneVideo) ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <video src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
+                  <video key={dbSceneVideoUrl ?? sceneVideo ?? ""} src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                     <button
                       type="button"
@@ -3511,7 +3523,7 @@ function Scene1Content({
                         fontWeight: 600,
                       }}
                     >
-                      ← Previous step
+                      ← Previous
                     </button>
                     {onRegenerate && (
                       <button
@@ -3527,28 +3539,30 @@ function Scene1Content({
                           fontWeight: 600,
                         }}
                       >
-                        Regenerate
+                        Regenerate scene video
                       </button>
                     )}
                   </div>
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={handleGenerateScene}
-                  disabled={!composited}
-                  style={{
-                    padding: "12px 24px",
-                    borderRadius: "8px",
-                    border: "none",
-                    background: composited ? "var(--p-color-bg-fill-info, #2c6ecb)" : "#ccc",
-                    color: "#fff",
-                    fontWeight: 600,
-                    cursor: composited ? "pointer" : "not-allowed",
-                  }}
-                >
-                  Generate scene
-                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={handleGenerateScene}
+                    disabled={!composited}
+                    style={{
+                      padding: "12px 24px",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: composited ? "var(--p-color-bg-fill-info, #2c6ecb)" : "#ccc",
+                      color: "#fff",
+                      fontWeight: 600,
+                      cursor: composited ? "pointer" : "not-allowed",
+                    }}
+                  >
+                    Generate scene
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -3826,26 +3840,43 @@ function Scene2Content({
             {(bgRemoved || skipRemoveBg) && (
               <>
                 {bgRemoved && (
-                  <img src={bgRemoved} alt="BG removed" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
+                  <img key={bgRemoved} src={bgRemoved} alt="BG removed" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
                 )}
                 {skipRemoveBg && !bgRemoved && (
                   <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Using image as-is</span>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setStep(2)}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: "8px",
-                    border: "none",
-                    background: "var(--p-color-bg-fill-info, #2c6ecb)",
-                    color: "#fff",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Next step →
-                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <button
+                    type="button"
+                    onClick={() => { setBgRemoved(null); setSkipRemoveBg(false); }}
+                    style={{
+                      padding: "10px 20px",
+                      borderRadius: "8px",
+                      border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                      background: "transparent",
+                      color: "var(--p-color-text-primary, #202223)",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Undo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    style={{
+                      padding: "10px 20px",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: "var(--p-color-bg-fill-info, #2c6ecb)",
+                      color: "#fff",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Next step →
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -3860,41 +3891,78 @@ function Scene2Content({
             title="Select stock video & generate scene"
             description="Search and pick a stock video from Pexels, Pixabay, or Coverr as the background. Then click Generate video to composite your subject onto it and create the scene (~8s)."
           />
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "8px",
+                border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                background: "transparent",
+                color: "var(--p-color-text-primary, #202223)",
+                fontWeight: 600,
+                cursor: "pointer",
+                fontSize: "14px",
+              }}
+            >
+              ← Previous
+            </button>
+          </div>
           <div style={{ display: "flex", flexDirection: "row", gap: "24px", alignItems: "flex-start", flexWrap: "wrap" }}>
             <div style={{ flex: "1 1 260px", minWidth: "240px", display: "flex", flexDirection: "column", gap: "12px" }}>
-              <button
-                type="button"
-                onClick={() => setVideoModalOpen(true)}
-                style={{
-                  ...boxStyle,
-                  minHeight: "60px",
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                {selectedStockVideoUrl ? (
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                    <video
-                      src={selectedStockVideoUrl}
-                      style={{ width: "120px", height: "68px", objectFit: "cover", borderRadius: "6px" }}
-                      muted
-                      playsInline
-                    />
-                    <span style={{ fontSize: "14px", color: "var(--p-color-text-primary, #202223)" }}>Stock video selected</span>
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); setVideoModalOpen(true); }}
-                      style={{ padding: "4px 8px", fontSize: "12px", borderRadius: "4px", border: "1px solid #e1e3e5", background: "#fff", cursor: "pointer" }}
-                    >
-                      Change
-                    </button>
-                  </div>
-                ) : (
+              {selectedStockVideoUrl ? (
+                <div style={{ ...boxStyle, padding: "12px", display: "flex", flexDirection: "column", gap: "12px" }}>
+                  <p style={{ margin: 0, fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>Selected stock video</p>
+                  <video
+                    key={selectedStockVideoUrl}
+                    src={selectedStockVideoUrl}
+                    controls
+                    muted
+                    playsInline
+                    style={{
+                      width: "100%",
+                      maxHeight: "260px",
+                      objectFit: "contain",
+                      borderRadius: "8px",
+                      border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                      background: "#000",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setVideoModalOpen(true)}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                      background: "transparent",
+                      color: "var(--p-color-text-primary, #202223)",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      alignSelf: "flex-start",
+                    }}
+                  >
+                    Change video
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setVideoModalOpen(true)}
+                  style={{
+                    ...boxStyle,
+                    minHeight: "120px",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
                   <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Search stock videos (Pexels, Pixabay, Coverr)</span>
-                )}
-              </button>
+                </button>
+              )}
             </div>
             <div style={{ flex: "1 1 260px", minWidth: "240px", display: "flex", flexDirection: "column", gap: "8px" }}>
               {sceneLoading ? (
@@ -3919,7 +3987,7 @@ function Scene2Content({
                 </div>
               ) : (dbSceneVideoUrl ?? sceneVideo) ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <video src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "100%", maxHeight: "240px", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
+                  <video key={dbSceneVideoUrl ?? sceneVideo ?? ""} src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "100%", maxHeight: "240px", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                     <button
                       type="button"
@@ -3934,7 +4002,7 @@ function Scene2Content({
                         fontWeight: 600,
                       }}
                     >
-                      ← Previous step
+                      ← Previous
                     </button>
                     {onRegenerate && (
                       <button
@@ -3950,28 +4018,30 @@ function Scene2Content({
                           fontWeight: 600,
                         }}
                       >
-                        Regenerate
+                        Regenerate scene video
                       </button>
                     )}
                   </div>
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={handleGenerateVideo}
-                  disabled={!selectedStockVideoUrl || !effectiveOverlayUrl || !scene2Id || !shortUserId || sceneLoading}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: "8px",
-                    border: "none",
-                    background: !selectedStockVideoUrl || !effectiveOverlayUrl || !scene2Id ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
-                    color: "#fff",
-                    fontWeight: 600,
-                    cursor: !selectedStockVideoUrl || !effectiveOverlayUrl || !scene2Id ? "not-allowed" : "pointer",
-                  }}
-                >
-                  Generate video
-                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={handleGenerateVideo}
+                    disabled={!selectedStockVideoUrl || !effectiveOverlayUrl || !scene2Id || !shortUserId || sceneLoading}
+                    style={{
+                      padding: "10px 20px",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: !selectedStockVideoUrl || !effectiveOverlayUrl || !scene2Id ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
+                      color: "#fff",
+                      fontWeight: 600,
+                      cursor: !selectedStockVideoUrl || !effectiveOverlayUrl || !scene2Id ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    Generate video
+                  </button>
+                </div>
               )}
               {sceneError && (
                 <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{sceneError}</span>
@@ -4364,26 +4434,43 @@ function Scene3Content({
             {(bgRemoved || skipRemoveBg) && (
               <>
                 {bgRemoved && (
-                  <img src={bgRemoved} alt="BG removed" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
+                  <img key={bgRemoved} src={bgRemoved} alt="BG removed" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
                 )}
                 {skipRemoveBg && !bgRemoved && (
                   <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Using image as-is</span>
                 )}
-                <button
-                  type="button"
-                  onClick={() => setStep(2)}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: "8px",
-                    border: "none",
-                    background: "var(--p-color-bg-fill-info, #2c6ecb)",
-                    color: "#fff",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Next step →
-                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <button
+                    type="button"
+                    onClick={() => { setBgRemoved(null); setSkipRemoveBg(false); }}
+                    style={{
+                      padding: "10px 20px",
+                      borderRadius: "8px",
+                      border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                      background: "transparent",
+                      color: "var(--p-color-text-primary, #202223)",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Undo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    style={{
+                      padding: "10px 20px",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: "var(--p-color-bg-fill-info, #2c6ecb)",
+                      color: "#fff",
+                      fontWeight: 600,
+                      cursor: "pointer",
+                    }}
+                  >
+                    Next step →
+                  </button>
+                </div>
               </>
             )}
           </div>
@@ -4398,6 +4485,24 @@ function Scene3Content({
             title="Add a background (Scene 3 style)"
             description="Generate a new background or fetch one from the library. Then click Composite to combine the subject with the chosen background. A different Remotion style will be applied in the next step."
           />
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+            <button
+              type="button"
+              onClick={() => setStep(1)}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "8px",
+                border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                background: "transparent",
+                color: "var(--p-color-text-primary, #202223)",
+                fontWeight: 600,
+                cursor: "pointer",
+                fontSize: "14px",
+              }}
+            >
+              ← Previous
+            </button>
+          </div>
           <div style={twoPartLayout}>
             <div style={{ ...boxStyle, borderRight: "none", borderTopRightRadius: 0, borderBottomRightRadius: 0 }}>
               {effectiveOverlayUrl ? (
@@ -4501,11 +4606,11 @@ function Scene3Content({
           )}
           {composited && (
             <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-              <img src={composited} alt="Composited" style={{ width: "200px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
+              <img key={composited} src={composited} alt="Composited" style={{ width: "200px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <button
                   type="button"
-                  onClick={() => setStep(1)}
+                  onClick={() => setComposited(null)}
                   style={{
                     padding: "10px 20px",
                     borderRadius: "8px",
@@ -4516,7 +4621,7 @@ function Scene3Content({
                     cursor: "pointer",
                   }}
                 >
-                  ← Previous step
+                  Undo
                 </button>
                 <button
                   type="button"
@@ -4547,10 +4652,28 @@ function Scene3Content({
             title="Generate scene video (different style)"
             description="Create the ~8 second video for this scene from the composited image using Remotion with a different style than Scene 1. Click Generate scene to start."
           />
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+            <button
+              type="button"
+              onClick={() => setStep(2)}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "8px",
+                border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                background: "transparent",
+                color: "var(--p-color-text-primary, #202223)",
+                fontWeight: 600,
+                cursor: "pointer",
+                fontSize: "14px",
+              }}
+            >
+              ← Previous
+            </button>
+          </div>
           <div style={twoPartLayout}>
             <div style={{ ...boxStyle, borderRight: "none", borderTopRightRadius: 0, borderBottomRightRadius: 0 }}>
               {composited ? (
-                <img src={composited} alt="Composited" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
+                <img key={composited} src={composited} alt="Composited" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
               ) : (
                 <img src={`${BASE}/scene3-compositied.png`} alt="Composited" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
               )}
@@ -4576,7 +4699,7 @@ function Scene3Content({
                 </div>
               ) : (dbSceneVideoUrl ?? sceneVideo) ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <video src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
+                  <video key={dbSceneVideoUrl ?? sceneVideo ?? ""} src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                     <button
                       type="button"
@@ -4591,7 +4714,7 @@ function Scene3Content({
                         fontWeight: 600,
                       }}
                     >
-                      ← Previous step
+                      ← Previous
                     </button>
                     {onRegenerate && (
                       <button
@@ -4607,28 +4730,30 @@ function Scene3Content({
                           fontWeight: 600,
                         }}
                       >
-                        Regenerate
+                        Regenerate scene video
                       </button>
                     )}
                   </div>
                 </div>
               ) : (
-                <button
-                  type="button"
-                  onClick={handleGenerateScene}
-                  disabled={!composited || !shortId || !shortUserId}
-                  style={{
-                    padding: "12px 24px",
-                    borderRadius: "8px",
-                    border: "none",
-                    background: !composited || !shortId ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
-                    color: "#fff",
-                    fontWeight: 600,
-                    cursor: !composited || !shortId ? "not-allowed" : "pointer",
-                  }}
-                >
-                  Generate scene
-                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={handleGenerateScene}
+                    disabled={!composited || !shortId || !shortUserId}
+                    style={{
+                      padding: "12px 24px",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: !composited || !shortId ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
+                      color: "#fff",
+                      fontWeight: 600,
+                      cursor: !composited || !shortId ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    Generate scene
+                  </button>
+                </div>
               )}
             </div>
           </div>
