@@ -3261,8 +3261,11 @@ function Scene1Content({
   const bgImageFromDb = isImageMedia1 ? (m1 as { url: string }).url : null;
   const [bgImage, setBgImage] = useState<string | null>(initialScene1?.bgImage ?? bgImageFromDb ?? null);
   useEffect(() => {
-    if (bgImageFromDb && !initialScene1?.bgImage) setBgImage((prev) => prev || bgImageFromDb);
-  }, [bgImageFromDb, initialScene1?.bgImage]);
+    setBgImage(bgImageFromDb ?? null);
+  }, [bgImageFromDb]);
+  useEffect(() => {
+    setBgRemoved(dbBgRemovedUrl ?? null);
+  }, [dbBgRemovedUrl]);
   useEffect(() => {
     if (bgImageFromDb && stepFromStatus === 1) setStep(2);
   }, [bgImageFromDb, stepFromStatus]);
@@ -3273,8 +3276,11 @@ function Scene1Content({
   const compositedFromDb = stepFromStatus >= 2 && dbImageUrl ? dbImageUrl : null;
   const [composited, setComposited] = useState<string | null>(initialScene1?.composited ?? compositedFromDb ?? null);
   useEffect(() => {
-    if (stepFromStatus >= 2 && dbImageUrl && !initialScene1?.composited) setComposited((prev) => prev || dbImageUrl);
-  }, [stepFromStatus, dbImageUrl, initialScene1?.composited]);
+    if (stepFromStatus >= 2 && dbImageUrl) setComposited((prev) => prev || dbImageUrl);
+  }, [stepFromStatus, dbImageUrl]);
+  useEffect(() => {
+    if (dbImageUrl) setComposited((prev) => prev || dbImageUrl);
+  }, [dbImageUrl]);
   const [compositeLoading, setCompositeLoading] = useState(false);
   const [compositeError, setCompositeError] = useState<string | null>(null);
   const [sceneVideo, setSceneVideo] = useState<string | null>(initialScene1?.sceneVideo ?? null);
@@ -3966,12 +3972,12 @@ function Scene2Content({
   const videoUrlFromDb = isVideoMedia2 ? (m2 as { url: string }).url : null;
   const videoDownloadUrlFromDb = isVideoMedia2 && "downloadUrl" in m2 ? (m2 as { downloadUrl?: string }).downloadUrl ?? null : null;
   const [selectedStockVideoUrl, setSelectedStockVideoUrl] = useState<string | null>(initialScene2?.selectedStockVideoUrl ?? videoUrlFromDb ?? null);
-  useEffect(() => {
-    if (videoUrlFromDb && !initialScene2?.selectedStockVideoUrl) setSelectedStockVideoUrl((prev) => prev || videoUrlFromDb);
-  }, [videoUrlFromDb, initialScene2?.selectedStockVideoUrl]);
   const [selectedStockVideoDownloadUrl, setSelectedStockVideoDownloadUrl] = useState<string | null>(videoDownloadUrlFromDb ?? null);
   useEffect(() => {
-    if (videoDownloadUrlFromDb) setSelectedStockVideoDownloadUrl((prev) => prev || videoDownloadUrlFromDb);
+    setSelectedStockVideoUrl(videoUrlFromDb ?? null);
+  }, [videoUrlFromDb]);
+  useEffect(() => {
+    setSelectedStockVideoDownloadUrl(videoDownloadUrlFromDb ?? null);
   }, [videoDownloadUrlFromDb]);
   useEffect(() => {
     if (videoUrlFromDb && stepFromStatus === 1) setStep(2);
@@ -4499,8 +4505,11 @@ function Scene3Content({
   const bgImageFromDbScene3 = isImageMedia3 ? (m3 as { url: string }).url : null;
   const [bgImage, setBgImage] = useState<string | null>(initialScene3?.bgImage ?? bgImageFromDbScene3 ?? null);
   useEffect(() => {
-    if (bgImageFromDbScene3 && !initialScene3?.bgImage) setBgImage((prev) => prev || bgImageFromDbScene3);
-  }, [bgImageFromDbScene3, initialScene3?.bgImage]);
+    setBgImage(bgImageFromDbScene3 ?? null);
+  }, [bgImageFromDbScene3]);
+  useEffect(() => {
+    setBgRemoved(dbBgRemovedUrl ?? null);
+  }, [dbBgRemovedUrl]);
   useEffect(() => {
     if (bgImageFromDbScene3 && stepFromStatus === 1) setStep(2);
   }, [bgImageFromDbScene3, stepFromStatus]);
@@ -4511,8 +4520,11 @@ function Scene3Content({
   const compositedFromDbScene3 = stepFromStatus >= 2 && dbImageUrl ? dbImageUrl : null;
   const [composited, setComposited] = useState<string | null>(initialScene3?.composited ?? compositedFromDbScene3 ?? null);
   useEffect(() => {
-    if (stepFromStatus >= 2 && dbImageUrl && !initialScene3?.composited) setComposited((prev) => prev || dbImageUrl);
-  }, [stepFromStatus, dbImageUrl, initialScene3?.composited]);
+    if (stepFromStatus >= 2 && dbImageUrl) setComposited((prev) => prev || dbImageUrl);
+  }, [stepFromStatus, dbImageUrl]);
+  useEffect(() => {
+    if (dbImageUrl) setComposited((prev) => prev || dbImageUrl);
+  }, [dbImageUrl]);
   const [compositeLoading, setCompositeLoading] = useState(false);
   const [compositeError, setCompositeError] = useState<string | null>(null);
   const [sceneVideo, setSceneVideo] = useState<string | null>(initialScene3?.sceneVideo ?? null);
