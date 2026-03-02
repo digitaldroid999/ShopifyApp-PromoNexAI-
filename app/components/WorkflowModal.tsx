@@ -2087,10 +2087,6 @@ export function WorkflowModal({
       setFinalizeError("Short not loaded. Please close and reopen the workflow.");
       return;
     }
-    if (displayedFinalVideoUrl) {
-      setShowingFinal(true);
-      return;
-    }
     setFinalizeError(null);
     setFinalizeLoading(true);
     setFinalizeProgress(0);
@@ -2137,6 +2133,7 @@ export function WorkflowModal({
               body: JSON.stringify({ short_id: shortId, final_video_url: url }),
             });
             console.log("[Finalize] saved final_video_url to short_id=", shortId);
+            refetchShort();
           } catch (e) {
             console.error("[Finalize] Failed to save final video URL:", e);
           }
@@ -2925,7 +2922,9 @@ export function WorkflowModal({
                 }}
               >
                 <p style={{ margin: "0 0 16px", fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>
-                  All scenes and audio are ready. Click below to merge into the final video.
+                  {displayedFinalVideoUrl
+                    ? "Merge again to create a new final video from the current scenes and audio."
+                    : "All scenes and audio are ready. Click below to merge into the final video."}
                 </p>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "8px" }}>
                   <button
@@ -2943,7 +2942,7 @@ export function WorkflowModal({
                       fontSize: "14px",
                     }}
                   >
-                    {finalizeLoading ? "Merging…" : "Finalize"}
+                    {finalizeLoading ? "Merging…" : displayedFinalVideoUrl ? "Re-finalize" : "Finalize"}
                   </button>
                   {finalizeProgress != null && (
                     <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>{finalizeProgress}%</span>
