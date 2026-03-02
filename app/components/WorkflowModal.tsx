@@ -3502,6 +3502,23 @@ function Scene1Content({
                     >
                       ← Previous
                     </button>
+                    <button
+                      type="button"
+                      onClick={handleGenerateScene}
+                      disabled={!composited || sceneLoading}
+                      style={{
+                        padding: "8px 16px",
+                        borderRadius: "8px",
+                        border: "none",
+                        background: composited && !sceneLoading ? "var(--p-color-bg-fill-info, #2c6ecb)" : "#9ca3af",
+                        color: "#fff",
+                        cursor: composited && !sceneLoading ? "pointer" : "not-allowed",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {sceneLoading ? "Generating…" : "Generate scene again"}
+                    </button>
                     {onRegenerate && (
                       <button
                         type="button"
@@ -3516,7 +3533,7 @@ function Scene1Content({
                           fontWeight: 600,
                         }}
                       >
-                        Regenerate scene video
+                        Start from scratch
                       </button>
                     )}
                   </div>
@@ -3981,6 +3998,23 @@ function Scene2Content({
                     >
                       ← Previous
                     </button>
+                    <button
+                      type="button"
+                      onClick={handleGenerateVideo}
+                      disabled={!selectedStockVideoUrl || !effectiveOverlayUrl || !scene2Id || !shortUserId || sceneLoading}
+                      style={{
+                        padding: "8px 16px",
+                        borderRadius: "8px",
+                        border: "none",
+                        background: selectedStockVideoUrl && effectiveOverlayUrl && scene2Id && shortUserId && !sceneLoading ? "var(--p-color-bg-fill-info, #2c6ecb)" : "#9ca3af",
+                        color: "#fff",
+                        cursor: selectedStockVideoUrl && effectiveOverlayUrl && scene2Id && shortUserId && !sceneLoading ? "pointer" : "not-allowed",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {sceneLoading ? "Generating…" : "Generate video again"}
+                    </button>
                     {onRegenerate && (
                       <button
                         type="button"
@@ -3995,7 +4029,7 @@ function Scene2Content({
                           fontWeight: 600,
                         }}
                       >
-                        Regenerate scene video
+                        Start from scratch
                       </button>
                     )}
                   </div>
@@ -4693,6 +4727,23 @@ function Scene3Content({
                     >
                       ← Previous
                     </button>
+                    <button
+                      type="button"
+                      onClick={handleGenerateScene}
+                      disabled={!composited || !shortId || !shortUserId || sceneLoading}
+                      style={{
+                        padding: "8px 16px",
+                        borderRadius: "8px",
+                        border: "none",
+                        background: composited && shortId && shortUserId && !sceneLoading ? "var(--p-color-bg-fill-info, #2c6ecb)" : "#9ca3af",
+                        color: "#fff",
+                        cursor: composited && shortId && shortUserId && !sceneLoading ? "pointer" : "not-allowed",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                      }}
+                    >
+                      {sceneLoading ? "Generating…" : "Generate scene again"}
+                    </button>
                     {onRegenerate && (
                       <button
                         type="button"
@@ -4707,7 +4758,7 @@ function Scene3Content({
                           fontWeight: 600,
                         }}
                       >
-                        Regenerate scene video
+                        Start from scratch
                       </button>
                     )}
                   </div>
