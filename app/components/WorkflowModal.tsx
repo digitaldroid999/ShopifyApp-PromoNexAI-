@@ -1381,12 +1381,11 @@ function FetchVideoModal({
 
   const handleSelect = (item: (typeof videos)[0]) => {
     if (forScene2Merge) {
-      // Display: use preview URL so the video plays in the <video> element.
-      // Merge API: use download URL (direct file) for background_video_url.
-      const displayUrl = item.preview_url || item.download_url;
+      // Use download URL for both playback and merge so the video plays after refresh (preview_url is often not a direct file).
+      const playableUrl = item.download_url || item.preview_url;
       const downloadUrl = item.download_url || item.preview_url;
-      if (displayUrl) {
-        onSelect(displayUrl, { downloadUrl, id: item.id });
+      if (playableUrl) {
+        onSelect(playableUrl, { downloadUrl, id: item.id });
         onClose();
       }
     } else {
