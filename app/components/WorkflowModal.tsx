@@ -1873,6 +1873,20 @@ export function WorkflowModal({
     [refetchShort]
   );
 
+  /** Save scene image_url (e.g. composited image URL) to DB immediately then refetch. */
+  const updateSceneImageUrl = useCallback(
+    async (sceneId: string, imageUrl: string) => {
+      const res = await fetch(SHORTS_SCENES_API, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ sceneId, imageUrl }),
+      });
+      if (res.ok) refetchShort();
+    },
+    [refetchShort]
+  );
+
   /** Go to previous step: show platform confirm modal, then PATCH goPrevious and refetch. */
   const goPreviousWithConfirm = useCallback((sceneId: string) => {
     setConfirmGoPrevious({
@@ -2913,6 +2927,7 @@ export function WorkflowModal({
                   onSkipRemoveBgWarning={showSkipRemoveBgWarning}
                   updateSceneStatus={updateSceneStatus}
                   updateSceneFetchedMedia={updateSceneFetchedMedia}
+                  updateSceneImageUrl={updateSceneImageUrl}
                   goPreviousWithConfirm={goPreviousWithConfirm}
                   getNextStatus={getNextStatusScene13}
                 />
@@ -2962,6 +2977,7 @@ export function WorkflowModal({
                   onSkipRemoveBgWarning={showSkipRemoveBgWarning}
                   updateSceneStatus={updateSceneStatus}
                   updateSceneFetchedMedia={updateSceneFetchedMedia}
+                  updateSceneImageUrl={updateSceneImageUrl}
                   goPreviousWithConfirm={goPreviousWithConfirm}
                   getNextStatus={getNextStatusScene13}
                 />
@@ -3152,6 +3168,7 @@ function Scene1Content({
   onSkipRemoveBgWarning,
   updateSceneStatus,
   updateSceneFetchedMedia,
+  updateSceneImageUrl,
   goPreviousWithConfirm,
   getNextStatus,
 }: {
@@ -3172,6 +3189,7 @@ function Scene1Content({
   onSkipRemoveBgWarning?: () => void;
   updateSceneStatus?: (sceneId: string, status: string) => void | Promise<void>;
   updateSceneFetchedMedia?: (sceneId: string, media: FetchedMediaSnapshot) => void | Promise<void>;
+  updateSceneImageUrl?: (sceneId: string, imageUrl: string) => void | Promise<void>;
   goPreviousWithConfirm?: (sceneId: string) => void | Promise<void>;
   getNextStatus?: (current: string) => string | null;
 }) {
@@ -3195,7 +3213,11 @@ function Scene1Content({
   const [bgError, setBgError] = useState<string | null>(null);
   const [fetchModalOpen, setFetchModalOpen] = useState(false);
   const [aiBgModalOpen, setAiBgModalOpen] = useState(false);
-  const [composited, setComposited] = useState<string | null>(initialScene1?.composited ?? null);
+  const compositedFromDb = stepFromStatus >= 2 && dbImageUrl ? dbImageUrl : null;
+  const [composited, setComposited] = useState<string | null>(initialScene1?.composited ?? compositedFromDb ?? null);
+  useEffect(() => {
+    if (stepFromStatus >= 2 && dbImageUrl && !initialScene1?.composited) setComposited((prev) => prev || dbImageUrl);
+  }, [stepFromStatus, dbImageUrl, initialScene1?.composited]);
   const [compositeLoading, setCompositeLoading] = useState(false);
   const [compositeError, setCompositeError] = useState<string | null>(null);
   const [sceneVideo, setSceneVideo] = useState<string | null>(initialScene1?.sceneVideo ?? null);
@@ -3356,8 +3378,11 @@ function Scene1Content({
       const result = await parseCompositeApiResponse(res);
       console.log(`[Composite] ${sceneLabel}: parsed result`, result);
       if (result.ok) {
-        setComposited(result.image_url);
-        console.log(`[Composite] ${sceneLabel}: success → composited image URL:`, result.image_url);
+        const compositedUrl = result.image_url;
+        setComposited(compositedUrl);
+        const fullCompositedUrl = compositedUrl.startsWith("http") ? compositedUrl : `${origin}${compositedUrl}`;
+        if (videoSceneId && updateSceneImageUrl) updateSceneImageUrl(videoSceneId, fullCompositedUrl);
+        console.log(`[Composite] ${sceneLabel}: success → composited image URL saved to DB`);
       } else {
         setCompositeError(result.error);
         console.warn(`[Composite] ${sceneLabel}: failed`, result.error);
@@ -4330,8 +4355,9 @@ function Scene2Content({
             forScene2Merge
             onSelect={(url, options) => {
               setSelectedStockVideoUrl(url);
-              setSelectedStockVideoDownloadUrl(options?.downloadUrl ?? url);
-              if (scene2Id && updateSceneFetchedMedia && options?.id) updateSceneFetchedMedia(scene2Id, { type: "video", id: options.id, url, downloadUrl: options?.downloadUrl });
+              const downloadUrl = options?.downloadUrl ?? url;
+              setSelectedStockVideoDownloadUrl(downloadUrl);
+              if (scene2Id && updateSceneFetchedMedia) updateSceneFetchedMedia(scene2Id, { type: "video", id: options?.id, url, downloadUrl });
               if (scene2Id && updateSceneStatus) updateSceneStatus(scene2Id, "bg_video_fetched");
               setVideoModalOpen(false);
             }}
@@ -4362,6 +4388,7 @@ function Scene3Content({
   onSkipRemoveBgWarning,
   updateSceneStatus,
   updateSceneFetchedMedia,
+  updateSceneImageUrl,
   goPreviousWithConfirm,
   getNextStatus,
 }: {
@@ -4382,6 +4409,7 @@ function Scene3Content({
   onSkipRemoveBgWarning?: () => void;
   updateSceneStatus?: (sceneId: string, status: string) => void | Promise<void>;
   updateSceneFetchedMedia?: (sceneId: string, media: FetchedMediaSnapshot) => void | Promise<void>;
+  updateSceneImageUrl?: (sceneId: string, imageUrl: string) => void | Promise<void>;
   goPreviousWithConfirm?: (sceneId: string) => void | Promise<void>;
   getNextStatus?: (current: string) => string | null;
 }) {
@@ -4405,7 +4433,11 @@ function Scene3Content({
   const [bgError, setBgError] = useState<string | null>(null);
   const [fetchModalOpen, setFetchModalOpen] = useState(false);
   const [aiBgModalOpen, setAiBgModalOpen] = useState(false);
-  const [composited, setComposited] = useState<string | null>(initialScene3?.composited ?? null);
+  const compositedFromDbScene3 = stepFromStatus >= 2 && dbImageUrl ? dbImageUrl : null;
+  const [composited, setComposited] = useState<string | null>(initialScene3?.composited ?? compositedFromDbScene3 ?? null);
+  useEffect(() => {
+    if (stepFromStatus >= 2 && dbImageUrl && !initialScene3?.composited) setComposited((prev) => prev || dbImageUrl);
+  }, [stepFromStatus, dbImageUrl, initialScene3?.composited]);
   const [compositeLoading, setCompositeLoading] = useState(false);
   const [compositeError, setCompositeError] = useState<string | null>(null);
   const [sceneVideo, setSceneVideo] = useState<string | null>(initialScene3?.sceneVideo ?? null);
@@ -4566,8 +4598,11 @@ function Scene3Content({
       const result = await parseCompositeApiResponse(res);
       console.log(`[Composite] ${sceneLabel}: parsed result`, result);
       if (result.ok) {
-        setComposited(result.image_url);
-        console.log(`[Composite] ${sceneLabel}: success → composited image URL:`, result.image_url);
+        const compositedUrl = result.image_url;
+        setComposited(compositedUrl);
+        const fullCompositedUrl = compositedUrl.startsWith("http") ? compositedUrl : `${origin}${compositedUrl}`;
+        if (videoSceneId && updateSceneImageUrl) updateSceneImageUrl(videoSceneId, fullCompositedUrl);
+        console.log(`[Composite] ${sceneLabel}: success → composited image URL saved to DB`);
       } else {
         setCompositeError(result.error);
         console.warn(`[Composite] ${sceneLabel}: failed`, result.error);
