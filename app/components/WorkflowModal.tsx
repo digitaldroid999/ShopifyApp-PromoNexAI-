@@ -2680,7 +2680,7 @@ export function WorkflowModal({
                                     padding: "6px 10px",
                                     border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
                                     borderRadius: "6px",
-                                    b ackground: scriptGenerateLoading ? "#9ca3af" : "#fff",
+                                    background: scriptGenerateLoading ? "#9ca3af" : "#fff",
                                     color: "var(--p-color-text-primary, #202223)",
                                     cursor: scriptGenerateLoading || !selectedVoiceId ? "not-allowed" : "pointer",
                                     fontSize: "12px",
