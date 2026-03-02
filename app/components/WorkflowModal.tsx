@@ -1681,7 +1681,7 @@ export type FetchedMediaSnapshot =
   | { type: "image"; id?: string; url: string; source?: "generated" }
   | { type: "video"; id?: string; url: string; downloadUrl?: string };
 
-/** Scene 1/3: status → UI step (1, 2, or 3). "pending" treated as step1. */
+/** Scene 1/3: status → UI step (1, 2, or 3). When status is bg_removed, UI stays in step 1 flow. */
 function scene13StatusToStep(status: string | null | undefined): number {
   const s = (status ?? "step1").trim() || "step1";
   if (s === "step1" || s === "bg_removed") return 1;
@@ -3276,8 +3276,8 @@ function Scene1Content({
     setBgRemoved(dbBgRemovedUrl ?? null);
   }, [dbBgRemovedUrl]);
   useEffect(() => {
-    if (bgImageFromDb && stepFromStatus === 1) setStep(2);
-  }, [bgImageFromDb, stepFromStatus]);
+    if (bgImageFromDb && stepFromStatus === 1 && (sceneStatus?.trim() || "step1") !== "bg_removed") setStep(2);
+  }, [bgImageFromDb, stepFromStatus, sceneStatus]);
   const [bgLoading, setBgLoading] = useState(false);
   const [bgError, setBgError] = useState<string | null>(null);
   const [fetchModalOpen, setFetchModalOpen] = useState(false);
@@ -4530,8 +4530,8 @@ function Scene3Content({
     setBgRemoved(dbBgRemovedUrl ?? null);
   }, [dbBgRemovedUrl]);
   useEffect(() => {
-    if (bgImageFromDbScene3 && stepFromStatus === 1) setStep(2);
-  }, [bgImageFromDbScene3, stepFromStatus]);
+    if (bgImageFromDbScene3 && stepFromStatus === 1 && (sceneStatus?.trim() || "step1") !== "bg_removed") setStep(2);
+  }, [bgImageFromDbScene3, stepFromStatus, sceneStatus]);
   const [bgLoading, setBgLoading] = useState(false);
   const [bgError, setBgError] = useState<string | null>(null);
   const [fetchModalOpen, setFetchModalOpen] = useState(false);
