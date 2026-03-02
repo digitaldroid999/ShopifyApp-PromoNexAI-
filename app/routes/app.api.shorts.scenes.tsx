@@ -1,15 +1,23 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import {
+  getScene13PreviousStatus,
+  getScene2PreviousStatus,
+  getScene13ClearFieldsWhenGoingPrevious,
+  getScene2ClearFieldsWhenGoingPrevious,
+  SCENE13_STATUSES,
+  SCENE2_STATUSES,
+} from "../services/sceneStatus.server";
 
 const DEFAULT_DURATION_SEC = 8;
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   await authenticate.admin(request);
 
-  // PATCH: update scene imageUrl (composited image URL) or reset scene to default
+  // PATCH: update scene imageUrl, status, reset, or goPrevious (clear current step data and set previous status)
   if (request.method === "PATCH") {
-    let body: { sceneId?: string; imageUrl?: string; reset?: boolean };
+    let body: { sceneId?: string; imageUrl?: string; reset?: boolean; status?: string; goPrevious?: boolean };
     try {
       body = await request.json();
     } catch {
@@ -28,17 +36,53 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           data: {
             imageUrl: null,
             generatedVideoUrl: null,
-            status: "pending",
+            status: "step1",
           },
         });
         return Response.json({ ok: true, reset: true });
       }
+      if (body.goPrevious === true) {
+        const scene = await videoScene.findUnique({ where: { id: sceneId }, select: { sceneNumber: true, status: true } });
+        if (!scene) {
+          return Response.json({ error: "Scene not found" }, { status: 404 });
+        }
+        const currentStatus = (scene.status?.trim() || "step1") as string;
+        const sceneNumber = scene.sceneNumber as 1 | 2 | 3;
+        const prevStatus: string | null =
+          sceneNumber === 2
+            ? getScene2PreviousStatus(currentStatus)
+            : getScene13PreviousStatus(currentStatus);
+        if (!prevStatus) {
+          return Response.json({ ok: true, status: currentStatus, goPrevious: false, message: "Already at first step" });
+        }
+        const clearFields =
+          sceneNumber === 2
+            ? getScene2ClearFieldsWhenGoingPrevious(currentStatus)
+            : getScene13ClearFieldsWhenGoingPrevious(currentStatus);
+        const data: { status: string; imageUrl?: null; generatedVideoUrl?: null } = { status: prevStatus };
+        if (clearFields.imageUrl) data.imageUrl = null;
+        if (clearFields.generatedVideoUrl) data.generatedVideoUrl = null;
+        await videoScene.update({ where: { id: sceneId }, data });
+        return Response.json({ ok: true, status: prevStatus, goPrevious: true });
+      }
       const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl.trim() : undefined;
+      const status =
+        typeof body.status === "string" && body.status.trim()
+          ? body.status.trim()
+          : undefined;
+      const validScene13 = status && SCENE13_STATUSES.includes(status as never);
+      const validScene2 = status && SCENE2_STATUSES.includes(status as never);
+      const data: { imageUrl?: string | null; status?: string } = {};
+      if (imageUrl !== undefined) data.imageUrl = imageUrl ?? null;
+      if (status && (validScene13 || validScene2)) data.status = status;
+      if (Object.keys(data).length === 0) {
+        return Response.json({ ok: true });
+      }
       await videoScene.update({
         where: { id: sceneId },
-        data: { imageUrl: imageUrl ?? null },
+        data,
       });
-      return Response.json({ ok: true });
+      return Response.json({ ok: true, ...(data.status ? { status: data.status } : {}) });
     } catch (err) {
       console.error("[app.api.shorts.scenes] VideoScene update failed:", err);
       return Response.json(
@@ -108,7 +152,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         shortId,
         sceneNumber,
         duration: DEFAULT_DURATION_SEC,
-        status: "pending",
+        status: "step1",
       },
     });
     return Response.json({ sceneId: scene.id, created: true });

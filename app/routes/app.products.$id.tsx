@@ -339,18 +339,26 @@ export default function ProductDetail() {
                 ) : null}
                 <div style={{ marginTop: "8px", paddingTop: "16px", borderTop: "1px solid var(--p-color-border-secondary, #e1e3e5)" }}>
                   <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "8px" }}>
-                    <s-button variant="primary" onClick={handleOpenWorkflow}>
-                      {shortStatus === "ready" && finalVideoUrl
-                        ? "Edit video"
-                        : hasShort
-                          ? "Continue"
-                          : "Create promo video"}
-                    </s-button>
-                    {(shortStatus === "ready" && finalVideoUrl) || hasShort ? (
-                      <s-button variant="secondary" onClick={handleStartFromScratch}>
+                    {shortStatus === "completed" ? (
+                      <s-button variant="primary" onClick={handleStartFromScratch}>
                         Start from scratch
                       </s-button>
-                    ) : null}
+                    ) : (
+                      <>
+                        <s-button variant="primary" onClick={handleOpenWorkflow}>
+                          {(shortStatus === "finished" && finalVideoUrl) || (shortStatus === "in_progress" && hasShort)
+                            ? "Edit video"
+                            : hasShort
+                              ? "Continue"
+                              : "Create promo video"}
+                        </s-button>
+                        {hasShort ? (
+                          <s-button variant="secondary" onClick={handleStartFromScratch}>
+                            Start from scratch
+                          </s-button>
+                        ) : null}
+                      </>
+                    )}
                   </div>
                   <div style={{ marginTop: "8px" }}>
                     <Link to="/app" style={{ display: "block" }}>
@@ -375,9 +383,12 @@ export default function ProductDetail() {
             price: getProductPrice(product),
             rating: getProductRating(product),
           }}
-          openAsEdit={shortStatus === "ready" && !!finalVideoUrl}
+          openAsEdit={(shortStatus === "finished" || shortStatus === "in_progress") && !!hasShort}
           onClose={() => setWorkflowOpen(false)}
-          onDone={(videoUrl) => setProductVideoUrl(videoUrl)}
+          onDone={(videoUrl) => {
+            setProductVideoUrl(videoUrl);
+            if (product?.id) shortsFetcher.load(`${SHORTS_API}?productId=${encodeURIComponent(product.id)}`);
+          }}
         />
       )}
     </>

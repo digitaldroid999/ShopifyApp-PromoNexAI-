@@ -40,7 +40,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         finalVideoUrl?: { not: null };
       } = {
         userId: shop,
-        status: "ready",
+        status: "finished",
         finalVideoUrl: { not: null },
       };
       if (productIdFilter) {
@@ -88,7 +88,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       });
 
       const allReady = await shortDelegate.findMany({
-        where: { userId: shop, status: "ready", finalVideoUrl: { not: null } },
+        where: { userId: shop, status: "finished", finalVideoUrl: { not: null } },
         select: { productId: true, title: true },
       }) as { productId: string | null; title: string }[];
       const seen = new Set<string>();

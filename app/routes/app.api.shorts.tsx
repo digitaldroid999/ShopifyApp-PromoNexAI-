@@ -20,9 +20,23 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     },
   });
   if (!short) {
-    return Response.json({ shortId: null, userId: null, status: null, scene1Id: null, scene2Id: null, scene3Id: null, audioInfo: null, bgMusic: null, scene1GeneratedVideoUrl: null, scene2GeneratedVideoUrl: null, scene3GeneratedVideoUrl: null, finalVideoUrl: null });
+    return Response.json({ shortId: null, userId: null, status: null, scene1Id: null, scene2Id: null, scene3Id: null, scene1Status: null, scene2Status: null, scene3Status: null, audioInfo: null, bgMusic: null, scene1GeneratedVideoUrl: null, scene2GeneratedVideoUrl: null, scene3GeneratedVideoUrl: null, finalVideoUrl: null });
   }
+  // When loading a short that is still draft, mark as in_progress (user is working on it)
+  const currentStatus = (short as { status?: string }).status?.trim() || "draft";
+  if (currentStatus === "draft") {
+    try {
+      await shortDelegate.update({
+        where: { id: short.id },
+        data: { status: "in_progress" },
+      });
+    } catch {
+      // ignore
+    }
+  }
+  const resolvedStatus = currentStatus === "draft" ? "in_progress" : currentStatus;
   const [s1, s2, s3] = short.scenes;
+  const sceneStatus = (s: { status?: string } | undefined) => (s?.status?.trim() || "step1");
   const audioInfo = (short as { audioInfo?: { voiceId: string | null; voiceName: string | null; audioScript: string | null; generatedAudioUrl: string | null; subtitles: unknown } | null }).audioInfo;
   const metadata = short.metadata as {
     bgMusic?: {
@@ -38,6 +52,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   } | null;
   const bgMusic = metadata?.bgMusic ?? null;
   const sceneWithUrl = (s: { generatedVideoUrl?: string | null } | undefined) => (s?.generatedVideoUrl?.trim() ? s.generatedVideoUrl : null) ?? null;
+  const sceneImageUrl = (s: { imageUrl?: string | null } | undefined) => (s?.imageUrl?.trim() ? s.imageUrl : null) ?? null;
   const finalVideoUrl = (short as { finalVideoUrl?: string | null }).finalVideoUrl?.trim() || null;
   const bgMusicPayload = bgMusic && typeof bgMusic === "object"
     ? {
@@ -52,10 +67,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return Response.json({
     shortId: short.id,
     userId: short.userId ?? null,
-    status: (short as { status?: string }).status ?? "draft",
+    status: resolvedStatus,
     scene1Id: s1?.id ?? null,
     scene2Id: s2?.id ?? null,
     scene3Id: s3?.id ?? null,
+    scene1Status: sceneStatus(s1),
+    scene2Status: sceneStatus(s2),
+    scene3Status: sceneStatus(s3),
+    scene1ImageUrl: sceneImageUrl(s1),
+    scene2ImageUrl: sceneImageUrl(s2),
+    scene3ImageUrl: sceneImageUrl(s3),
     scene1GeneratedVideoUrl: sceneWithUrl(s1),
     scene2GeneratedVideoUrl: sceneWithUrl(s2),
     scene3GeneratedVideoUrl: sceneWithUrl(s3),
@@ -107,6 +128,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const [s1, s2, s3] = existing.scenes;
       const audioInfo = (existing as { audioInfo?: { voiceId: string | null; voiceName: string | null; audioScript: string | null; generatedAudioUrl: string | null; subtitles: unknown } | null }).audioInfo;
       const sceneWithUrl = (s: { generatedVideoUrl?: string | null } | undefined) => (s?.generatedVideoUrl?.trim() ? s.generatedVideoUrl : null) ?? null;
+      const sceneImageUrl = (s: { imageUrl?: string | null } | undefined) => (s?.imageUrl?.trim() ? s.imageUrl : null) ?? null;
       const meta = existing.metadata as {
         bgMusic?: {
           id?: string | null;
@@ -130,6 +152,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
             downloadUrl: bgMusicExisting.downloadUrl ?? bgMusicExisting.previewUrl ?? bgMusicExisting.preview_url ?? null,
           }
         : null;
+      const sceneStatusExisting = (s: { status?: string } | undefined) => (s?.status?.trim() || "step1");
       return Response.json({
         shortId: existing.id,
         userId: existing.userId ?? null,
@@ -137,6 +160,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         scene1Id: s1?.id ?? null,
         scene2Id: s2?.id ?? null,
         scene3Id: s3?.id ?? null,
+        scene1Status: sceneStatusExisting(s1),
+        scene2Status: sceneStatusExisting(s2),
+        scene3Status: sceneStatusExisting(s3),
+        scene1ImageUrl: sceneImageUrl(s1),
+        scene2ImageUrl: sceneImageUrl(s2),
+        scene3ImageUrl: sceneImageUrl(s3),
         scene1GeneratedVideoUrl: sceneWithUrl(s1),
         scene2GeneratedVideoUrl: sceneWithUrl(s2),
         scene3GeneratedVideoUrl: sceneWithUrl(s3),
@@ -165,7 +194,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           shortId: short.id,
           sceneNumber,
           duration: DEFAULT_DURATION_SEC,
-          status: "pending",
+          status: "step1",
         },
       });
       sceneIds.push(scene.id);

@@ -34,7 +34,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
     await (prisma as any).short.update({
       where: { id: shortId },
-      data: { finalVideoUrl, status: finalVideoUrl ? "ready" : "draft" },
+      data: { finalVideoUrl, status: finalVideoUrl ? "finished" : "in_progress" },
     });
 
     return Response.json({ success: true, final_video_url: finalVideoUrl });

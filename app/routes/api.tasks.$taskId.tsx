@@ -62,7 +62,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
           try {
             await (prisma as any).videoScene.update({
               where: { id: task.videoSceneId },
-              data: { generatedVideoUrl: mergeStatus.video_url, status: "ready" },
+              data: { generatedVideoUrl: mergeStatus.video_url, status: "video_generated" },
             });
             console.log(`${LOG_PREFIX} [Scene2 polling] completed. Saved generated_video_url to VideoScene ${task.videoSceneId} → ${mergeStatus.video_url}`);
           } catch (e) {
@@ -114,7 +114,7 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
           if (videoSceneId) {
             await (prisma as any).videoScene.update({
               where: { id: videoSceneId },
-              data: { generatedVideoUrl: remotion.videoUrl, status: "ready" },
+              data: { generatedVideoUrl: remotion.videoUrl, status: "video_generated" },
             });
             console.log(`${LOG_PREFIX} Completed. Saved generated_video_url to VideoScene ${videoSceneId} (scene 1)`);
           } else {

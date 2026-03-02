@@ -1236,15 +1236,21 @@ function FetchVideoModal({
   };
 
   const handleSelect = (item: (typeof videos)[0]) => {
-    const url = item.download_url || item.preview_url;
-    if (url) {
-      if (forScene2Merge) {
-        // Scene 2 merge must receive the download URL (direct video file) for the backend.
-        onSelect(url, { downloadUrl: item.download_url ?? url });
-      } else {
-        onSelect(url);
+    if (forScene2Merge) {
+      // Display: use preview URL so the video plays in the <video> element.
+      // Merge API: use download URL (direct file) for background_video_url.
+      const displayUrl = item.preview_url || item.download_url;
+      const downloadUrl = item.download_url || item.preview_url;
+      if (displayUrl) {
+        onSelect(displayUrl, { downloadUrl });
+        onClose();
       }
-      onClose();
+    } else {
+      const url = item.download_url || item.preview_url;
+      if (url) {
+        onSelect(url);
+        onClose();
+      }
     }
   };
 
@@ -1506,6 +1512,12 @@ type ShortInfo = {
   scene1Id: string | null;
   scene2Id: string | null;
   scene3Id: string | null;
+  scene1Status: string | null;
+  scene2Status: string | null;
+  scene3Status: string | null;
+  scene1ImageUrl: string | null;
+  scene2ImageUrl: string | null;
+  scene3ImageUrl: string | null;
   scene1GeneratedVideoUrl: string | null;
   scene2GeneratedVideoUrl: string | null;
   scene3GeneratedVideoUrl: string | null;
@@ -1513,6 +1525,44 @@ type ShortInfo = {
   bgMusic: BgMusicSnapshot | null;
   finalVideoUrl: string | null;
 };
+
+/** Scene 1/3: status → UI step (1, 2, or 3). "pending" treated as step1. */
+function scene13StatusToStep(status: string | null | undefined): number {
+  const s = (status ?? "step1").trim() || "step1";
+  if (s === "step1" || s === "bg_removed") return 1;
+  if (s === "step2" || s === "bg_image_fetched_generated" || s === "images_compositied") return 2;
+  if (s === "step3" || s === "video_generated") return 3;
+  return 1;
+}
+
+/** Scene 2: status → UI step (1 or 2). */
+function scene2StatusToStep(status: string | null | undefined): number {
+  const s = (status ?? "step1").trim() || "step1";
+  if (s === "step1" || s === "bg_removed") return 1;
+  return 2;
+}
+
+/** Next status for scene 1/3 when advancing (e.g. Next button). step3→video_generated is set by task completion. */
+function getNextStatusScene13(current: string): string | null {
+  const map: Record<string, string> = {
+    step1: "bg_removed",
+    bg_removed: "step2",
+    step2: "bg_image_fetched_generated",
+    bg_image_fetched_generated: "images_compositied",
+    images_compositied: "step3",
+  };
+  return map[current?.trim() ?? ""] ?? null;
+}
+
+/** Next status for scene 2. video_generated is set by task completion. */
+function getNextStatusScene2(current: string): string | null {
+  const map: Record<string, string> = {
+    step1: "bg_removed",
+    bg_removed: "step2",
+    step2: "bg_video_fetched",
+  };
+  return map[current?.trim() ?? ""] ?? null;
+}
 
 export type WorkflowProduct = { name: string; price?: string; rating?: number; description?: string };
 
@@ -1558,6 +1608,12 @@ export function WorkflowModal({
           scene1Id: loadShortFetcher.data.scene1Id ?? null,
           scene2Id: loadShortFetcher.data.scene2Id ?? null,
           scene3Id: loadShortFetcher.data.scene3Id ?? null,
+          scene1Status: (loadShortFetcher.data as { scene1Status?: string | null }).scene1Status ?? null,
+          scene2Status: (loadShortFetcher.data as { scene2Status?: string | null }).scene2Status ?? null,
+          scene3Status: (loadShortFetcher.data as { scene3Status?: string | null }).scene3Status ?? null,
+          scene1ImageUrl: (loadShortFetcher.data as { scene1ImageUrl?: string | null }).scene1ImageUrl ?? null,
+          scene2ImageUrl: (loadShortFetcher.data as { scene2ImageUrl?: string | null }).scene2ImageUrl ?? null,
+          scene3ImageUrl: (loadShortFetcher.data as { scene3ImageUrl?: string | null }).scene3ImageUrl ?? null,
           scene1GeneratedVideoUrl: (loadShortFetcher.data as { scene1GeneratedVideoUrl?: string | null }).scene1GeneratedVideoUrl ?? null,
           scene2GeneratedVideoUrl: (loadShortFetcher.data as { scene2GeneratedVideoUrl?: string | null }).scene2GeneratedVideoUrl ?? null,
           scene3GeneratedVideoUrl: (loadShortFetcher.data as { scene3GeneratedVideoUrl?: string | null }).scene3GeneratedVideoUrl ?? null,
@@ -1606,10 +1662,10 @@ export function WorkflowModal({
   /** Final video URL from merge (set after finalize completes; used when showing final view) */
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
 
-  // Completion derived from Short (single source of truth)
-  const scene1Complete = !!shortInfo?.scene1GeneratedVideoUrl?.trim();
-  const scene2Complete = !!shortInfo?.scene2GeneratedVideoUrl?.trim();
-  const scene3Complete = !!shortInfo?.scene3GeneratedVideoUrl?.trim();
+  // Completion derived from video_scenes.status (status === "video_generated" means scene finished)
+  const scene1Complete = shortInfo?.scene1Status === "video_generated";
+  const scene2Complete = shortInfo?.scene2Status === "video_generated";
+  const scene3Complete = shortInfo?.scene3Status === "video_generated";
   const scriptGenerated = !!shortInfo?.audioInfo?.audioScript?.trim();
   const audioGenerated = !!shortInfo?.audioInfo?.generatedAudioUrl?.trim();
   const allScenesComplete = scene1Complete && scene2Complete && scene3Complete;
@@ -1629,6 +1685,36 @@ export function WorkflowModal({
   const refetchShort = useCallback(() => {
     if (productId?.trim()) loadShortFetcher.load(`/app/api/shorts?productId=${encodeURIComponent(productId.trim())}`);
   }, [productId]);
+
+  /** Update scene status in DB then refetch. Used when advancing to next step. */
+  const updateSceneStatus = useCallback(
+    async (sceneId: string, status: string) => {
+      const res = await fetch(SHORTS_SCENES_API, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ sceneId, status }),
+      });
+      if (res.ok) refetchShort();
+    },
+    [refetchShort]
+  );
+
+  /** Go to previous step: confirm then PATCH goPrevious and refetch. */
+  const goPreviousWithConfirm = useCallback(
+    async (sceneId: string) => {
+      const message = "If you go to the previous step, current data will be removed. Continue?";
+      if (!window.confirm(message)) return;
+      const res = await fetch(SHORTS_SCENES_API, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ sceneId, goPrevious: true }),
+      });
+      if (res.ok) refetchShort();
+    },
+    [refetchShort]
+  );
 
   // Load short + scene ids from DB when modal opens with productId
   useEffect(() => {
@@ -1685,28 +1771,13 @@ export function WorkflowModal({
     }
   }, [shortInfo?.shortId, shortInfo?.bgMusic?.id, shortInfo?.bgMusic?.previewUrl, shortInfo?.bgMusic?.name]);
 
-  // When shortInfo is available, derive initial workflow state from DB once (single source of truth for assets).
+  // Scene step is derived from video_scenes.status (passed to scene content). No snapshot step from DB.
   useEffect(() => {
     if (!shortInfo?.shortId || restoredFromDbRef.current) return;
     restoredFromDbRef.current = true;
-    const s1 = shortInfo.scene1GeneratedVideoUrl?.trim();
-    const s2 = shortInfo.scene2GeneratedVideoUrl?.trim();
-    const s3 = shortInfo.scene3GeneratedVideoUrl?.trim();
-    setScene1Snapshot({
-      ...defaultScene1State(firstImageId),
-      step: s1 ? 3 : 1,
-      sceneVideo: s1 ?? null,
-    });
-    setScene2Snapshot({
-      ...defaultScene2State(firstImageId),
-      step: s2 ? 2 : 1,
-      sceneVideo: s2 ?? null,
-    });
-    setScene3Snapshot({
-      ...defaultScene3State(firstImageId),
-      step: s3 ? 3 : 1,
-      sceneVideo: s3 ?? null,
-    });
+    setScene1Snapshot({ ...defaultScene1State(firstImageId), sceneVideo: shortInfo.scene1GeneratedVideoUrl ?? null });
+    setScene2Snapshot({ ...defaultScene2State(firstImageId), sceneVideo: shortInfo.scene2GeneratedVideoUrl ?? null });
+    setScene3Snapshot({ ...defaultScene3State(firstImageId), sceneVideo: shortInfo.scene3GeneratedVideoUrl ?? null });
   }, [shortInfo?.shortId, shortInfo?.scene1GeneratedVideoUrl, shortInfo?.scene2GeneratedVideoUrl, shortInfo?.scene3GeneratedVideoUrl, firstImageId]);
 
   // Load voices and backend config once when audio step becomes relevant (avoid re-fetch loop)
@@ -2072,14 +2143,19 @@ export function WorkflowModal({
             )}
             <button
               type="button"
-              onClick={() => {
-                if (productId?.trim()) {
-                  deleteTempFetcher.submit(null, {
-                    method: "delete",
-                    action: `${WORKFLOW_TEMP_API}?productId=${encodeURIComponent(productId.trim())}`,
+              onClick={async () => {
+                if (!displayedFinalVideoUrl) return;
+                try {
+                  await fetch(SHORTS_COMPLETE_API, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    credentials: "include",
+                    body: JSON.stringify({ shortId: shortInfo?.shortId ?? null, productId: productId?.trim() ?? null }),
                   });
+                } catch {
+                  // continue to close
                 }
-                if (displayedFinalVideoUrl) onDone?.(displayedFinalVideoUrl);
+                onDone?.(displayedFinalVideoUrl);
                 onClose();
               }}
               disabled={!displayedFinalVideoUrl}
@@ -2645,6 +2721,8 @@ export function WorkflowModal({
                   sceneId={shortInfo?.scene1Id ?? undefined}
                   shortId={shortInfo?.shortId ?? undefined}
                   shortUserId={shortInfo?.userId ?? undefined}
+                  sceneStatus={shortInfo?.scene1Status ?? undefined}
+                  dbImageUrl={shortInfo?.scene1ImageUrl ?? undefined}
                   initialScene1={scene1Regenerated ? undefined : (scene1Snapshot ?? defaultScene1State(firstImageId))}
                   dbSceneVideoUrl={scene1Regenerated ? undefined : (shortInfo?.scene1GeneratedVideoUrl ?? undefined)}
                   onScene1Change={setScene1Snapshot}
@@ -2654,6 +2732,9 @@ export function WorkflowModal({
                   }}
                   onRegenerate={handleRegenerateScene1}
                   onSkipRemoveBgWarning={showSkipRemoveBgWarning}
+                  updateSceneStatus={updateSceneStatus}
+                  goPreviousWithConfirm={goPreviousWithConfirm}
+                  getNextStatus={getNextStatusScene13}
                 />
               </div>
               <div style={{ display: activeTab === "scene2" ? "block" : "none" }} key={`scene2-${scene2ResetKey}`}>
@@ -2661,6 +2742,8 @@ export function WorkflowModal({
                   productImages={productImages}
                   sceneId={shortInfo?.scene2Id ?? undefined}
                   shortUserId={shortInfo?.userId ?? undefined}
+                  sceneStatus={shortInfo?.scene2Status ?? undefined}
+                  dbImageUrl={shortInfo?.scene2ImageUrl ?? undefined}
                   initialScene2={scene2Regenerated ? undefined : (scene2Snapshot ?? defaultScene2State(firstImageId))}
                   dbSceneVideoUrl={scene2Regenerated ? undefined : (shortInfo?.scene2GeneratedVideoUrl ?? undefined)}
                   onScene2Change={setScene2Snapshot}
@@ -2670,6 +2753,9 @@ export function WorkflowModal({
                   }}
                   onRegenerate={handleRegenerateScene2}
                   onSkipRemoveBgWarning={showSkipRemoveBgWarning}
+                  updateSceneStatus={updateSceneStatus}
+                  goPreviousWithConfirm={goPreviousWithConfirm}
+                  getNextStatus={getNextStatusScene2}
                 />
               </div>
               <div style={{ display: activeTab === "scene3" ? "block" : "none" }} key={`scene3-${scene3ResetKey}`}>
@@ -2680,6 +2766,8 @@ export function WorkflowModal({
                   sceneId={shortInfo?.scene3Id ?? undefined}
                   shortId={shortInfo?.shortId ?? undefined}
                   shortUserId={shortInfo?.userId ?? undefined}
+                  sceneStatus={shortInfo?.scene3Status ?? undefined}
+                  dbImageUrl={shortInfo?.scene3ImageUrl ?? undefined}
                   initialScene3={scene3Regenerated ? undefined : (scene3Snapshot ?? defaultScene3State(firstImageId))}
                   dbSceneVideoUrl={scene3Regenerated ? undefined : (shortInfo?.scene3GeneratedVideoUrl ?? undefined)}
                   onScene3Change={setScene3Snapshot}
@@ -2689,6 +2777,9 @@ export function WorkflowModal({
                   }}
                   onRegenerate={handleRegenerateScene3}
                   onSkipRemoveBgWarning={showSkipRemoveBgWarning}
+                  updateSceneStatus={updateSceneStatus}
+                  goPreviousWithConfirm={goPreviousWithConfirm}
+                  getNextStatus={getNextStatusScene13}
                 />
               </div>
             </div>
@@ -2722,6 +2813,7 @@ const SHORTS_SAVE_BG_MUSIC_API = "/app/api/shorts/save-bg-music";
 const MERGE_FINALIZE_API = "/app/api/merge/finalize";
 const MERGE_STATUS_API_BASE = "/app/api/merge/status";
 const SHORTS_SAVE_FINAL_VIDEO_API = "/app/api/shorts/save-final-video";
+const SHORTS_COMPLETE_API = "/app/api/shorts/complete";
 const PER_PAGE = 12;
 const POLL_INTERVAL_MS = 5000;
 const POLL_MAX_ATTEMPTS = 60; // 5 min at 5s
@@ -2851,12 +2943,17 @@ function Scene1Content({
   sceneId: videoSceneId,
   shortId,
   shortUserId,
+  sceneStatus,
+  dbImageUrl,
   initialScene1,
   dbSceneVideoUrl,
   onScene1Change,
   onComplete,
   onRegenerate,
   onSkipRemoveBgWarning,
+  updateSceneStatus,
+  goPreviousWithConfirm,
+  getNextStatus,
 }: {
   productImages: ProductImageItem[];
   productId?: string | null;
@@ -2864,16 +2961,24 @@ function Scene1Content({
   sceneId?: string | null;
   shortId?: string | null;
   shortUserId?: string | null;
+  sceneStatus?: string | null;
+  dbImageUrl?: string | null;
   initialScene1?: Scene1State | null;
-  /** Display URL from DB (video_scenes.generated_video_url); preferred over state from temp */
   dbSceneVideoUrl?: string | null;
   onScene1Change?: (s: Scene1State) => void;
   onComplete?: () => void;
   onRegenerate?: () => void;
   onSkipRemoveBgWarning?: () => void;
+  updateSceneStatus?: (sceneId: string, status: string) => void | Promise<void>;
+  goPreviousWithConfirm?: (sceneId: string) => void | Promise<void>;
+  getNextStatus?: (current: string) => string | null;
 }) {
   const firstId = productImagesProp[0]?.id ?? "s1";
-  const [step, setStep] = useState(initialScene1?.step ?? 1);
+  const stepFromStatus = scene13StatusToStep(sceneStatus);
+  const [step, setStep] = useState(stepFromStatus);
+  useEffect(() => {
+    setStep(scene13StatusToStep(sceneStatus));
+  }, [sceneStatus]);
   const [selectedImage, setSelectedImage] = useState<string | null>(initialScene1?.selectedImage ?? firstId);
   const [bgRemoved, setBgRemoved] = useState<string | null>(initialScene1?.bgRemoved ?? null);
   const [skipRemoveBg, setSkipRemoveBg] = useState(initialScene1?.skipRemoveBg ?? false);
@@ -2913,10 +3018,11 @@ function Scene1Content({
     if (data.ok && data.url) {
       setBgRemoved(data.url);
       setBgRemovedError(null);
+      if (videoSceneId && updateSceneStatus) updateSceneStatus(videoSceneId, "bg_removed");
     } else {
       setBgRemovedError(data.error ?? "Remove BG failed");
     }
-  }, [removeBgFetcher.state, removeBgFetcher.data]);
+  }, [removeBgFetcher.state, removeBgFetcher.data, videoSceneId, updateSceneStatus]);
 
   const handleRemoveBg = () => {
     const img = productImagesProp.find((i) => i.id === selectedImage);
@@ -3129,20 +3235,8 @@ function Scene1Content({
     }
   };
 
-  const handleNextStepAfterComposite = async () => {
-    if (videoSceneId && composited) {
-      try {
-        await fetch(SHORTS_SCENES_API, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ sceneId: videoSceneId, imageUrl: composited }),
-        });
-      } catch (e) {
-        console.error("[Composite] Failed to save composited URL to scene:", e);
-      }
-    }
-    setStep(3);
+  const handleNextStepAfterComposite = () => {
+    if (videoSceneId && updateSceneStatus) updateSceneStatus(videoSceneId, "step3");
   };
 
   return (
@@ -3196,7 +3290,7 @@ function Scene1Content({
               onClick={() => {
                 setSkipRemoveBg(true);
                 onSkipRemoveBgWarning?.();
-                setStep(2);
+                if (videoSceneId && updateSceneStatus) updateSceneStatus(videoSceneId, "step2");
               }}
               disabled={bgRemovedLoading}
               style={{
@@ -3230,22 +3324,10 @@ function Scene1Content({
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <button
                     type="button"
-                    onClick={() => { setBgRemoved(null); setSkipRemoveBg(false); }}
-                    style={{
-                      padding: "10px 20px",
-                      borderRadius: "8px",
-                      border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                      background: "transparent",
-                      color: "var(--p-color-text-primary, #202223)",
-                      fontWeight: 600,
-                      cursor: "pointer",
+                    onClick={() => {
+                      const next = getNextStatus?.(sceneStatus ?? "step1");
+                      if (videoSceneId && next && updateSceneStatus) updateSceneStatus(videoSceneId, next);
                     }}
-                  >
-                    Undo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStep(2)}
                     style={{
                       padding: "10px 20px",
                       borderRadius: "8px",
@@ -3274,22 +3356,24 @@ function Scene1Content({
             description="Generate a new background with AI or fetch one from the library. Then click Composite to combine the subject with the chosen background."
           />
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-            <button
-              type="button"
-              onClick={() => setStep(1)}
-              style={{
-                padding: "8px 16px",
-                borderRadius: "8px",
-                border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                background: "transparent",
-                color: "var(--p-color-text-primary, #202223)",
-                fontWeight: 600,
-                cursor: "pointer",
-                fontSize: "14px",
-              }}
-            >
-              ← Previous
-            </button>
+            {videoSceneId && goPreviousWithConfirm && (
+              <button
+                type="button"
+                onClick={() => goPreviousWithConfirm(videoSceneId)}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                  background: "transparent",
+                  color: "var(--p-color-text-primary, #202223)",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontSize: "14px",
+                }}
+              >
+                ← Previous
+              </button>
+            )}
           </div>
           <div style={twoPartLayout}>
             <div style={{ ...boxStyle, borderRight: "none", borderTopRightRadius: 0, borderBottomRightRadius: 0 }}>
@@ -3406,21 +3490,6 @@ function Scene1Content({
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <button
                   type="button"
-                  onClick={() => setComposited(null)}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: "8px",
-                    border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                    background: "transparent",
-                    color: "var(--p-color-text-primary, #202223)",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Undo
-                </button>
-                <button
-                  type="button"
                   onClick={handleNextStepAfterComposite}
                   style={{
                     padding: "10px 20px",
@@ -3499,21 +3568,23 @@ function Scene1Content({
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <video key={dbSceneVideoUrl ?? sceneVideo ?? ""} src={normalizeSceneVideoUrl(dbSceneVideoUrl ?? sceneVideo)} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                    <button
-                      type="button"
-                      onClick={() => setStep(2)}
-                      style={{
-                        padding: "8px 16px",
-                        borderRadius: "8px",
-                        border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                        background: "transparent",
-                        cursor: "pointer",
-                        fontSize: "14px",
-                        fontWeight: 600,
-                      }}
-                    >
-                      ← Previous
-                    </button>
+                    {videoSceneId && goPreviousWithConfirm && (
+                      <button
+                        type="button"
+                        onClick={() => goPreviousWithConfirm(videoSceneId)}
+                        style={{
+                          padding: "8px 16px",
+                          borderRadius: "8px",
+                          border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                          background: "transparent",
+                          cursor: "pointer",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                        }}
+                      >
+                        ← Previous
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={handleGenerateScene}
@@ -3599,26 +3670,39 @@ function Scene2Content({
   productImages: productImagesProp,
   sceneId: scene2Id,
   shortUserId,
+  sceneStatus,
+  dbImageUrl,
   initialScene2,
   dbSceneVideoUrl,
   onScene2Change,
   onComplete,
   onRegenerate,
   onSkipRemoveBgWarning,
+  updateSceneStatus,
+  goPreviousWithConfirm,
+  getNextStatus,
 }: {
   productImages: ProductImageItem[];
   sceneId?: string | null;
   shortUserId?: string | null;
+  sceneStatus?: string | null;
+  dbImageUrl?: string | null;
   initialScene2?: Scene2State | null;
-  /** Display URL from DB (video_scenes.generated_video_url); preferred over state from temp */
   dbSceneVideoUrl?: string | null;
   onScene2Change?: (s: Scene2State) => void;
   onComplete?: () => void;
   onRegenerate?: () => void;
   onSkipRemoveBgWarning?: () => void;
+  updateSceneStatus?: (sceneId: string, status: string) => void | Promise<void>;
+  goPreviousWithConfirm?: (sceneId: string) => void | Promise<void>;
+  getNextStatus?: (current: string) => string | null;
 }) {
   const firstId = productImagesProp[0]?.id ?? "s1";
-  const [step, setStep] = useState(initialScene2?.step ?? 1);
+  const stepFromStatus = scene2StatusToStep(sceneStatus);
+  const [step, setStep] = useState(stepFromStatus);
+  useEffect(() => {
+    setStep(scene2StatusToStep(sceneStatus));
+  }, [sceneStatus]);
   const [selectedImage, setSelectedImage] = useState<string | null>(initialScene2?.selectedImage ?? firstId);
   const [bgRemoved, setBgRemoved] = useState<string | null>(initialScene2?.bgRemoved ?? null);
   const [skipRemoveBg, setSkipRemoveBg] = useState(initialScene2?.skipRemoveBg ?? false);
@@ -3626,7 +3710,6 @@ function Scene2Content({
   const [bgRemovedError, setBgRemovedError] = useState<string | null>(null);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [selectedStockVideoUrl, setSelectedStockVideoUrl] = useState<string | null>(initialScene2?.selectedStockVideoUrl ?? null);
-  /** Download URL sent to merge API (direct video file); when set, use this for scene 2 generate. */
   const [selectedStockVideoDownloadUrl, setSelectedStockVideoDownloadUrl] = useState<string | null>(null);
   const [sceneVideo, setSceneVideo] = useState<string | null>(initialScene2?.sceneVideo ?? null);
   const [sceneLoading, setSceneLoading] = useState(false);
@@ -3654,16 +3737,15 @@ function Scene2Content({
     if (data.ok && data.url) {
       setBgRemoved(data.url);
       setBgRemovedError(null);
-      // Save scene2 image_url to DB (video_scenes.image_url) — same pattern as other scenes: /bg_removed_images/{filename}
       if (scene2Id && data.url) {
         fetch(SHORTS_SCENES_API, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ sceneId: scene2Id, imageUrl: data.url }),
+          body: JSON.stringify({ sceneId: scene2Id, imageUrl: data.url, status: "bg_removed" }),
         })
           .then((r) => (r.ok ? Promise.resolve() : Promise.reject(new Error(r.statusText))))
-          .then(() => console.log("[Scene2] Saved image_url to VideoScene:", data.url))
+          .then(() => console.log("[Scene2] Saved image_url and status to VideoScene:", data.url))
           .catch((err) => console.warn("[Scene2] Failed to save image_url:", err));
       }
     } else {
@@ -3843,7 +3925,7 @@ function Scene2Content({
               onClick={() => {
                 setSkipRemoveBg(true);
                 onSkipRemoveBgWarning?.();
-                setStep(2);
+                if (scene2Id && updateSceneStatus) updateSceneStatus(scene2Id, "step2");
               }}
               disabled={bgRemovedLoading}
               style={{
@@ -3872,22 +3954,10 @@ function Scene2Content({
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <button
                     type="button"
-                    onClick={() => { setBgRemoved(null); setSkipRemoveBg(false); }}
-                    style={{
-                      padding: "10px 20px",
-                      borderRadius: "8px",
-                      border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                      background: "transparent",
-                      color: "var(--p-color-text-primary, #202223)",
-                      fontWeight: 600,
-                      cursor: "pointer",
+                    onClick={() => {
+                      const next = getNextStatus?.(sceneStatus ?? "step1");
+                      if (scene2Id && next && updateSceneStatus) updateSceneStatus(scene2Id, next);
                     }}
-                  >
-                    Undo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStep(2)}
                     style={{
                       padding: "10px 20px",
                       borderRadius: "8px",
@@ -3915,6 +3985,26 @@ function Scene2Content({
             title="Select stock video & generate scene"
             description="Search and pick a stock video from Pexels, Pixabay, or Coverr as the background. Then click Generate video to composite your subject onto it and create the scene (~8s)."
           />
+          {scene2Id && goPreviousWithConfirm && (
+            <div style={{ marginBottom: "8px" }}>
+              <button
+                type="button"
+                onClick={() => goPreviousWithConfirm(scene2Id)}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                  background: "transparent",
+                  color: "var(--p-color-text-primary, #202223)",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontSize: "14px",
+                }}
+              >
+                ← Previous
+              </button>
+            </div>
+          )}
           <div style={{ display: "flex", flexDirection: "row", gap: "24px", alignItems: "flex-start", flexWrap: "wrap" }}>
             <div style={{ flex: "1 1 260px", minWidth: "240px", display: "flex", flexDirection: "column", gap: "16px" }}>
               {effectiveOverlayUrl ? (
@@ -4012,21 +4102,23 @@ function Scene2Content({
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <video key={dbSceneVideoUrl ?? sceneVideo ?? ""} src={normalizeSceneVideoUrl(dbSceneVideoUrl ?? sceneVideo)} controls style={{ maxWidth: "100%", maxHeight: "240px", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                    <button
-                      type="button"
-                      onClick={() => setStep(1)}
-                      style={{
-                        padding: "8px 16px",
-                        borderRadius: "8px",
-                        border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                        background: "transparent",
-                        cursor: "pointer",
-                        fontSize: "14px",
-                        fontWeight: 600,
-                      }}
-                    >
-                      ← Previous
-                    </button>
+                    {scene2Id && goPreviousWithConfirm && (
+                      <button
+                        type="button"
+                        onClick={() => goPreviousWithConfirm(scene2Id)}
+                        style={{
+                          padding: "8px 16px",
+                          borderRadius: "8px",
+                          border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                          background: "transparent",
+                          cursor: "pointer",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                        }}
+                      >
+                        ← Previous
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={handleGenerateVideo}
@@ -4065,21 +4157,23 @@ function Scene2Content({
                 </div>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    onClick={() => setStep(1)}
-                    style={{
-                      padding: "8px 16px",
-                      borderRadius: "8px",
-                      border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                      background: "transparent",
-                      cursor: "pointer",
-                      fontSize: "14px",
-                      fontWeight: 600,
-                    }}
-                  >
-                    ← Previous
-                  </button>
+                  {scene2Id && goPreviousWithConfirm && (
+                    <button
+                      type="button"
+                      onClick={() => goPreviousWithConfirm(scene2Id)}
+                      style={{
+                        padding: "8px 16px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                        background: "transparent",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                      }}
+                    >
+                      ← Previous
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={handleGenerateVideo}
@@ -4110,6 +4204,7 @@ function Scene2Content({
             onSelect={(url, options) => {
               setSelectedStockVideoUrl(url);
               setSelectedStockVideoDownloadUrl(options?.downloadUrl ?? url);
+              if (scene2Id && updateSceneStatus) updateSceneStatus(scene2Id, "bg_video_fetched");
               setVideoModalOpen(false);
             }}
           />
@@ -4128,12 +4223,17 @@ function Scene3Content({
   sceneId: videoSceneId,
   shortId,
   shortUserId,
+  sceneStatus,
+  dbImageUrl,
   initialScene3,
   dbSceneVideoUrl,
   onScene3Change,
   onComplete,
   onRegenerate,
   onSkipRemoveBgWarning,
+  updateSceneStatus,
+  goPreviousWithConfirm,
+  getNextStatus,
 }: {
   productImages: ProductImageItem[];
   productId?: string | null;
@@ -4141,16 +4241,24 @@ function Scene3Content({
   sceneId?: string | null;
   shortId?: string | null;
   shortUserId?: string | null;
+  sceneStatus?: string | null;
+  dbImageUrl?: string | null;
   initialScene3?: Scene3State | null;
-  /** Display URL from DB (video_scenes.generated_video_url); preferred over state from temp */
   dbSceneVideoUrl?: string | null;
   onScene3Change?: (s: Scene3State) => void;
   onComplete?: () => void;
   onRegenerate?: () => void;
   onSkipRemoveBgWarning?: () => void;
+  updateSceneStatus?: (sceneId: string, status: string) => void | Promise<void>;
+  goPreviousWithConfirm?: (sceneId: string) => void | Promise<void>;
+  getNextStatus?: (current: string) => string | null;
 }) {
   const firstId = productImagesProp[0]?.id ?? "s1";
-  const [step, setStep] = useState(initialScene3?.step ?? 1);
+  const stepFromStatus = scene13StatusToStep(sceneStatus);
+  const [step, setStep] = useState(stepFromStatus);
+  useEffect(() => {
+    setStep(scene13StatusToStep(sceneStatus));
+  }, [sceneStatus]);
   const [selectedImage, setSelectedImage] = useState<string | null>(initialScene3?.selectedImage ?? firstId);
   const [bgRemoved, setBgRemoved] = useState<string | null>(initialScene3?.bgRemoved ?? null);
   const [skipRemoveBg, setSkipRemoveBg] = useState(initialScene3?.skipRemoveBg ?? false);
@@ -4190,10 +4298,11 @@ function Scene3Content({
     if (data.ok && data.url) {
       setBgRemoved(data.url);
       setBgRemovedError(null);
+      if (videoSceneId && updateSceneStatus) updateSceneStatus(videoSceneId, "bg_removed");
     } else {
       setBgRemovedError(data.error ?? "Remove BG failed");
     }
-  }, [removeBgFetcher.state, removeBgFetcher.data]);
+  }, [removeBgFetcher.state, removeBgFetcher.data, videoSceneId, updateSceneStatus]);
 
   const handleRemoveBg = () => {
     const img = productImagesProp.find((i) => i.id === selectedImage);
@@ -4406,20 +4515,8 @@ function Scene3Content({
     }
   };
 
-  const handleNextStepAfterComposite = async () => {
-    if (videoSceneId && composited) {
-      try {
-        await fetch(SHORTS_SCENES_API, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({ sceneId: videoSceneId, imageUrl: composited }),
-        });
-      } catch (e) {
-        console.error("[Composite] Failed to save composited URL to scene:", e);
-      }
-    }
-    setStep(3);
+  const handleNextStepAfterComposite = () => {
+    if (videoSceneId && updateSceneStatus) updateSceneStatus(videoSceneId, "step3");
   };
 
   return (
@@ -4473,7 +4570,7 @@ function Scene3Content({
               onClick={() => {
                 setSkipRemoveBg(true);
                 onSkipRemoveBgWarning?.();
-                setStep(2);
+                if (videoSceneId && updateSceneStatus) updateSceneStatus(videoSceneId, "step2");
               }}
               disabled={bgRemovedLoading}
               style={{
@@ -4502,22 +4599,10 @@ function Scene3Content({
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   <button
                     type="button"
-                    onClick={() => { setBgRemoved(null); setSkipRemoveBg(false); }}
-                    style={{
-                      padding: "10px 20px",
-                      borderRadius: "8px",
-                      border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                      background: "transparent",
-                      color: "var(--p-color-text-primary, #202223)",
-                      fontWeight: 600,
-                      cursor: "pointer",
+                    onClick={() => {
+                      const next = getNextStatus?.(sceneStatus ?? "step1");
+                      if (videoSceneId && next && updateSceneStatus) updateSceneStatus(videoSceneId, next);
                     }}
-                  >
-                    Undo
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setStep(2)}
                     style={{
                       padding: "10px 20px",
                       borderRadius: "8px",
@@ -4546,22 +4631,24 @@ function Scene3Content({
             description="Generate a new background or fetch one from the library. Then click Composite to combine the subject with the chosen background. A different Remotion style will be applied in the next step."
           />
           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-            <button
-              type="button"
-              onClick={() => setStep(1)}
-              style={{
-                padding: "8px 16px",
-                borderRadius: "8px",
-                border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                background: "transparent",
-                color: "var(--p-color-text-primary, #202223)",
-                fontWeight: 600,
-                cursor: "pointer",
-                fontSize: "14px",
-              }}
-            >
-              ← Previous
-            </button>
+            {videoSceneId && goPreviousWithConfirm && (
+              <button
+                type="button"
+                onClick={() => goPreviousWithConfirm(videoSceneId)}
+                style={{
+                  padding: "8px 16px",
+                  borderRadius: "8px",
+                  border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                  background: "transparent",
+                  color: "var(--p-color-text-primary, #202223)",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  fontSize: "14px",
+                }}
+              >
+                ← Previous
+              </button>
+            )}
           </div>
           <div style={twoPartLayout}>
             <div style={{ ...boxStyle, borderRight: "none", borderTopRightRadius: 0, borderBottomRightRadius: 0 }}>
@@ -4670,21 +4757,6 @@ function Scene3Content({
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <button
                   type="button"
-                  onClick={() => setComposited(null)}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: "8px",
-                    border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                    background: "transparent",
-                    color: "var(--p-color-text-primary, #202223)",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Undo
-                </button>
-                <button
-                  type="button"
                   onClick={handleNextStepAfterComposite}
                   style={{
                     padding: "10px 20px",
@@ -4743,21 +4815,23 @@ function Scene3Content({
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <video key={dbSceneVideoUrl ?? sceneVideo ?? ""} src={normalizeSceneVideoUrl(dbSceneVideoUrl ?? sceneVideo)} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                    <button
-                      type="button"
-                      onClick={() => setStep(2)}
-                      style={{
-                        padding: "8px 16px",
-                        borderRadius: "8px",
-                        border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                        background: "transparent",
-                        cursor: "pointer",
-                        fontSize: "14px",
-                        fontWeight: 600,
-                      }}
-                    >
-                      ← Previous
-                    </button>
+                    {videoSceneId && goPreviousWithConfirm && (
+                      <button
+                        type="button"
+                        onClick={() => goPreviousWithConfirm(videoSceneId)}
+                        style={{
+                          padding: "8px 16px",
+                          borderRadius: "8px",
+                          border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                          background: "transparent",
+                          cursor: "pointer",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                        }}
+                      >
+                        ← Previous
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={handleGenerateScene}

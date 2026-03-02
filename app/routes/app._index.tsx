@@ -91,7 +91,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const products = connection?.edges?.map((e: { node: unknown }) => e.node) ?? [];
   const pageInfo = connection?.pageInfo ?? { hasNextPage: false, endCursor: null };
 
-  let stats = { totalShorts: 0, readyCount: 0, generatingCount: 0, draftCount: 0 };
+  let stats = { totalShorts: 0, finishedCount: 0, inProgressCount: 0, draftCount: 0, completedCount: 0 };
   let recentShorts: { id: string; title: string; productId: string | null; status: string; finalVideoUrl: string | null; updatedAt: Date; thumbnailUrl: string | null }[] = [];
   let productIdToShortStatus: Record<string, string> = {};
 
@@ -99,11 +99,12 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const shortDelegate = (prisma as any).short;
     if (shortDelegate) {
-      const [totalShorts, readyCount, generatingCount, draftCount, recentList, allShortsForMap] = await Promise.all([
+      const [totalShorts, finishedCount, inProgressCount, draftCount, completedCount, recentList, allShortsForMap] = await Promise.all([
         shortDelegate.count({ where: { userId: shop } }),
-        shortDelegate.count({ where: { userId: shop, status: "ready" } }),
-        shortDelegate.count({ where: { userId: shop, status: "generating" } }),
+        shortDelegate.count({ where: { userId: shop, status: "finished" } }),
+        shortDelegate.count({ where: { userId: shop, status: "in_progress" } }),
         shortDelegate.count({ where: { userId: shop, status: "draft" } }),
+        shortDelegate.count({ where: { userId: shop, status: "completed" } }),
         shortDelegate.findMany({
           where: { userId: shop },
           orderBy: { updatedAt: "desc" },
@@ -128,7 +129,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
         }) as Promise<{ productId: string | null; status: string }[]>,
       ]);
 
-      stats = { totalShorts, readyCount, generatingCount, draftCount };
+      stats = { totalShorts, finishedCount, inProgressCount, draftCount, completedCount };
       recentShorts = (recentList ?? []).map((s: { id: string; title: string; productId: string | null; status: string; finalVideoUrl: string | null; updatedAt: Date; scenes: { imageUrl: string | null; generatedVideoUrl: string | null }[] }) => {
         const thumb = s.finalVideoUrl?.trim() || s.scenes?.[0]?.generatedVideoUrl?.trim() || s.scenes?.[0]?.imageUrl?.trim() || null;
         return {
@@ -421,8 +422,8 @@ export default function Index() {
             border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
           }}
         >
-          <s-text color="subdued">Videos created</s-text>
-          <div style={{ fontSize: "24px", fontWeight: 600, marginTop: "4px" }}>{stats?.readyCount ?? 0}</div>
+          <s-text color="subdued">Finished</s-text>
+          <div style={{ fontSize: "24px", fontWeight: 600, marginTop: "4px" }}>{stats?.finishedCount ?? 0}</div>
         </div>
         <div
           style={{
@@ -433,7 +434,7 @@ export default function Index() {
           }}
         >
           <s-text color="subdued">In progress</s-text>
-          <div style={{ fontSize: "24px", fontWeight: 600, marginTop: "4px" }}>{stats?.generatingCount ?? 0}</div>
+          <div style={{ fontSize: "24px", fontWeight: 600, marginTop: "4px" }}>{stats?.inProgressCount ?? 0}</div>
         </div>
         <div
           style={{
@@ -445,6 +446,17 @@ export default function Index() {
         >
           <s-text color="subdued">Drafts</s-text>
           <div style={{ fontSize: "24px", fontWeight: 600, marginTop: "4px" }}>{stats?.draftCount ?? 0}</div>
+        </div>
+        <div
+          style={{
+            padding: "16px",
+            background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
+            borderRadius: "8px",
+            border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+          }}
+        >
+          <s-text color="subdued">Completed</s-text>
+          <div style={{ fontSize: "24px", fontWeight: 600, marginTop: "4px" }}>{stats?.completedCount ?? 0}</div>
         </div>
       </div>
 
@@ -512,8 +524,8 @@ export default function Index() {
                           borderRadius: "999px",
                           fontSize: "11px",
                           fontWeight: 500,
-                          background: s.status === "ready" ? "var(--p-color-bg-fill-success-secondary, #d3f0d9)" : s.status === "generating" ? "var(--p-color-bg-fill-caution-secondary, #fcf1e0)" : "var(--p-color-bg-fill-secondary, #e1e3e5)",
-                          color: s.status === "ready" ? "var(--p-color-text-success, #008060)" : s.status === "generating" ? "var(--p-color-text-caution, #b98900)" : "var(--p-color-text-subdued, #6d7175)",
+                          background: s.status === "finished" ? "var(--p-color-bg-fill-success-secondary, #d3f0d9)" : s.status === "finalizing" || s.status === "in_progress" ? "var(--p-color-bg-fill-caution-secondary, #fcf1e0)" : s.status === "completed" ? "var(--p-color-bg-fill-secondary, #e1e3e5)" : "var(--p-color-bg-fill-secondary, #e1e3e5)",
+                          color: s.status === "finished" ? "var(--p-color-text-success, #008060)" : s.status === "finalizing" || s.status === "in_progress" ? "var(--p-color-text-caution, #b98900)" : "var(--p-color-text-subdued, #6d7175)",
                         }}
                       >
                         {s.status}

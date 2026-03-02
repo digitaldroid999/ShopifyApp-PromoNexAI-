@@ -55,7 +55,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     try {
       await (prisma as any).short.update({
         where: { id: shortId },
-        data: { status: "draft" },
+        data: { status: "in_progress" },
       });
     } catch {
       // ignore
