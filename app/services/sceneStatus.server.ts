@@ -28,16 +28,29 @@ export type Scene2Status = (typeof SCENE2_STATUSES)[number];
 /** Treat legacy "pending" as step1 */
 export const NORMALIZE_PENDING = "step1";
 
+/**
+ * Scene 1 & 3: Previous is not step-by-step.
+ * - From video_generated or step3 → images_compositied (step 2)
+ * - From images_compositied / step2 / bg_image_fetched_generated → bg_removed (step 1)
+ * - From bg_removed / step1 → already at first step (null)
+ */
 export function getScene13PreviousStatus(current: string): Scene13Status | null {
-  const idx = SCENE13_STATUSES.indexOf(current as Scene13Status);
-  if (idx <= 0) return null;
-  return SCENE13_STATUSES[idx - 1];
+  const s = current?.trim() || "step1";
+  if (s === "video_generated" || s === "step3") return "images_compositied";
+  if (s === "images_compositied" || s === "step2" || s === "bg_image_fetched_generated") return "bg_removed";
+  return null;
 }
 
+/**
+ * Scene 2: Previous is not step-by-step.
+ * - From video_generated (step 2) → bg_removed (step 1)
+ * - From bg_video_fetched / step2 → bg_removed
+ * - From bg_removed / step1 → already at first step (null)
+ */
 export function getScene2PreviousStatus(current: string): Scene2Status | null {
-  const idx = SCENE2_STATUSES.indexOf(current as Scene2Status);
-  if (idx <= 0) return null;
-  return SCENE2_STATUSES[idx - 1];
+  const s = current?.trim() || "step1";
+  if (s === "video_generated" || s === "step2" || s === "bg_video_fetched") return "bg_removed";
+  return null;
 }
 
 export function getScene13NextStatus(current: string): Scene13Status | null {

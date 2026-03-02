@@ -3239,8 +3239,49 @@ function Scene1Content({
     if (videoSceneId && updateSceneStatus) updateSceneStatus(videoSceneId, "step3");
   };
 
+  const navBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexShrink: 0 };
+  const navBtnStyle = {
+    padding: "8px 16px",
+    borderRadius: "8px",
+    border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+    background: "transparent",
+    color: "var(--p-color-text-primary, #202223)",
+    fontWeight: 600,
+    cursor: "pointer",
+    fontSize: "14px",
+  } as const;
+  const navBtnPrimaryStyle = { ...navBtnStyle, border: "none", background: "var(--p-color-bg-fill-info, #2c6ecb)", color: "#fff" };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+      <div style={navBarStyle}>
+        <div>
+          {step > 1 && videoSceneId && goPreviousWithConfirm && (
+            <button type="button" onClick={() => goPreviousWithConfirm(videoSceneId)} style={navBtnStyle}>
+              ← Previous
+            </button>
+          )}
+        </div>
+        <div>
+          {step === 1 && (bgRemoved || skipRemoveBg) && (
+            <button
+              type="button"
+              onClick={() => {
+                const next = getNextStatus?.(sceneStatus ?? "step1");
+                if (videoSceneId && next && updateSceneStatus) updateSceneStatus(videoSceneId, next);
+              }}
+              style={navBtnPrimaryStyle}
+            >
+              Next step →
+            </button>
+          )}
+          {step === 2 && composited && (
+            <button type="button" onClick={handleNextStepAfterComposite} style={navBtnPrimaryStyle}>
+              Next step →
+            </button>
+          )}
+        </div>
+      </div>
       {step === 1 && (
         <>
           <StepDescription
@@ -3321,26 +3362,6 @@ function Scene1Content({
                 {skipRemoveBg && !bgRemoved && (
                   <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Using image as-is</span>
                 )}
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = getNextStatus?.(sceneStatus ?? "step1");
-                      if (videoSceneId && next && updateSceneStatus) updateSceneStatus(videoSceneId, next);
-                    }}
-                    style={{
-                      padding: "10px 20px",
-                      borderRadius: "8px",
-                      border: "none",
-                      background: "var(--p-color-bg-fill-info, #2c6ecb)",
-                      color: "#fff",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Next step →
-                  </button>
-                </div>
               </>
             )}
           </div>
@@ -3355,26 +3376,6 @@ function Scene1Content({
             title="Add a background"
             description="Generate a new background with AI or fetch one from the library. Then click Composite to combine the subject with the chosen background."
           />
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-            {videoSceneId && goPreviousWithConfirm && (
-              <button
-                type="button"
-                onClick={() => goPreviousWithConfirm(videoSceneId)}
-                style={{
-                  padding: "8px 16px",
-                  borderRadius: "8px",
-                  border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                  background: "transparent",
-                  color: "var(--p-color-text-primary, #202223)",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  fontSize: "14px",
-                }}
-              >
-                ← Previous
-              </button>
-            )}
-          </div>
           <div style={twoPartLayout}>
             <div style={{ ...boxStyle, borderRight: "none", borderTopRightRadius: 0, borderBottomRightRadius: 0 }}>
               {effectiveOverlayUrl ? (
@@ -3487,23 +3488,6 @@ function Scene1Content({
           {composited && (
             <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
               <img key={composited} src={composited} alt="Composited" style={{ width: "200px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <button
-                  type="button"
-                  onClick={handleNextStepAfterComposite}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: "8px",
-                    border: "none",
-                    background: "var(--p-color-bg-fill-info, #2c6ecb)",
-                    color: "#fff",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Next step →
-                </button>
-              </div>
             </div>
           )}
         </>
@@ -3568,23 +3552,6 @@ function Scene1Content({
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <video key={dbSceneVideoUrl ?? sceneVideo ?? ""} src={normalizeSceneVideoUrl(dbSceneVideoUrl ?? sceneVideo)} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                    {videoSceneId && goPreviousWithConfirm && (
-                      <button
-                        type="button"
-                        onClick={() => goPreviousWithConfirm(videoSceneId)}
-                        style={{
-                          padding: "8px 16px",
-                          borderRadius: "8px",
-                          border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                          background: "transparent",
-                          cursor: "pointer",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                        }}
-                      >
-                        ← Previous
-                      </button>
-                    )}
                     <button
                       type="button"
                       onClick={handleGenerateScene}
@@ -3623,21 +3590,6 @@ function Scene1Content({
                 </div>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    onClick={() => setStep(2)}
-                    style={{
-                      padding: "8px 16px",
-                      borderRadius: "8px",
-                      border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                      background: "transparent",
-                      cursor: "pointer",
-                      fontSize: "14px",
-                      fontWeight: 600,
-                    }}
-                  >
-                    ← Previous
-                  </button>
                   <button
                     type="button"
                     onClick={handleGenerateScene}
@@ -3874,8 +3826,35 @@ function Scene2Content({
     }
   };
 
+  const navBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexShrink: 0 };
+  const navBtnStyle = { padding: "8px 16px", borderRadius: "8px", border: "1px solid var(--p-color-border-secondary, #e1e3e5)", background: "transparent", color: "var(--p-color-text-primary, #202223)", fontWeight: 600, cursor: "pointer", fontSize: "14px" } as const;
+  const navBtnPrimaryStyle = { ...navBtnStyle, border: "none", background: "var(--p-color-bg-fill-info, #2c6ecb)", color: "#fff" };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+      <div style={navBarStyle}>
+        <div>
+          {step > 1 && scene2Id && goPreviousWithConfirm && (
+            <button type="button" onClick={() => goPreviousWithConfirm(scene2Id)} style={navBtnStyle}>
+              ← Previous
+            </button>
+          )}
+        </div>
+        <div>
+          {step === 1 && (bgRemoved || skipRemoveBg) && (
+            <button
+              type="button"
+              onClick={() => {
+                const next = getNextStatus?.(sceneStatus ?? "step1");
+                if (scene2Id && next && updateSceneStatus) updateSceneStatus(scene2Id, next);
+              }}
+              style={navBtnPrimaryStyle}
+            >
+              Next step →
+            </button>
+          )}
+        </div>
+      </div>
       {step === 1 && (
         <>
           <StepDescription
@@ -3951,26 +3930,6 @@ function Scene2Content({
                 {skipRemoveBg && !bgRemoved && (
                   <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Using image as-is</span>
                 )}
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = getNextStatus?.(sceneStatus ?? "step1");
-                      if (scene2Id && next && updateSceneStatus) updateSceneStatus(scene2Id, next);
-                    }}
-                    style={{
-                      padding: "10px 20px",
-                      borderRadius: "8px",
-                      border: "none",
-                      background: "var(--p-color-bg-fill-info, #2c6ecb)",
-                      color: "#fff",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Next step →
-                  </button>
-                </div>
               </>
             )}
           </div>
@@ -3985,26 +3944,6 @@ function Scene2Content({
             title="Select stock video & generate scene"
             description="Search and pick a stock video from Pexels, Pixabay, or Coverr as the background. Then click Generate video to composite your subject onto it and create the scene (~8s)."
           />
-          {scene2Id && goPreviousWithConfirm && (
-            <div style={{ marginBottom: "8px" }}>
-              <button
-                type="button"
-                onClick={() => goPreviousWithConfirm(scene2Id)}
-                style={{
-                  padding: "8px 16px",
-                  borderRadius: "8px",
-                  border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                  background: "transparent",
-                  color: "var(--p-color-text-primary, #202223)",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  fontSize: "14px",
-                }}
-              >
-                ← Previous
-              </button>
-            </div>
-          )}
           <div style={{ display: "flex", flexDirection: "row", gap: "24px", alignItems: "flex-start", flexWrap: "wrap" }}>
             <div style={{ flex: "1 1 260px", minWidth: "240px", display: "flex", flexDirection: "column", gap: "16px" }}>
               {effectiveOverlayUrl ? (
@@ -4102,23 +4041,6 @@ function Scene2Content({
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <video key={dbSceneVideoUrl ?? sceneVideo ?? ""} src={normalizeSceneVideoUrl(dbSceneVideoUrl ?? sceneVideo)} controls style={{ maxWidth: "100%", maxHeight: "240px", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                    {scene2Id && goPreviousWithConfirm && (
-                      <button
-                        type="button"
-                        onClick={() => goPreviousWithConfirm(scene2Id)}
-                        style={{
-                          padding: "8px 16px",
-                          borderRadius: "8px",
-                          border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                          background: "transparent",
-                          cursor: "pointer",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                        }}
-                      >
-                        ← Previous
-                      </button>
-                    )}
                     <button
                       type="button"
                       onClick={handleGenerateVideo}
@@ -4157,23 +4079,6 @@ function Scene2Content({
                 </div>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                  {scene2Id && goPreviousWithConfirm && (
-                    <button
-                      type="button"
-                      onClick={() => goPreviousWithConfirm(scene2Id)}
-                      style={{
-                        padding: "8px 16px",
-                        borderRadius: "8px",
-                        border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                        background: "transparent",
-                        cursor: "pointer",
-                        fontSize: "14px",
-                        fontWeight: 600,
-                      }}
-                    >
-                      ← Previous
-                    </button>
-                  )}
                   <button
                     type="button"
                     onClick={handleGenerateVideo}
@@ -4519,8 +4424,40 @@ function Scene3Content({
     if (videoSceneId && updateSceneStatus) updateSceneStatus(videoSceneId, "step3");
   };
 
+  const navBarStyle = { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px", flexShrink: 0 };
+  const navBtnStyle = { padding: "8px 16px", borderRadius: "8px", border: "1px solid var(--p-color-border-secondary, #e1e3e5)", background: "transparent", color: "var(--p-color-text-primary, #202223)", fontWeight: 600, cursor: "pointer", fontSize: "14px" } as const;
+  const navBtnPrimaryStyle = { ...navBtnStyle, border: "none", background: "var(--p-color-bg-fill-info, #2c6ecb)", color: "#fff" };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+      <div style={navBarStyle}>
+        <div>
+          {step > 1 && videoSceneId && goPreviousWithConfirm && (
+            <button type="button" onClick={() => goPreviousWithConfirm(videoSceneId)} style={navBtnStyle}>
+              ← Previous
+            </button>
+          )}
+        </div>
+        <div>
+          {step === 1 && (bgRemoved || skipRemoveBg) && (
+            <button
+              type="button"
+              onClick={() => {
+                const next = getNextStatus?.(sceneStatus ?? "step1");
+                if (videoSceneId && next && updateSceneStatus) updateSceneStatus(videoSceneId, next);
+              }}
+              style={navBtnPrimaryStyle}
+            >
+              Next step →
+            </button>
+          )}
+          {step === 2 && composited && (
+            <button type="button" onClick={handleNextStepAfterComposite} style={navBtnPrimaryStyle}>
+              Next step →
+            </button>
+          )}
+        </div>
+      </div>
       {step === 1 && (
         <>
           <StepDescription
@@ -4596,26 +4533,6 @@ function Scene3Content({
                 {skipRemoveBg && !bgRemoved && (
                   <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Using image as-is</span>
                 )}
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = getNextStatus?.(sceneStatus ?? "step1");
-                      if (videoSceneId && next && updateSceneStatus) updateSceneStatus(videoSceneId, next);
-                    }}
-                    style={{
-                      padding: "10px 20px",
-                      borderRadius: "8px",
-                      border: "none",
-                      background: "var(--p-color-bg-fill-info, #2c6ecb)",
-                      color: "#fff",
-                      fontWeight: 600,
-                      cursor: "pointer",
-                    }}
-                  >
-                    Next step →
-                  </button>
-                </div>
               </>
             )}
           </div>
@@ -4630,26 +4547,6 @@ function Scene3Content({
             title="Add a background (Scene 3 style)"
             description="Generate a new background or fetch one from the library. Then click Composite to combine the subject with the chosen background. A different Remotion style will be applied in the next step."
           />
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-            {videoSceneId && goPreviousWithConfirm && (
-              <button
-                type="button"
-                onClick={() => goPreviousWithConfirm(videoSceneId)}
-                style={{
-                  padding: "8px 16px",
-                  borderRadius: "8px",
-                  border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                  background: "transparent",
-                  color: "var(--p-color-text-primary, #202223)",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  fontSize: "14px",
-                }}
-              >
-                ← Previous
-              </button>
-            )}
-          </div>
           <div style={twoPartLayout}>
             <div style={{ ...boxStyle, borderRight: "none", borderTopRightRadius: 0, borderBottomRightRadius: 0 }}>
               {effectiveOverlayUrl ? (
@@ -4754,23 +4651,6 @@ function Scene3Content({
           {composited && (
             <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
               <img key={composited} src={composited} alt="Composited" style={{ width: "200px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
-              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <button
-                  type="button"
-                  onClick={handleNextStepAfterComposite}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: "8px",
-                    border: "none",
-                    background: "var(--p-color-bg-fill-info, #2c6ecb)",
-                    color: "#fff",
-                    fontWeight: 600,
-                    cursor: "pointer",
-                  }}
-                >
-                  Next step →
-                </button>
-              </div>
             </div>
           )}
         </>
@@ -4815,23 +4695,6 @@ function Scene3Content({
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <video key={dbSceneVideoUrl ?? sceneVideo ?? ""} src={normalizeSceneVideoUrl(dbSceneVideoUrl ?? sceneVideo)} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                    {videoSceneId && goPreviousWithConfirm && (
-                      <button
-                        type="button"
-                        onClick={() => goPreviousWithConfirm(videoSceneId)}
-                        style={{
-                          padding: "8px 16px",
-                          borderRadius: "8px",
-                          border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                          background: "transparent",
-                          cursor: "pointer",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                        }}
-                      >
-                        ← Previous
-                      </button>
-                    )}
                     <button
                       type="button"
                       onClick={handleGenerateScene}
@@ -4870,21 +4733,6 @@ function Scene3Content({
                 </div>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    onClick={() => setStep(2)}
-                    style={{
-                      padding: "8px 16px",
-                      borderRadius: "8px",
-                      border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                      background: "transparent",
-                      cursor: "pointer",
-                      fontSize: "14px",
-                      fontWeight: 600,
-                    }}
-                  >
-                    ← Previous
-                  </button>
                   <button
                     type="button"
                     onClick={handleGenerateScene}
