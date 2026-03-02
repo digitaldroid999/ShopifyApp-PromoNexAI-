@@ -1,41 +1,15 @@
 /**
  * Temporary storage for "Create promo video" workflow state.
- * Saved while generation is in progress; deleted when user clicks Done (video completed).
+ * Only ephemeral UI is stored (tab, final view); asset data comes from Short/VideoScene/AudioInfo.
+ * Deleted when user clicks Done (video completed).
  */
 
 import prisma from "../db.server";
 
+/** Slim state: only activeTab and showingFinal. Legacy payloads with extra keys are accepted but only these are persisted. */
 export type WorkflowTempState = {
   activeTab: "scene1" | "scene2" | "scene3";
-  scene1Complete: boolean;
-  scene2Complete: boolean;
-  scene3Complete: boolean;
   showingFinal: boolean;
-  scriptGenerated: boolean;
-  audioGenerated: boolean;
-  scene1: {
-    step: number;
-    selectedImage: string | null;
-    bgRemoved: string | null;
-    bgImage: string | null;
-    composited: string | null;
-    sceneVideo: string | null;
-  };
-  scene2: {
-    step: number;
-    selectedImage: string | null;
-    bgRemoved: string | null;
-    selectedStockVideoUrl: string | null;
-    sceneVideo: string | null;
-  };
-  scene3: {
-    step: number;
-    selectedImage: string | null;
-    bgRemoved: string | null;
-    bgImage: string | null;
-    composited: string | null;
-    sceneVideo: string | null;
-  };
 };
 
 export async function getWorkflowTemp(
@@ -46,18 +20,26 @@ export async function getWorkflowTemp(
     where: { shop_productId: { shop, productId } },
   });
   if (!row || !row.state) return null;
-  return row.state as unknown as WorkflowTempState;
+  const raw = row.state as Record<string, unknown>;
+  return {
+    activeTab: (raw.activeTab === "scene2" || raw.activeTab === "scene3" ? raw.activeTab : "scene1") as "scene1" | "scene2" | "scene3",
+    showingFinal: Boolean(raw.showingFinal),
+  };
 }
 
 export async function saveWorkflowTemp(
   shop: string,
   productId: string,
-  state: WorkflowTempState
+  state: Partial<WorkflowTempState> & { activeTab?: "scene1" | "scene2" | "scene3"; showingFinal?: boolean }
 ): Promise<void> {
+  const slim: WorkflowTempState = {
+    activeTab: (state.activeTab === "scene2" || state.activeTab === "scene3" ? state.activeTab : "scene1"),
+    showingFinal: Boolean(state.showingFinal),
+  };
   await prisma.promoWorkflowTemp.upsert({
     where: { shop_productId: { shop, productId } },
-    create: { shop, productId, state: state as object },
-    update: { state: state as object },
+    create: { shop, productId, state: slim as object },
+    update: { state: slim as object },
   });
 }
 

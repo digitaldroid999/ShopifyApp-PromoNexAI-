@@ -111,9 +111,8 @@ const SHORTS_RESET_API = "/app/api/shorts/reset";
 export default function ProductDetail() {
   const { product, isSample } = useLoaderData<typeof loader>();
   const [workflowOpen, setWorkflowOpen] = useState(false);
-  const [openAsEdit, setOpenAsEdit] = useState(false);
   const [productVideoUrl, setProductVideoUrl] = useState<string | null>(null);
-  const shortsFetcher = useFetcher<{ finalVideoUrl?: string | null; shortId?: string | null }>();
+  const shortsFetcher = useFetcher<{ shortId?: string | null; finalVideoUrl?: string | null; status?: string | null }>();
 
   useEffect(() => {
     if (!isSample && product?.id) {
@@ -122,27 +121,28 @@ export default function ProductDetail() {
   }, [product?.id, isSample]);
 
   const finalVideoUrl = productVideoUrl ?? (shortsFetcher.data?.finalVideoUrl?.trim() || null);
+  const shortStatus = shortsFetcher.data?.status?.trim() || "draft";
+  const hasShort = !!shortsFetcher.data?.shortId?.trim();
 
-  const handleGenerateVideoClick = async () => {
-    try {
-      await fetch(SHORTS_API, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title: product.title ?? "Promo video", productId: product.id }),
-      });
-    } catch {
-      // continue to open modal
+  /** Single entry: ensure Short exists, then open workflow. Modal always loads Short and derives state. */
+  const handleOpenWorkflow = async () => {
+    if (!hasShort) {
+      try {
+        await fetch(SHORTS_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: product.title ?? "Promo video", productId: product.id }),
+        });
+      } catch {
+        // continue to open modal
+      }
+      shortsFetcher.load(`${SHORTS_API}?productId=${encodeURIComponent(product.id)}`);
     }
-    setOpenAsEdit(false);
     setWorkflowOpen(true);
   };
 
-  const handleEditVideoClick = () => {
-    setOpenAsEdit(true);
-    setWorkflowOpen(true);
-  };
-
-  const handleCreateNewVideoClick = async () => {
+  /** Optional: reset short then open workflow. */
+  const handleStartFromScratch = async () => {
     const shortId = shortsFetcher.data?.shortId?.trim();
     if (shortId) {
       try {
@@ -152,11 +152,10 @@ export default function ProductDetail() {
           body: JSON.stringify({ shortId }),
         });
       } catch {
-        // continue to open modal
+        // continue
       }
       shortsFetcher.load(`${SHORTS_API}?productId=${encodeURIComponent(product.id)}`);
     }
-    setOpenAsEdit(false);
     setWorkflowOpen(true);
   };
 
@@ -340,20 +339,18 @@ export default function ProductDetail() {
                 ) : null}
                 <div style={{ marginTop: "8px", paddingTop: "16px", borderTop: "1px solid var(--p-color-border-secondary, #e1e3e5)" }}>
                   <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "8px" }}>
-                    {finalVideoUrl ? (
-                      <>
-                        <s-button variant="primary" onClick={handleEditVideoClick}>
-                          Edit video
-                        </s-button>
-                        <s-button variant="secondary" onClick={handleCreateNewVideoClick}>
-                          Create new video
-                        </s-button>
-                      </>
-                    ) : (
-                      <s-button variant="primary" onClick={handleGenerateVideoClick}>
-                        Generate video
+                    <s-button variant="primary" onClick={handleOpenWorkflow}>
+                      {shortStatus === "ready" && finalVideoUrl
+                        ? "Edit video"
+                        : hasShort
+                          ? "Continue"
+                          : "Create promo video"}
+                    </s-button>
+                    {(shortStatus === "ready" && finalVideoUrl) || hasShort ? (
+                      <s-button variant="secondary" onClick={handleStartFromScratch}>
+                        Start from scratch
                       </s-button>
-                    )}
+                    ) : null}
                   </div>
                   <div style={{ marginTop: "8px" }}>
                     <Link to="/app" style={{ display: "block" }}>
@@ -378,7 +375,7 @@ export default function ProductDetail() {
             price: getProductPrice(product),
             rating: getProductRating(product),
           }}
-          openAsEdit={openAsEdit}
+          openAsEdit={shortStatus === "ready" && !!finalVideoUrl}
           onClose={() => setWorkflowOpen(false)}
           onDone={(videoUrl) => setProductVideoUrl(videoUrl)}
         />

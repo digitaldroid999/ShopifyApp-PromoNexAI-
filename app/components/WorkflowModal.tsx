@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useFetcher } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 
@@ -1495,6 +1495,7 @@ type BgMusicSnapshot = {
 type ShortInfo = {
   shortId: string | null;
   userId: string | null;
+  status: string | null;
   scene1Id: string | null;
   scene2Id: string | null;
   scene3Id: string | null;
@@ -1535,7 +1536,7 @@ export function WorkflowModal({
   const firstImageId = productImages[0]?.id ?? "s1";
   const showSkipRemoveBgWarning = () => shopify.toast.show(SKIP_REMOVE_BG_WARNING);
 
-  const loadTempFetcher = useFetcher<{ state: WorkflowTempState | null }>();
+  const loadTempFetcher = useFetcher<{ state: WorkflowTempStateSlim | null }>();
   const loadShortFetcher = useFetcher<ShortInfo>();
   const saveTempFetcher = useFetcher();
   const deleteTempFetcher = useFetcher();
@@ -1546,6 +1547,7 @@ export function WorkflowModal({
       ? {
           shortId: loadShortFetcher.data.shortId ?? null,
           userId: loadShortFetcher.data.userId ?? null,
+          status: (loadShortFetcher.data as { status?: string }).status ?? "draft",
           scene1Id: loadShortFetcher.data.scene1Id ?? null,
           scene2Id: loadShortFetcher.data.scene2Id ?? null,
           scene3Id: loadShortFetcher.data.scene3Id ?? null,
@@ -1558,14 +1560,9 @@ export function WorkflowModal({
         }
       : null;
 
-  const [loadedState, setLoadedState] = useState<WorkflowTempState | null | "pending">(null);
+  const [loadedState, setLoadedState] = useState<WorkflowTempStateSlim | null | "pending">(null);
   const [activeTab, setActiveTab] = useState<"scene1" | "scene2" | "scene3">("scene1");
-  const [scene1Complete, setScene1Complete] = useState(false);
-  const [scene2Complete, setScene2Complete] = useState(false);
-  const [scene3Complete, setScene3Complete] = useState(false);
   const [showingFinal, setShowingFinal] = useState(false);
-  const [scriptGenerated, setScriptGenerated] = useState(false);
-  const [audioGenerated, setAudioGenerated] = useState(false);
   const [audioLoading, setAudioLoading] = useState(false);
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>("");
   const [audioScript, setAudioScript] = useState<string>("");
@@ -1602,14 +1599,33 @@ export function WorkflowModal({
   /** Final video URL from merge (set after finalize completes; used when showing final view) */
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
 
+  // Completion derived from Short (single source of truth)
+  const scene1Complete = !!shortInfo?.scene1GeneratedVideoUrl?.trim();
+  const scene2Complete = !!shortInfo?.scene2GeneratedVideoUrl?.trim();
+  const scene3Complete = !!shortInfo?.scene3GeneratedVideoUrl?.trim();
+  const scriptGenerated = !!shortInfo?.audioInfo?.audioScript?.trim();
+  const audioGenerated = !!shortInfo?.audioInfo?.generatedAudioUrl?.trim();
   const allScenesComplete = scene1Complete && scene2Complete && scene3Complete;
+  const audioComplete = scriptGenerated && audioGenerated && !!shortInfo?.bgMusic;
+  type WorkflowPhase = "scenes" | "audio" | "finalize" | "finalView";
+  const workflowPhase: WorkflowPhase = showingFinal
+    ? "finalView"
+    : !allScenesComplete
+      ? "scenes"
+      : !audioComplete
+        ? "audio"
+        : "finalize";
 
   /** Resolved final video URL: from merge result or from short (e.g. after reload) */
   const displayedFinalVideoUrl = finalVideoUrl ?? shortInfo?.finalVideoUrl ?? null;
 
   /** Restored state from temp (null while loading or when none saved) */
-  const restoredState: WorkflowTempState | null =
+  const restoredState: WorkflowTempStateSlim | null =
     loadedState !== null && loadedState !== "pending" ? loadedState : null;
+
+  const refetchShort = useCallback(() => {
+    if (productId?.trim()) loadShortFetcher.load(`/app/api/shorts?productId=${encodeURIComponent(productId.trim())}`);
+  }, [productId]);
 
   // Load short + scene ids from DB when modal opens with productId
   useEffect(() => {
@@ -1638,14 +1654,12 @@ export function WorkflowModal({
     initedAudioFromInfoRef.current = true;
     if (typeof info.audioScript === "string" && info.audioScript) {
       setAudioScript(info.audioScript);
-      setScriptGenerated(true);
     }
     if (typeof info.voiceId === "string" && info.voiceId) {
       setSelectedVoiceId(info.voiceId);
     }
     if (typeof info.generatedAudioUrl === "string" && info.generatedAudioUrl) {
       setGeneratedAudioUrl(info.generatedAudioUrl);
-      setAudioGenerated(true);
     }
     if (info.subtitles && Array.isArray(info.subtitles)) {
       setLastSubtitleTiming(info.subtitles as Array<{ text: string; start_time: number; end_time: number; duration: number }>);
@@ -1668,17 +1682,13 @@ export function WorkflowModal({
     }
   }, [shortInfo?.shortId, shortInfo?.bgMusic?.id, shortInfo?.bgMusic?.previewUrl, shortInfo?.bgMusic?.name]);
 
-  // When openAsEdit and shortInfo is available, restore workflow state from DB (scenes + showingFinal) so user can edit and re-finalize.
+  // When shortInfo is available, derive initial workflow state from DB once (single source of truth for assets).
   useEffect(() => {
-    if (!openAsEdit || !shortInfo?.shortId || restoredFromDbRef.current) return;
+    if (!shortInfo?.shortId || restoredFromDbRef.current) return;
     restoredFromDbRef.current = true;
-    setShowingFinal(false);
     const s1 = shortInfo.scene1GeneratedVideoUrl?.trim();
     const s2 = shortInfo.scene2GeneratedVideoUrl?.trim();
     const s3 = shortInfo.scene3GeneratedVideoUrl?.trim();
-    setScene1Complete(!!s1);
-    setScene2Complete(!!s2);
-    setScene3Complete(!!s3);
     setScene1Snapshot({
       ...defaultScene1State(firstImageId),
       step: s1 ? 3 : 1,
@@ -1694,7 +1704,7 @@ export function WorkflowModal({
       step: s3 ? 3 : 1,
       sceneVideo: s3 ?? null,
     });
-  }, [openAsEdit, shortInfo?.shortId, shortInfo?.scene1GeneratedVideoUrl, shortInfo?.scene2GeneratedVideoUrl, shortInfo?.scene3GeneratedVideoUrl, firstImageId]);
+  }, [shortInfo?.shortId, shortInfo?.scene1GeneratedVideoUrl, shortInfo?.scene2GeneratedVideoUrl, shortInfo?.scene3GeneratedVideoUrl, firstImageId]);
 
   // Load voices and backend config once when audio step becomes relevant (avoid re-fetch loop)
   useEffect(() => {
@@ -1722,52 +1732,32 @@ export function WorkflowModal({
     }
   }, [voicesFetcher.data, selectedVoiceId]);
 
-  // Restore workflow state from temp only on initial load (when still "pending").
-  // When openAsEdit, skip restoring scene state so restore-from-DB can set it from shortInfo.
+  // Restore only ephemeral UI from temp (activeTab, showingFinal). Asset data always comes from Short.
   useEffect(() => {
     if (loadedState !== "pending" || loadTempFetcher.state !== "idle" || !loadTempFetcher.data) return;
     const data = loadTempFetcher.data;
     const state = data?.state ?? null;
-    setLoadedState(state);
-    if (state) {
-      setActiveTab(state.activeTab);
-      setShowingFinal(state.showingFinal);
-      setScriptGenerated(state.scriptGenerated);
-      setAudioGenerated(state.audioGenerated);
-      if (!openAsEdit) {
-        setScene1Complete(state.scene1Complete);
-        setScene2Complete(state.scene2Complete);
-        setScene3Complete(state.scene3Complete);
-        setScene1Snapshot(state.scene1);
-        setScene2Snapshot(state.scene2);
-        setScene3Snapshot(state.scene3);
-      }
+    if (state && (state.activeTab === "scene2" || state.activeTab === "scene3" || state.activeTab === "scene1")) {
+      const slim = { activeTab: state.activeTab, showingFinal: Boolean(state.showingFinal) };
+      setLoadedState(slim);
+      setActiveTab(slim.activeTab);
+      setShowingFinal(slim.showingFinal);
+    } else {
+      setLoadedState(null);
     }
-  }, [loadedState, loadTempFetcher.state, loadTempFetcher.data, openAsEdit]);
+  }, [loadedState, loadTempFetcher.state, loadTempFetcher.data]);
 
-  // Debounced save while workflow is in progress (skip while still loading temp)
+  // Debounced save of ephemeral UI only (activeTab, showingFinal). Asset data lives in Short.
   useEffect(() => {
     if (!productId?.trim() || loadedState === "pending") return;
     const timer = setTimeout(() => {
-      const state: WorkflowTempState = {
-        activeTab,
-        scene1Complete,
-        scene2Complete,
-        scene3Complete,
-        showingFinal,
-        scriptGenerated,
-        audioGenerated,
-        scene1: scene1Snapshot ?? defaultScene1State(firstImageId),
-        scene2: scene2Snapshot ?? defaultScene2State(firstImageId),
-        scene3: scene3Snapshot ?? defaultScene3State(firstImageId),
-      };
       saveTempFetcher.submit(
-        { productId: productId.trim(), state },
+        { productId: productId.trim(), state: { activeTab, showingFinal } },
         { method: "post", action: WORKFLOW_TEMP_API, encType: "application/json" }
       );
     }, 2000);
     return () => clearTimeout(timer);
-  }, [productId, loadedState, activeTab, scene1Complete, scene2Complete, scene3Complete, showingFinal, scriptGenerated, audioGenerated, scene1Snapshot, scene2Snapshot, scene3Snapshot, firstImageId]);
+  }, [productId, loadedState, activeTab, showingFinal]);
 
   const handleFinalize = async () => {
     if (!shortInfo?.shortId) {
@@ -1865,7 +1855,6 @@ export function WorkflowModal({
         // continue with UI reset
       }
     }
-    setScene1Complete(false);
     setScene1Snapshot(null);
     setScene1ResetKey((k) => k + 1);
     setScene1Regenerated(true);
@@ -1886,7 +1875,6 @@ export function WorkflowModal({
         // continue with UI reset
       }
     }
-    setScene2Complete(false);
     setScene2Snapshot(null);
     setScene2ResetKey((k) => k + 1);
     setScene2Regenerated(true);
@@ -1907,7 +1895,6 @@ export function WorkflowModal({
         // continue with UI reset
       }
     }
-    setScene3Complete(false);
     setScene3Snapshot(null);
     setScene3ResetKey((k) => k + 1);
     setScene3Regenerated(true);
@@ -1917,6 +1904,7 @@ export function WorkflowModal({
   };
 
   const handleStartFromScratch = async () => {
+    restoredFromDbRef.current = false;
     if (shortInfo?.shortId) {
       try {
         await fetch(SHORTS_RESET_API, {
@@ -1933,14 +1921,9 @@ export function WorkflowModal({
       }
     }
     setShowingFinal(false);
-    setScene1Complete(false);
-    setScene2Complete(false);
-    setScene3Complete(false);
     setScene1Snapshot(null);
     setScene2Snapshot(null);
     setScene3Snapshot(null);
-    setScriptGenerated(false);
-    setAudioGenerated(false);
     setScene1Regenerated(true);
     setScene2Regenerated(true);
     setScene3Regenerated(true);
@@ -2110,31 +2093,29 @@ export function WorkflowModal({
           </div>
         ) : (
           <>
-            {/* Stepper: Scene 1 → Scene 2 → Scene 3 → Audio → Final (visual only) */}
+            {/* Phase strip: 1. Scenes | 2. Audio | 3. Finalize */}
             <div
               style={{
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: "4px",
-                padding: "12px 20px",
+                gap: "8px",
+                padding: "16px 24px",
                 borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
                 background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
               }}
             >
               {[
-                { key: "scene1", label: "Scene 1", done: scene1Complete, active: !allScenesComplete && activeTab === "scene1" },
-                { key: "scene2", label: "Scene 2", done: scene2Complete, active: !allScenesComplete && activeTab === "scene2" },
-                { key: "scene3", label: "Scene 3", done: scene3Complete, active: !allScenesComplete && activeTab === "scene3" },
-                { key: "audio", label: "Audio", done: false, active: allScenesComplete },
-                { key: "final", label: "Final", done: false, active: false },
+                { phase: "scenes" as const, label: "1. Scenes", done: allScenesComplete, active: workflowPhase === "scenes" },
+                { phase: "audio" as const, label: "2. Audio", done: audioComplete, active: workflowPhase === "audio" },
+                { phase: "finalize" as const, label: "3. Finalize", done: workflowPhase === "finalView", active: workflowPhase === "finalize" },
               ].map((item, index) => (
-                <div key={item.key} style={{ display: "flex", alignItems: "center" }}>
+                <div key={item.phase} style={{ display: "flex", alignItems: "center" }}>
                   <span
                     style={{
-                      padding: "4px 10px",
-                      borderRadius: "999px",
-                      fontSize: "12px",
+                      padding: "6px 12px",
+                      borderRadius: "8px",
+                      fontSize: "14px",
                       fontWeight: 600,
                       background: item.active ? "var(--p-color-bg-fill-info, #2c6ecb)" : item.done ? "var(--p-color-bg-fill-success-secondary, #d3f0d9)" : "transparent",
                       color: item.active ? "#fff" : item.done ? "var(--p-color-text-success, #008060)" : "var(--p-color-text-subdued, #6d7175)",
@@ -2143,60 +2124,53 @@ export function WorkflowModal({
                   >
                     {item.done ? "✓ " : ""}{item.label}
                   </span>
-                  {index < 4 && (
-                    <span
-                      style={{
-                        width: "20px",
-                        height: "2px",
-                        margin: "0 2px",
-                        background: item.done ? "var(--p-color-border-success, #008060)" : "var(--p-color-border-secondary, #e1e3e5)",
-                      }}
-                      aria-hidden
-                    />
+                  {index < 2 && (
+                    <span style={{ width: "24px", height: "2px", margin: "0 4px", background: item.done ? "var(--p-color-border-success, #008060)" : "var(--p-color-border-secondary, #e1e3e5)" }} aria-hidden />
                   )}
                 </div>
               ))}
             </div>
-            <div
-              style={{
-                display: "flex",
-                borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                padding: "0 20px",
-              }}
-            >
-              {(["scene1", "scene2", "scene3"] as const).map((tab) => {
-                const complete = tab === "scene1" ? scene1Complete : tab === "scene2" ? scene2Complete : scene3Complete;
-                const label = tab === "scene1" ? "Scene 1" : tab === "scene2" ? "Scene 2" : "Scene 3";
-                return (
-                  <button
-                    key={tab}
-                    type="button"
-                    onClick={() => setActiveTab(tab)}
-                    style={{
-                      padding: "14px 20px",
-                      border: "none",
-                      background: "none",
-                      cursor: "pointer",
-                      fontSize: "14px",
-                      fontWeight: 600,
-                      color: activeTab === tab ? "var(--p-color-text-primary, #202223)" : "var(--p-color-text-subdued, #6d7175)",
-                      borderBottom: activeTab === tab ? "2px solid var(--p-color-border-info, #2c6ecb)" : "2px solid transparent",
-                      marginBottom: "-1px",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}
-                  >
-                    {complete ? (
-                      <span style={{ color: "var(--p-color-text-success, #008060)", fontSize: "16px" }} title="Complete" aria-hidden>✓</span>
-                    ) : null}
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
 
-            {allScenesComplete && (
+            {workflowPhase === "scenes" && (
+              <div
+                style={{
+                  display: "flex",
+                  borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                  padding: "0 24px",
+                }}
+              >
+                {(["scene1", "scene2", "scene3"] as const).map((tab) => {
+                  const complete = tab === "scene1" ? scene1Complete : tab === "scene2" ? scene2Complete : scene3Complete;
+                  const label = tab === "scene1" ? "Scene 1" : tab === "scene2" ? "Scene 2" : "Scene 3";
+                  return (
+                    <button
+                      key={tab}
+                      type="button"
+                      onClick={() => setActiveTab(tab)}
+                      style={{
+                        padding: "14px 20px",
+                        border: "none",
+                        background: "none",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        color: activeTab === tab ? "var(--p-color-text-primary, #202223)" : "var(--p-color-text-subdued, #6d7175)",
+                        borderBottom: activeTab === tab ? "2px solid var(--p-color-border-info, #2c6ecb)" : "2px solid transparent",
+                        marginBottom: "-1px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "8px",
+                      }}
+                    >
+                      {complete ? <span style={{ color: "var(--p-color-text-success, #008060)", fontSize: "16px" }} title="Complete" aria-hidden>✓</span> : null}
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {workflowPhase === "audio" && (
               <div
                 style={{
                   background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
@@ -2284,7 +2258,6 @@ export function WorkflowModal({
                                 const scriptText = typeof data.script === "string" ? data.script : "";
                                 if (scriptText) {
                                   setAudioScript(scriptText);
-                                  setScriptGenerated(true);
                                   try {
                                     const saveRes = await fetch(AUDIO_SAVE_SCRIPT_API, {
                                       method: "POST",
@@ -2297,7 +2270,7 @@ export function WorkflowModal({
                                       }),
                                     });
                                     const saveData = await saveRes.json();
-                                    if (saveData.success) { setScriptSavedFeedback(true); setTimeout(() => setScriptSavedFeedback(false), 2000); }
+                                    if (saveData.success) { setScriptSavedFeedback(true); setTimeout(() => setScriptSavedFeedback(false), 2000); refetchShort(); }
                                   } catch {
                                     // non-blocking; script is in state
                                   }
@@ -2342,7 +2315,6 @@ export function WorkflowModal({
                                       const scriptText = typeof data.script === "string" ? data.script : "";
                                       if (scriptText) {
                                         setAudioScript(scriptText);
-                                        setScriptGenerated(true);
                                         try {
                                           const saveRes = await fetch(AUDIO_SAVE_SCRIPT_API, {
                                             method: "POST",
@@ -2355,7 +2327,7 @@ export function WorkflowModal({
                                             }),
                                           });
                                           const saveData = await saveRes.json();
-                                          if (saveData.success) { setScriptSavedFeedback(true); setTimeout(() => setScriptSavedFeedback(false), 2000); }
+                                          if (saveData.success) { setScriptSavedFeedback(true); setTimeout(() => setScriptSavedFeedback(false), 2000); refetchShort(); }
                                         } catch {
                                           // non-blocking
                                         }
@@ -2387,7 +2359,7 @@ export function WorkflowModal({
                                     try {
                                       const res = await fetch(AUDIO_SAVE_SCRIPT_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ short_id: shortInfo.shortId, audio_script: audioScript, voice_id: selectedVoiceId || undefined, voice_name: voicesFetcher.data?.success ? voicesFetcher.data.voices.find((v) => v.voice_id === selectedVoiceId)?.name : undefined }) });
                                       const data = await res.json();
-                                      if (data.success) { setScriptSavedFeedback(true); setTimeout(() => setScriptSavedFeedback(false), 2000); } else { alert(data.error || "Failed to save script"); }
+                                      if (data.success) { setScriptSavedFeedback(true); setTimeout(() => setScriptSavedFeedback(false), 2000); refetchShort(); } else { alert(data.error || "Failed to save script"); }
                                     } finally { setScriptSaveLoading(false); }
                                 }}
                                   title={scriptSaveLoading ? "Saving…" : "Save script"}
@@ -2433,7 +2405,6 @@ export function WorkflowModal({
                                     if (data.audio_url) {
                                       setGeneratedAudioUrl(data.audio_url);
                                       setLastSubtitleTiming(Array.isArray(data.subtitle_timing) ? data.subtitle_timing : null);
-                                      setAudioGenerated(true);
                                       try {
                                         const saveRes = await fetch(AUDIO_SAVE_API, {
                                           method: "POST",
@@ -2447,7 +2418,7 @@ export function WorkflowModal({
                                           }),
                                         });
                                         const saveData = await saveRes.json();
-                                        if (saveData.success) { setAudioSavedFeedback(true); setTimeout(() => setAudioSavedFeedback(false), 2000); }
+                                        if (saveData.success) { setAudioSavedFeedback(true); setTimeout(() => setAudioSavedFeedback(false), 2000); refetchShort(); }
                                       } catch {
                                         // non-blocking
                                       }
@@ -2479,7 +2450,6 @@ export function WorkflowModal({
                                       if (data.audio_url) {
                                         setGeneratedAudioUrl(data.audio_url);
                                         setLastSubtitleTiming(Array.isArray(data.subtitle_timing) ? data.subtitle_timing : null);
-                                        setAudioGenerated(true);
                                         try {
                                           const saveRes = await fetch(AUDIO_SAVE_API, {
                                             method: "POST",
@@ -2493,7 +2463,7 @@ export function WorkflowModal({
                                             }),
                                           });
                                           const saveData = await saveRes.json();
-                                          if (saveData.success) { setAudioSavedFeedback(true); setTimeout(() => setAudioSavedFeedback(false), 2000); }
+                                          if (saveData.success) { setAudioSavedFeedback(true); setTimeout(() => setAudioSavedFeedback(false), 2000); refetchShort(); }
                                         } catch {
                                           // non-blocking
                                         }
@@ -2592,6 +2562,7 @@ export function WorkflowModal({
                                 if (data.success) {
                                   setBgMusicSavedFeedback(true);
                                   setTimeout(() => setBgMusicSavedFeedback(false), 2000);
+                                  refetchShort();
                                 }
                               })
                               .catch(() => {})
@@ -2605,45 +2576,46 @@ export function WorkflowModal({
               </div>
             )}
 
-            {allScenesComplete && (
+            {workflowPhase === "finalize" && (
               <div
                 style={{
-                  padding: "12px 20px",
-                  background: "var(--p-color-bg-fill-success-secondary, #e3f1df)",
+                  padding: "24px",
                   borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                  display: "flex",
-                  flexDirection: "column",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
+                  background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
                 }}
               >
-                <button
-                  type="button"
-                  onClick={handleFinalize}
-                  disabled={finalizeLoading || !shortInfo?.shortId}
-                  style={{
-                    padding: "12px 24px",
-                    borderRadius: "8px",
-                    border: "none",
-                    background: finalizeLoading || !shortInfo?.shortId ? "#9ca3af" : "var(--p-color-bg-fill-success, #008060)",
-                    color: "#fff",
-                    fontWeight: 600,
-                    cursor: finalizeLoading || !shortInfo?.shortId ? "not-allowed" : "pointer",
-                    fontSize: "14px",
-                  }}
-                >
-                  {finalizeLoading ? "Merging…" : "Finalize"}
-                </button>
-                {finalizeProgress != null && (
-                  <span style={{ fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)" }}>{finalizeProgress}%</span>
-                )}
-                {finalizeError && (
-                  <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{finalizeError}</span>
-                )}
+                <p style={{ margin: "0 0 16px", fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>
+                  All scenes and audio are ready. Click below to merge into the final video.
+                </p>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "8px" }}>
+                  <button
+                    type="button"
+                    onClick={handleFinalize}
+                    disabled={finalizeLoading || !shortInfo?.shortId}
+                    style={{
+                      padding: "12px 24px",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: finalizeLoading || !shortInfo?.shortId ? "#9ca3af" : "var(--p-color-bg-fill-success, #008060)",
+                      color: "#fff",
+                      fontWeight: 600,
+                      cursor: finalizeLoading || !shortInfo?.shortId ? "not-allowed" : "pointer",
+                      fontSize: "14px",
+                    }}
+                  >
+                    {finalizeLoading ? "Merging…" : "Finalize"}
+                  </button>
+                  {finalizeProgress != null && (
+                    <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>{finalizeProgress}%</span>
+                  )}
+                  {finalizeError && (
+                    <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{finalizeError}</span>
+                  )}
+                </div>
               </div>
             )}
 
+            {workflowPhase === "scenes" && (
             <div style={{ padding: "24px", overflow: "auto", flex: 1 }}>
               <div style={{ display: activeTab === "scene1" ? "block" : "none" }} key={`scene1-${scene1ResetKey}`}>
                 <Scene1Content
@@ -2653,12 +2625,12 @@ export function WorkflowModal({
                   sceneId={shortInfo?.scene1Id ?? undefined}
                   shortId={shortInfo?.shortId ?? undefined}
                   shortUserId={shortInfo?.userId ?? undefined}
-                  initialScene1={scene1Regenerated ? undefined : (restoredState?.scene1 ?? scene1Snapshot)}
+                  initialScene1={scene1Regenerated ? undefined : (scene1Snapshot ?? defaultScene1State(firstImageId))}
                   dbSceneVideoUrl={scene1Regenerated ? undefined : (shortInfo?.scene1GeneratedVideoUrl ?? undefined)}
                   onScene1Change={setScene1Snapshot}
                   onComplete={() => {
-                    setScene1Complete(true);
                     setScene1Regenerated(false);
+                    refetchShort();
                   }}
                   onRegenerate={handleRegenerateScene1}
                   onSkipRemoveBgWarning={showSkipRemoveBgWarning}
@@ -2669,12 +2641,12 @@ export function WorkflowModal({
                   productImages={productImages}
                   sceneId={shortInfo?.scene2Id ?? undefined}
                   shortUserId={shortInfo?.userId ?? undefined}
-                  initialScene2={scene2Regenerated ? undefined : (restoredState?.scene2 ?? scene2Snapshot)}
+                  initialScene2={scene2Regenerated ? undefined : (scene2Snapshot ?? defaultScene2State(firstImageId))}
                   dbSceneVideoUrl={scene2Regenerated ? undefined : (shortInfo?.scene2GeneratedVideoUrl ?? undefined)}
                   onScene2Change={setScene2Snapshot}
                   onComplete={() => {
-                    setScene2Complete(true);
                     setScene2Regenerated(false);
+                    refetchShort();
                   }}
                   onRegenerate={handleRegenerateScene2}
                   onSkipRemoveBgWarning={showSkipRemoveBgWarning}
@@ -2688,18 +2660,19 @@ export function WorkflowModal({
                   sceneId={shortInfo?.scene3Id ?? undefined}
                   shortId={shortInfo?.shortId ?? undefined}
                   shortUserId={shortInfo?.userId ?? undefined}
-                  initialScene3={scene3Regenerated ? undefined : (restoredState?.scene3 ?? scene3Snapshot)}
+                  initialScene3={scene3Regenerated ? undefined : (scene3Snapshot ?? defaultScene3State(firstImageId))}
                   dbSceneVideoUrl={scene3Regenerated ? undefined : (shortInfo?.scene3GeneratedVideoUrl ?? undefined)}
                   onScene3Change={setScene3Snapshot}
                   onComplete={() => {
-                    setScene3Complete(true);
                     setScene3Regenerated(false);
+                    refetchShort();
                   }}
                   onRegenerate={handleRegenerateScene3}
                   onSkipRemoveBgWarning={showSkipRemoveBgWarning}
                 />
               </div>
             </div>
+            )}
           </>
         )}
       </div>
@@ -2770,13 +2743,17 @@ async function parseCompositeApiResponse(
   return { ok: false, error: errorMessage };
 }
 
-/** Serializable workflow state for temp save/restore (matches server WorkflowTempState) */
-export type WorkflowTempState = {
+/** Slim state persisted to temp API (server only stores activeTab + showingFinal) */
+export type WorkflowTempStateSlim = {
   activeTab: "scene1" | "scene2" | "scene3";
+  showingFinal: boolean;
+};
+
+/** Full workflow state shape (scene snapshots used in-memory only; temp API uses WorkflowTempStateSlim) */
+export type WorkflowTempState = WorkflowTempStateSlim & {
   scene1Complete: boolean;
   scene2Complete: boolean;
   scene3Complete: boolean;
-  showingFinal: boolean;
   scriptGenerated: boolean;
   audioGenerated: boolean;
   scene1: { step: number; selectedImage: string | null; bgRemoved: string | null; skipRemoveBg: boolean; bgImage: string | null; composited: string | null; sceneVideo: string | null };

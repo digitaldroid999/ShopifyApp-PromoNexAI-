@@ -40,9 +40,26 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
   console.log(`${LOG} Starting finalize short_id=${shortId} user_id=${userId}`);
 
+  try {
+    await (prisma as any).short.update({
+      where: { id: shortId },
+      data: { status: "finalizing" },
+    });
+  } catch (e) {
+    console.log(`${LOG} Failed to set status=finalizing:`, e);
+  }
+
   const result = await finalizeShortStart(userId, short.id);
   if (!result.ok) {
     console.log(`${LOG} Backend error short_id=${shortId}:`, result.error);
+    try {
+      await (prisma as any).short.update({
+        where: { id: shortId },
+        data: { status: "draft" },
+      });
+    } catch {
+      // ignore
+    }
     return Response.json({ error: result.error }, { status: 400 });
   }
   console.log(`${LOG} Started OK short_id=${shortId} task_id=${result.task_id} status=${result.status} message=${result.message ?? "-"}`);

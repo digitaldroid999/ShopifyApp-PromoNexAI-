@@ -20,7 +20,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     },
   });
   if (!short) {
-    return Response.json({ shortId: null, userId: null, scene1Id: null, scene2Id: null, scene3Id: null, audioInfo: null, bgMusic: null, scene1GeneratedVideoUrl: null, scene2GeneratedVideoUrl: null, scene3GeneratedVideoUrl: null, finalVideoUrl: null });
+    return Response.json({ shortId: null, userId: null, status: null, scene1Id: null, scene2Id: null, scene3Id: null, audioInfo: null, bgMusic: null, scene1GeneratedVideoUrl: null, scene2GeneratedVideoUrl: null, scene3GeneratedVideoUrl: null, finalVideoUrl: null });
   }
   const [s1, s2, s3] = short.scenes;
   const audioInfo = (short as { audioInfo?: { voiceId: string | null; voiceName: string | null; audioScript: string | null; generatedAudioUrl: string | null; subtitles: unknown } | null }).audioInfo;
@@ -52,6 +52,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return Response.json({
     shortId: short.id,
     userId: short.userId ?? null,
+    status: (short as { status?: string }).status ?? "draft",
     scene1Id: s1?.id ?? null,
     scene2Id: s2?.id ?? null,
     scene3Id: s3?.id ?? null,
@@ -132,6 +133,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       return Response.json({
         shortId: existing.id,
         userId: existing.userId ?? null,
+        status: (existing as { status?: string }).status ?? "draft",
         scene1Id: s1?.id ?? null,
         scene2Id: s2?.id ?? null,
         scene3Id: s3?.id ?? null,
