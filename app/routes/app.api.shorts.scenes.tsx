@@ -15,9 +15,9 @@ const DEFAULT_DURATION_SEC = 8;
 export const action = async ({ request }: ActionFunctionArgs) => {
   await authenticate.admin(request);
 
-  // PATCH: update scene imageUrl, status, reset, or goPrevious (clear current step data and set previous status)
+  // PATCH: update scene imageUrl, status, fetchedMedia, reset, or goPrevious (clear current step data and set previous status)
   if (request.method === "PATCH") {
-    let body: { sceneId?: string; imageUrl?: string; reset?: boolean; status?: string; goPrevious?: boolean };
+    let body: { sceneId?: string; imageUrl?: string; reset?: boolean; status?: string; goPrevious?: boolean; fetchedMedia?: unknown };
     try {
       body = await request.json();
     } catch {
@@ -36,6 +36,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           data: {
             imageUrl: null,
             generatedVideoUrl: null,
+            fetchedMedia: null,
             status: "step1",
           },
         });
@@ -59,9 +60,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           sceneNumber === 2
             ? getScene2ClearFieldsWhenGoingPrevious(currentStatus)
             : getScene13ClearFieldsWhenGoingPrevious(currentStatus);
-        const data: { status: string; imageUrl?: null; generatedVideoUrl?: null } = { status: prevStatus };
+        const data: { status: string; imageUrl?: null; generatedVideoUrl?: null; fetchedMedia?: null } = { status: prevStatus };
         if (clearFields.imageUrl) data.imageUrl = null;
         if (clearFields.generatedVideoUrl) data.generatedVideoUrl = null;
+        if (clearFields.fetchedMedia) data.fetchedMedia = null;
         await videoScene.update({ where: { id: sceneId }, data });
         return Response.json({ ok: true, status: prevStatus, goPrevious: true });
       }
@@ -70,11 +72,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         typeof body.status === "string" && body.status.trim()
           ? body.status.trim()
           : undefined;
+      const fetchedMedia = body.fetchedMedia;
       const validScene13 = status && SCENE13_STATUSES.includes(status as never);
       const validScene2 = status && SCENE2_STATUSES.includes(status as never);
-      const data: { imageUrl?: string | null; status?: string } = {};
+      const data: { imageUrl?: string | null; status?: string; fetchedMedia?: unknown } = {};
       if (imageUrl !== undefined) data.imageUrl = imageUrl ?? null;
       if (status && (validScene13 || validScene2)) data.status = status;
+      if (fetchedMedia !== undefined) data.fetchedMedia = fetchedMedia === null ? null : fetchedMedia;
       if (Object.keys(data).length === 0) {
         return Response.json({ ok: true });
       }

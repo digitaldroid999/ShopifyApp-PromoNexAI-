@@ -6,7 +6,7 @@ import prisma from "../db.server";
  * POST: Reset a short and all its scenes to default (e.g. after "Start from scratch").
  * Body: { shortId: string }
  * - Short: finalVideoUrl = null, status = "draft"
- * - All VideoScenes for that short: imageUrl = null, generatedVideoUrl = null, status = "step1"
+ * - All VideoScenes for that short: imageUrl = null, generatedVideoUrl = null, fetchedMedia = null, status = "step1"
  */
 export const action = async ({ request }: ActionFunctionArgs) => {
   await authenticate.admin(request);
@@ -42,6 +42,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       data: {
         imageUrl: null,
         generatedVideoUrl: null,
+        fetchedMedia: null,
         status: "step1",
       },
     });

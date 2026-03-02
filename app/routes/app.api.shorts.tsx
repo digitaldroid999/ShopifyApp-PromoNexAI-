@@ -19,8 +19,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       audioInfo: true,
     },
   });
-  if (!short) {
-    return Response.json({ shortId: null, userId: null, status: null, scene1Id: null, scene2Id: null, scene3Id: null, scene1Status: null, scene2Status: null, scene3Status: null, audioInfo: null, bgMusic: null, scene1GeneratedVideoUrl: null, scene2GeneratedVideoUrl: null, scene3GeneratedVideoUrl: null, finalVideoUrl: null });
+    if (!short) {
+    return Response.json({ shortId: null, userId: null, status: null, scene1Id: null, scene2Id: null, scene3Id: null, scene1Status: null, scene2Status: null, scene3Status: null, audioInfo: null, bgMusic: null, scene1FetchedMedia: null, scene2FetchedMedia: null, scene3FetchedMedia: null, scene1GeneratedVideoUrl: null, scene2GeneratedVideoUrl: null, scene3GeneratedVideoUrl: null, finalVideoUrl: null });
   }
   // When loading a short that is still draft, mark as in_progress (user is working on it)
   const currentStatus = (short as { status?: string }).status?.trim() || "draft";
@@ -37,6 +37,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const resolvedStatus = currentStatus === "draft" ? "in_progress" : currentStatus;
   const [s1, s2, s3] = short.scenes;
   const sceneStatus = (s: { status?: string } | undefined) => (s?.status?.trim() || "step1");
+  const sceneFetchedMedia = (s: { fetchedMedia?: unknown } | undefined) => (s?.fetchedMedia != null ? s.fetchedMedia : null);
   const audioInfo = (short as { audioInfo?: { voiceId: string | null; voiceName: string | null; audioScript: string | null; generatedAudioUrl: string | null; subtitles: unknown } | null }).audioInfo;
   const metadata = short.metadata as {
     bgMusic?: {
@@ -77,6 +78,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     scene1ImageUrl: sceneImageUrl(s1),
     scene2ImageUrl: sceneImageUrl(s2),
     scene3ImageUrl: sceneImageUrl(s3),
+    scene1FetchedMedia: sceneFetchedMedia(s1),
+    scene2FetchedMedia: sceneFetchedMedia(s2),
+    scene3FetchedMedia: sceneFetchedMedia(s3),
     scene1GeneratedVideoUrl: sceneWithUrl(s1),
     scene2GeneratedVideoUrl: sceneWithUrl(s2),
     scene3GeneratedVideoUrl: sceneWithUrl(s3),
@@ -129,6 +133,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const audioInfo = (existing as { audioInfo?: { voiceId: string | null; voiceName: string | null; audioScript: string | null; generatedAudioUrl: string | null; subtitles: unknown } | null }).audioInfo;
       const sceneWithUrl = (s: { generatedVideoUrl?: string | null } | undefined) => (s?.generatedVideoUrl?.trim() ? s.generatedVideoUrl : null) ?? null;
       const sceneImageUrl = (s: { imageUrl?: string | null } | undefined) => (s?.imageUrl?.trim() ? s.imageUrl : null) ?? null;
+      const sceneFetchedMediaExisting = (s: { fetchedMedia?: unknown } | undefined) => (s?.fetchedMedia != null ? s.fetchedMedia : null);
       const meta = existing.metadata as {
         bgMusic?: {
           id?: string | null;
@@ -166,6 +171,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         scene1ImageUrl: sceneImageUrl(s1),
         scene2ImageUrl: sceneImageUrl(s2),
         scene3ImageUrl: sceneImageUrl(s3),
+        scene1FetchedMedia: sceneFetchedMediaExisting(s1),
+        scene2FetchedMedia: sceneFetchedMediaExisting(s2),
+        scene3FetchedMedia: sceneFetchedMediaExisting(s3),
         scene1GeneratedVideoUrl: sceneWithUrl(s1),
         scene2GeneratedVideoUrl: sceneWithUrl(s2),
         scene3GeneratedVideoUrl: sceneWithUrl(s3),

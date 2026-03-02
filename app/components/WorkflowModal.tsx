@@ -61,6 +61,149 @@ function StepDescription({ step, total, title, description }: { step: number; to
   );
 }
 
+/** Platform-styled confirm dialog (replaces window.confirm). */
+function ConfirmModal({
+  open,
+  title,
+  message,
+  confirmLabel = "Continue",
+  cancelLabel = "Cancel",
+  onConfirm,
+  onCancel,
+}: {
+  open: boolean;
+  title: string;
+  message: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  if (!open) return null;
+  const overlayStyle: React.CSSProperties = {
+    position: "fixed",
+    inset: 0,
+    zIndex: 2000,
+    background: "rgba(0,0,0,0.45)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "16px",
+  };
+  const modalStyle: React.CSSProperties = {
+    background: "var(--p-color-bg-surface, #fff)",
+    borderRadius: "12px",
+    boxShadow: "var(--p-shadow-modal, 0 8px 32px rgba(0,0,0,0.12))",
+    maxWidth: "400px",
+    width: "100%",
+    padding: "20px 24px",
+  };
+  return (
+    <div style={overlayStyle} onClick={onCancel} role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title">
+      <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+        <p id="confirm-modal-title" style={{ margin: "0 0 12px", fontSize: "16px", fontWeight: 600, color: "var(--p-color-text-primary, #202223)" }}>
+          {title}
+        </p>
+        <p style={{ margin: "0 0 20px", fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)", lineHeight: 1.5 }}>
+          {message}
+        </p>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px" }}>
+          <button
+            type="button"
+            onClick={onCancel}
+            style={{
+              padding: "10px 18px",
+              borderRadius: "8px",
+              border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+              background: "var(--p-color-bg-surface, #fff)",
+              color: "var(--p-color-text-primary, #202223)",
+              fontWeight: 600,
+              cursor: "pointer",
+              fontSize: "14px",
+            }}
+          >
+            {cancelLabel}
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            style={{
+              padding: "10px 18px",
+              borderRadius: "8px",
+              border: "none",
+              background: "var(--p-color-bg-fill-info, #2c6ecb)",
+              color: "#fff",
+              fontWeight: 600,
+              cursor: "pointer",
+              fontSize: "14px",
+            }}
+          >
+            {confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Platform-styled alert dialog (replaces window.alert). */
+function AlertModal({
+  open,
+  message,
+  onClose,
+}: {
+  open: boolean;
+  message: string;
+  onClose: () => void;
+}) {
+  if (!open) return null;
+  const overlayStyle: React.CSSProperties = {
+    position: "fixed",
+    inset: 0,
+    zIndex: 2000,
+    background: "rgba(0,0,0,0.45)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "16px",
+  };
+  const modalStyle: React.CSSProperties = {
+    background: "var(--p-color-bg-surface, #fff)",
+    borderRadius: "12px",
+    boxShadow: "var(--p-shadow-modal, 0 8px 32px rgba(0,0,0,0.12))",
+    maxWidth: "400px",
+    width: "100%",
+    padding: "20px 24px",
+  };
+  return (
+    <div style={overlayStyle} onClick={onClose} role="alertdialog" aria-modal="true" aria-labelledby="alert-modal-message">
+      <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+        <p id="alert-modal-message" style={{ margin: "0 0 20px", fontSize: "14px", color: "var(--p-color-text-primary, #202223)", lineHeight: 1.5 }}>
+          {message}
+        </p>
+        <div style={{ display: "flex", justifyContent: "flex-end" }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              padding: "10px 18px",
+              borderRadius: "8px",
+              border: "none",
+              background: "var(--p-color-bg-fill-info, #2c6ecb)",
+              color: "#fff",
+              fontWeight: 600,
+              cursor: "pointer",
+              fontSize: "14px",
+            }}
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const MOODS = [
   { value: "energetic", label: "Energetic", icon: "⚡" },
   { value: "friendly", label: "Friendly", icon: "🤗" },
@@ -424,7 +567,8 @@ function FetchBackgroundModal({
 }: {
   open: boolean;
   onClose: () => void;
-  onSelect: (url: string) => void;
+  /** url and optional item (id, url) for saving to DB */
+  onSelect: (url: string, item?: { id: string; preview_url?: string; download_url?: string }) => void;
 }) {
   const [query, setQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -475,7 +619,7 @@ function FetchBackgroundModal({
   const handleSelect = (img: (typeof images)[0]) => {
     const url = img.preview_url || img.download_url;
     if (url) {
-      onSelect(url);
+      onSelect(url, { id: img.id, preview_url: img.preview_url, download_url: img.download_url });
       onClose();
     }
   };
@@ -1187,7 +1331,7 @@ function FetchVideoModal({
 }: {
   open: boolean;
   onClose: () => void;
-  onSelect: (url: string, options?: { downloadUrl?: string }) => void;
+  onSelect: (url: string, options?: { downloadUrl?: string; id?: string }) => void;
   forScene2Merge?: boolean;
 }) {
   const [query, setQuery] = useState("");
@@ -1242,13 +1386,13 @@ function FetchVideoModal({
       const displayUrl = item.preview_url || item.download_url;
       const downloadUrl = item.download_url || item.preview_url;
       if (displayUrl) {
-        onSelect(displayUrl, { downloadUrl });
+        onSelect(displayUrl, { downloadUrl, id: item.id });
         onClose();
       }
     } else {
       const url = item.download_url || item.preview_url;
       if (url) {
-        onSelect(url);
+        onSelect(url, { id: item.id });
         onClose();
       }
     }
@@ -1518,6 +1662,9 @@ type ShortInfo = {
   scene1ImageUrl: string | null;
   scene2ImageUrl: string | null;
   scene3ImageUrl: string | null;
+  scene1FetchedMedia: FetchedMediaSnapshot | null;
+  scene2FetchedMedia: FetchedMediaSnapshot | null;
+  scene3FetchedMedia: FetchedMediaSnapshot | null;
   scene1GeneratedVideoUrl: string | null;
   scene2GeneratedVideoUrl: string | null;
   scene3GeneratedVideoUrl: string | null;
@@ -1525,6 +1672,11 @@ type ShortInfo = {
   bgMusic: BgMusicSnapshot | null;
   finalVideoUrl: string | null;
 };
+
+/** Stored in video_scenes.fetched_media: background image (scene 1/3) or stock video (scene 2). */
+export type FetchedMediaSnapshot =
+  | { type: "image"; id?: string; url: string; source?: "generated" }
+  | { type: "video"; id?: string; url: string; downloadUrl?: string };
 
 /** Scene 1/3: status → UI step (1, 2, or 3). "pending" treated as step1. */
 function scene13StatusToStep(status: string | null | undefined): number {
@@ -1614,6 +1766,9 @@ export function WorkflowModal({
           scene1ImageUrl: (loadShortFetcher.data as { scene1ImageUrl?: string | null }).scene1ImageUrl ?? null,
           scene2ImageUrl: (loadShortFetcher.data as { scene2ImageUrl?: string | null }).scene2ImageUrl ?? null,
           scene3ImageUrl: (loadShortFetcher.data as { scene3ImageUrl?: string | null }).scene3ImageUrl ?? null,
+          scene1FetchedMedia: (loadShortFetcher.data as { scene1FetchedMedia?: FetchedMediaSnapshot | null }).scene1FetchedMedia ?? null,
+          scene2FetchedMedia: (loadShortFetcher.data as { scene2FetchedMedia?: FetchedMediaSnapshot | null }).scene2FetchedMedia ?? null,
+          scene3FetchedMedia: (loadShortFetcher.data as { scene3FetchedMedia?: FetchedMediaSnapshot | null }).scene3FetchedMedia ?? null,
           scene1GeneratedVideoUrl: (loadShortFetcher.data as { scene1GeneratedVideoUrl?: string | null }).scene1GeneratedVideoUrl ?? null,
           scene2GeneratedVideoUrl: (loadShortFetcher.data as { scene2GeneratedVideoUrl?: string | null }).scene2GeneratedVideoUrl ?? null,
           scene3GeneratedVideoUrl: (loadShortFetcher.data as { scene3GeneratedVideoUrl?: string | null }).scene3GeneratedVideoUrl ?? null,
@@ -1661,6 +1816,10 @@ export function WorkflowModal({
   const [finalizeProgress, setFinalizeProgress] = useState<number | null>(null);
   /** Final video URL from merge (set after finalize completes; used when showing final view) */
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
+  /** Platform confirm modal (replaces window.confirm for "go previous") */
+  const [confirmGoPrevious, setConfirmGoPrevious] = useState<{ message: string; sceneId: string } | null>(null);
+  /** Platform alert modal (replaces window.alert for errors) */
+  const [platformAlert, setPlatformAlert] = useState<string | null>(null);
 
   // Completion derived from video_scenes.status (status === "video_generated" means scene finished)
   const scene1Complete = shortInfo?.scene1Status === "video_generated";
@@ -1700,21 +1859,40 @@ export function WorkflowModal({
     [refetchShort]
   );
 
-  /** Go to previous step: confirm then PATCH goPrevious and refetch. */
-  const goPreviousWithConfirm = useCallback(
-    async (sceneId: string) => {
-      const message = "If you go to the previous step, current data will be removed. Continue?";
-      if (!window.confirm(message)) return;
+  /** Save scene fetched_media (selected/generated background image or stock video) then refetch. */
+  const updateSceneFetchedMedia = useCallback(
+    async (sceneId: string, fetchedMedia: FetchedMediaSnapshot) => {
       const res = await fetch(SHORTS_SCENES_API, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ sceneId, goPrevious: true }),
+        body: JSON.stringify({ sceneId, fetchedMedia }),
       });
       if (res.ok) refetchShort();
     },
     [refetchShort]
   );
+
+  /** Go to previous step: show platform confirm modal, then PATCH goPrevious and refetch. */
+  const goPreviousWithConfirm = useCallback((sceneId: string) => {
+    setConfirmGoPrevious({
+      message: "If you go to the previous step, current data will be removed. Continue?",
+      sceneId,
+    });
+  }, []);
+  const handleConfirmGoPrevious = useCallback(() => {
+    const pending = confirmGoPrevious;
+    setConfirmGoPrevious(null);
+    if (!pending) return;
+    fetch(SHORTS_SCENES_API, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ sceneId: pending.sceneId, goPrevious: true }),
+    }).then((res) => {
+      if (res.ok) refetchShort();
+    });
+  }, [confirmGoPrevious, refetchShort]);
 
   // Load short + scene ids from DB when modal opens with productId
   useEffect(() => {
@@ -2371,7 +2549,7 @@ export function WorkflowModal({
                                     // non-blocking; script is in state
                                   }
                                 } else {
-                                  alert(data.error || "Failed to generate script");
+                                  setPlatformAlert(data.error || "Failed to generate script");
                                 }
                               } finally { setScriptGenerateLoading(false); }
                             }}
@@ -2428,7 +2606,7 @@ export function WorkflowModal({
                                           // non-blocking
                                         }
                                       } else {
-                                        alert(data.error || "Failed to regenerate script");
+                                        setPlatformAlert(data.error || "Failed to regenerate script");
                                       }
                                     } finally { setScriptGenerateLoading(false); }
                                   }}
@@ -2455,7 +2633,7 @@ export function WorkflowModal({
                                     try {
                                       const res = await fetch(AUDIO_SAVE_SCRIPT_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ short_id: shortInfo.shortId, audio_script: audioScript, voice_id: selectedVoiceId || undefined, voice_name: voicesFetcher.data?.success ? voicesFetcher.data.voices.find((v) => v.voice_id === selectedVoiceId)?.name : undefined }) });
                                       const data = await res.json();
-                                      if (data.success) { setScriptSavedFeedback(true); setTimeout(() => setScriptSavedFeedback(false), 2000); refetchShort(); } else { alert(data.error || "Failed to save script"); }
+                                      if (data.success) { setScriptSavedFeedback(true); setTimeout(() => setScriptSavedFeedback(false), 2000); refetchShort(); } else { setPlatformAlert(data.error || "Failed to save script"); }
                                     } finally { setScriptSaveLoading(false); }
                                 }}
                                   title={scriptSaveLoading ? "Saving…" : "Save script"}
@@ -2519,7 +2697,7 @@ export function WorkflowModal({
                                         // non-blocking
                                       }
                                     } else {
-                                      alert(data.error || "Failed to generate audio");
+                                      setPlatformAlert(data.error || "Failed to generate audio");
                                     }
                                   } finally { setAudioGenerateLoading(false); }
                                 }}
@@ -2564,7 +2742,7 @@ export function WorkflowModal({
                                           // non-blocking
                                         }
                                       } else {
-                                        alert(data.error || "Failed to regenerate audio");
+                                        setPlatformAlert(data.error || "Failed to regenerate audio");
                                       }
                                     } finally { setAudioGenerateLoading(false); }
                                   }}
@@ -2723,6 +2901,7 @@ export function WorkflowModal({
                   shortUserId={shortInfo?.userId ?? undefined}
                   sceneStatus={shortInfo?.scene1Status ?? undefined}
                   dbImageUrl={shortInfo?.scene1ImageUrl ?? undefined}
+                  dbFetchedMedia={shortInfo?.scene1FetchedMedia ?? undefined}
                   initialScene1={scene1Regenerated ? undefined : (scene1Snapshot ?? defaultScene1State(firstImageId))}
                   dbSceneVideoUrl={scene1Regenerated ? undefined : (shortInfo?.scene1GeneratedVideoUrl ?? undefined)}
                   onScene1Change={setScene1Snapshot}
@@ -2733,6 +2912,7 @@ export function WorkflowModal({
                   onRegenerate={handleRegenerateScene1}
                   onSkipRemoveBgWarning={showSkipRemoveBgWarning}
                   updateSceneStatus={updateSceneStatus}
+                  updateSceneFetchedMedia={updateSceneFetchedMedia}
                   goPreviousWithConfirm={goPreviousWithConfirm}
                   getNextStatus={getNextStatusScene13}
                 />
@@ -2744,6 +2924,7 @@ export function WorkflowModal({
                   shortUserId={shortInfo?.userId ?? undefined}
                   sceneStatus={shortInfo?.scene2Status ?? undefined}
                   dbImageUrl={shortInfo?.scene2ImageUrl ?? undefined}
+                  dbFetchedMedia={shortInfo?.scene2FetchedMedia ?? undefined}
                   initialScene2={scene2Regenerated ? undefined : (scene2Snapshot ?? defaultScene2State(firstImageId))}
                   dbSceneVideoUrl={scene2Regenerated ? undefined : (shortInfo?.scene2GeneratedVideoUrl ?? undefined)}
                   onScene2Change={setScene2Snapshot}
@@ -2754,6 +2935,7 @@ export function WorkflowModal({
                   onRegenerate={handleRegenerateScene2}
                   onSkipRemoveBgWarning={showSkipRemoveBgWarning}
                   updateSceneStatus={updateSceneStatus}
+                  updateSceneFetchedMedia={updateSceneFetchedMedia}
                   goPreviousWithConfirm={goPreviousWithConfirm}
                   getNextStatus={getNextStatusScene2}
                 />
@@ -2768,6 +2950,7 @@ export function WorkflowModal({
                   shortUserId={shortInfo?.userId ?? undefined}
                   sceneStatus={shortInfo?.scene3Status ?? undefined}
                   dbImageUrl={shortInfo?.scene3ImageUrl ?? undefined}
+                  dbFetchedMedia={shortInfo?.scene3FetchedMedia ?? undefined}
                   initialScene3={scene3Regenerated ? undefined : (scene3Snapshot ?? defaultScene3State(firstImageId))}
                   dbSceneVideoUrl={scene3Regenerated ? undefined : (shortInfo?.scene3GeneratedVideoUrl ?? undefined)}
                   onScene3Change={setScene3Snapshot}
@@ -2778,6 +2961,7 @@ export function WorkflowModal({
                   onRegenerate={handleRegenerateScene3}
                   onSkipRemoveBgWarning={showSkipRemoveBgWarning}
                   updateSceneStatus={updateSceneStatus}
+                  updateSceneFetchedMedia={updateSceneFetchedMedia}
                   goPreviousWithConfirm={goPreviousWithConfirm}
                   getNextStatus={getNextStatusScene13}
                 />
@@ -2787,6 +2971,20 @@ export function WorkflowModal({
           </>
         )}
       </div>
+      <ConfirmModal
+        open={confirmGoPrevious !== null}
+        title="Go to previous step"
+        message={confirmGoPrevious?.message ?? ""}
+        confirmLabel="Continue"
+        cancelLabel="Cancel"
+        onConfirm={handleConfirmGoPrevious}
+        onCancel={() => setConfirmGoPrevious(null)}
+      />
+      <AlertModal
+        open={platformAlert !== null}
+        message={platformAlert ?? ""}
+        onClose={() => setPlatformAlert(null)}
+      />
     </div>
   );
 }
@@ -2945,6 +3143,7 @@ function Scene1Content({
   shortUserId,
   sceneStatus,
   dbImageUrl,
+  dbFetchedMedia,
   initialScene1,
   dbSceneVideoUrl,
   onScene1Change,
@@ -2952,6 +3151,7 @@ function Scene1Content({
   onRegenerate,
   onSkipRemoveBgWarning,
   updateSceneStatus,
+  updateSceneFetchedMedia,
   goPreviousWithConfirm,
   getNextStatus,
 }: {
@@ -2963,6 +3163,7 @@ function Scene1Content({
   shortUserId?: string | null;
   sceneStatus?: string | null;
   dbImageUrl?: string | null;
+  dbFetchedMedia?: FetchedMediaSnapshot | null;
   initialScene1?: Scene1State | null;
   dbSceneVideoUrl?: string | null;
   onScene1Change?: (s: Scene1State) => void;
@@ -2970,6 +3171,7 @@ function Scene1Content({
   onRegenerate?: () => void;
   onSkipRemoveBgWarning?: () => void;
   updateSceneStatus?: (sceneId: string, status: string) => void | Promise<void>;
+  updateSceneFetchedMedia?: (sceneId: string, media: FetchedMediaSnapshot) => void | Promise<void>;
   goPreviousWithConfirm?: (sceneId: string) => void | Promise<void>;
   getNextStatus?: (current: string) => string | null;
 }) {
@@ -2984,7 +3186,11 @@ function Scene1Content({
   const [skipRemoveBg, setSkipRemoveBg] = useState(initialScene1?.skipRemoveBg ?? false);
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
   const [bgRemovedError, setBgRemovedError] = useState<string | null>(null);
-  const [bgImage, setBgImage] = useState<string | null>(initialScene1?.bgImage ?? null);
+  const bgImageFromDb = dbFetchedMedia && typeof dbFetchedMedia === "object" && "url" in dbFetchedMedia ? (dbFetchedMedia as { url?: string }).url : null;
+  const [bgImage, setBgImage] = useState<string | null>(initialScene1?.bgImage ?? bgImageFromDb ?? null);
+  useEffect(() => {
+    if (bgImageFromDb && !initialScene1?.bgImage) setBgImage((prev) => prev || bgImageFromDb);
+  }, [bgImageFromDb, initialScene1?.bgImage]);
   const [bgLoading, setBgLoading] = useState(false);
   const [bgError, setBgError] = useState<string | null>(null);
   const [fetchModalOpen, setFetchModalOpen] = useState(false);
@@ -3091,6 +3297,7 @@ function Scene1Content({
           const url = statusData.image_url.startsWith("http") ? statusData.image_url : `${origin}${statusData.image_url}`;
           setBgImage(url);
           setBgError(null);
+          if (videoSceneId && updateSceneFetchedMedia) updateSceneFetchedMedia(videoSceneId, { type: "image", source: "generated", url });
           console.log(`${LOG_BG} [6] Completed → image set`);
           return;
         }
@@ -3443,7 +3650,10 @@ function Scene1Content({
             <FetchBackgroundModal
               open={fetchModalOpen}
               onClose={() => setFetchModalOpen(false)}
-              onSelect={(url) => setBgImage(url)}
+              onSelect={(url, item) => {
+                setBgImage(url);
+                if (videoSceneId && updateSceneFetchedMedia && item) updateSceneFetchedMedia(videoSceneId, { type: "image", id: item.id, url });
+              }}
             />
             <div
               style={{
@@ -3624,6 +3834,7 @@ function Scene2Content({
   shortUserId,
   sceneStatus,
   dbImageUrl,
+  dbFetchedMedia,
   initialScene2,
   dbSceneVideoUrl,
   onScene2Change,
@@ -3631,6 +3842,7 @@ function Scene2Content({
   onRegenerate,
   onSkipRemoveBgWarning,
   updateSceneStatus,
+  updateSceneFetchedMedia,
   goPreviousWithConfirm,
   getNextStatus,
 }: {
@@ -3639,6 +3851,7 @@ function Scene2Content({
   shortUserId?: string | null;
   sceneStatus?: string | null;
   dbImageUrl?: string | null;
+  dbFetchedMedia?: FetchedMediaSnapshot | null;
   initialScene2?: Scene2State | null;
   dbSceneVideoUrl?: string | null;
   onScene2Change?: (s: Scene2State) => void;
@@ -3646,6 +3859,7 @@ function Scene2Content({
   onRegenerate?: () => void;
   onSkipRemoveBgWarning?: () => void;
   updateSceneStatus?: (sceneId: string, status: string) => void | Promise<void>;
+  updateSceneFetchedMedia?: (sceneId: string, media: FetchedMediaSnapshot) => void | Promise<void>;
   goPreviousWithConfirm?: (sceneId: string) => void | Promise<void>;
   getNextStatus?: (current: string) => string | null;
 }) {
@@ -3661,8 +3875,16 @@ function Scene2Content({
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
   const [bgRemovedError, setBgRemovedError] = useState<string | null>(null);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
-  const [selectedStockVideoUrl, setSelectedStockVideoUrl] = useState<string | null>(initialScene2?.selectedStockVideoUrl ?? null);
-  const [selectedStockVideoDownloadUrl, setSelectedStockVideoDownloadUrl] = useState<string | null>(null);
+  const videoUrlFromDb = dbFetchedMedia && typeof dbFetchedMedia === "object" && "url" in dbFetchedMedia ? (dbFetchedMedia as { url?: string }).url : null;
+  const videoDownloadUrlFromDb = dbFetchedMedia && typeof dbFetchedMedia === "object" && "downloadUrl" in dbFetchedMedia ? (dbFetchedMedia as { downloadUrl?: string }).downloadUrl : null;
+  const [selectedStockVideoUrl, setSelectedStockVideoUrl] = useState<string | null>(initialScene2?.selectedStockVideoUrl ?? videoUrlFromDb ?? null);
+  useEffect(() => {
+    if (videoUrlFromDb && !initialScene2?.selectedStockVideoUrl) setSelectedStockVideoUrl((prev) => prev || videoUrlFromDb);
+  }, [videoUrlFromDb, initialScene2?.selectedStockVideoUrl]);
+  const [selectedStockVideoDownloadUrl, setSelectedStockVideoDownloadUrl] = useState<string | null>(videoDownloadUrlFromDb ?? null);
+  useEffect(() => {
+    if (videoDownloadUrlFromDb) setSelectedStockVideoDownloadUrl((prev) => prev || videoDownloadUrlFromDb);
+  }, [videoDownloadUrlFromDb]);
   const [sceneVideo, setSceneVideo] = useState<string | null>(initialScene2?.sceneVideo ?? null);
   const [sceneLoading, setSceneLoading] = useState(false);
   const [sceneError, setSceneError] = useState<string | null>(null);
@@ -4109,6 +4331,7 @@ function Scene2Content({
             onSelect={(url, options) => {
               setSelectedStockVideoUrl(url);
               setSelectedStockVideoDownloadUrl(options?.downloadUrl ?? url);
+              if (scene2Id && updateSceneFetchedMedia && options?.id) updateSceneFetchedMedia(scene2Id, { type: "video", id: options.id, url, downloadUrl: options?.downloadUrl });
               if (scene2Id && updateSceneStatus) updateSceneStatus(scene2Id, "bg_video_fetched");
               setVideoModalOpen(false);
             }}
@@ -4130,6 +4353,7 @@ function Scene3Content({
   shortUserId,
   sceneStatus,
   dbImageUrl,
+  dbFetchedMedia,
   initialScene3,
   dbSceneVideoUrl,
   onScene3Change,
@@ -4137,6 +4361,7 @@ function Scene3Content({
   onRegenerate,
   onSkipRemoveBgWarning,
   updateSceneStatus,
+  updateSceneFetchedMedia,
   goPreviousWithConfirm,
   getNextStatus,
 }: {
@@ -4148,6 +4373,7 @@ function Scene3Content({
   shortUserId?: string | null;
   sceneStatus?: string | null;
   dbImageUrl?: string | null;
+  dbFetchedMedia?: FetchedMediaSnapshot | null;
   initialScene3?: Scene3State | null;
   dbSceneVideoUrl?: string | null;
   onScene3Change?: (s: Scene3State) => void;
@@ -4155,6 +4381,7 @@ function Scene3Content({
   onRegenerate?: () => void;
   onSkipRemoveBgWarning?: () => void;
   updateSceneStatus?: (sceneId: string, status: string) => void | Promise<void>;
+  updateSceneFetchedMedia?: (sceneId: string, media: FetchedMediaSnapshot) => void | Promise<void>;
   goPreviousWithConfirm?: (sceneId: string) => void | Promise<void>;
   getNextStatus?: (current: string) => string | null;
 }) {
@@ -4169,7 +4396,11 @@ function Scene3Content({
   const [skipRemoveBg, setSkipRemoveBg] = useState(initialScene3?.skipRemoveBg ?? false);
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
   const [bgRemovedError, setBgRemovedError] = useState<string | null>(null);
-  const [bgImage, setBgImage] = useState<string | null>(initialScene3?.bgImage ?? null);
+  const bgImageFromDbScene3 = dbFetchedMedia && typeof dbFetchedMedia === "object" && "url" in dbFetchedMedia ? (dbFetchedMedia as { url?: string }).url : null;
+  const [bgImage, setBgImage] = useState<string | null>(initialScene3?.bgImage ?? bgImageFromDbScene3 ?? null);
+  useEffect(() => {
+    if (bgImageFromDbScene3 && !initialScene3?.bgImage) setBgImage((prev) => prev || bgImageFromDbScene3);
+  }, [bgImageFromDbScene3, initialScene3?.bgImage]);
   const [bgLoading, setBgLoading] = useState(false);
   const [bgError, setBgError] = useState<string | null>(null);
   const [fetchModalOpen, setFetchModalOpen] = useState(false);
@@ -4278,6 +4509,7 @@ function Scene3Content({
           const url = statusData.image_url.startsWith("http") ? statusData.image_url : `${origin}${statusData.image_url}`;
           setBgImage(url);
           setBgError(null);
+          if (videoSceneId && updateSceneFetchedMedia) updateSceneFetchedMedia(videoSceneId, { type: "image", source: "generated", url });
           console.log(`${LOG_BG} [6] Completed → image set`);
           return;
         }
@@ -4614,7 +4846,10 @@ function Scene3Content({
             <FetchBackgroundModal
               open={fetchModalOpen}
               onClose={() => setFetchModalOpen(false)}
-              onSelect={(url) => setBgImage(url)}
+              onSelect={(url, item) => {
+                setBgImage(url);
+                if (videoSceneId && updateSceneFetchedMedia && item) updateSceneFetchedMedia(videoSceneId, { type: "image", id: item.id, url });
+              }}
             />
             <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", zIndex: 2 }}>
               <button

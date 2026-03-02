@@ -86,7 +86,7 @@ export function isScene2Finished(status: string): boolean {
 }
 
 /** When going previous from this status, clear these fields (scene 1/3) */
-export function getScene13ClearFieldsWhenGoingPrevious(current: string): { imageUrl?: boolean; generatedVideoUrl?: boolean } {
+export function getScene13ClearFieldsWhenGoingPrevious(current: string): { imageUrl?: boolean; generatedVideoUrl?: boolean; fetchedMedia?: boolean } {
   switch (current) {
     case "video_generated":
     case "step3":
@@ -95,7 +95,7 @@ export function getScene13ClearFieldsWhenGoingPrevious(current: string): { image
       return { imageUrl: true };
     case "bg_image_fetched_generated":
     case "step2":
-      return { imageUrl: true };
+      return { imageUrl: true, fetchedMedia: true };
     case "bg_removed":
       return { imageUrl: true };
     default:
@@ -104,12 +104,12 @@ export function getScene13ClearFieldsWhenGoingPrevious(current: string): { image
 }
 
 /** When going previous from this status, clear these fields (scene 2) */
-export function getScene2ClearFieldsWhenGoingPrevious(current: string): { imageUrl?: boolean; generatedVideoUrl?: boolean } {
+export function getScene2ClearFieldsWhenGoingPrevious(current: string): { imageUrl?: boolean; generatedVideoUrl?: boolean; fetchedMedia?: boolean } {
   switch (current) {
     case "video_generated":
       return { generatedVideoUrl: true };
     case "bg_video_fetched":
-      return { imageUrl: true };
+      return { imageUrl: true, fetchedMedia: true };
     case "bg_removed":
       return { imageUrl: true };
     default:
