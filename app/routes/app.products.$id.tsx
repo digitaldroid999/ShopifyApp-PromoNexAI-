@@ -106,9 +106,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
 
 const SHORTS_API = "/app/api/shorts";
 
+const SHORTS_RESET_API = "/app/api/shorts/reset";
+
 export default function ProductDetail() {
   const { product, isSample } = useLoaderData<typeof loader>();
   const [workflowOpen, setWorkflowOpen] = useState(false);
+  const [openAsEdit, setOpenAsEdit] = useState(false);
   const [productVideoUrl, setProductVideoUrl] = useState<string | null>(null);
   const shortsFetcher = useFetcher<{ finalVideoUrl?: string | null; shortId?: string | null }>();
 
@@ -130,6 +133,30 @@ export default function ProductDetail() {
     } catch {
       // continue to open modal
     }
+    setOpenAsEdit(false);
+    setWorkflowOpen(true);
+  };
+
+  const handleEditVideoClick = () => {
+    setOpenAsEdit(true);
+    setWorkflowOpen(true);
+  };
+
+  const handleCreateNewVideoClick = async () => {
+    const shortId = shortsFetcher.data?.shortId?.trim();
+    if (shortId) {
+      try {
+        await fetch(SHORTS_RESET_API, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ shortId }),
+        });
+      } catch {
+        // continue to open modal
+      }
+      shortsFetcher.load(`${SHORTS_API}?productId=${encodeURIComponent(product.id)}`);
+    }
+    setOpenAsEdit(false);
     setWorkflowOpen(true);
   };
 
@@ -229,7 +256,7 @@ export default function ProductDetail() {
                     }}
                   />
                   <div style={{ marginTop: "8px" }}>
-                    <s-paragraph color="subdued">Your promo video is ready. Create a new one to replace it.</s-paragraph>
+                    <s-paragraph color="subdued">Your promo video is ready. Edit it or create a new one to replace it.</s-paragraph>
                   </div>
                 </div>
               ) : (
@@ -312,10 +339,21 @@ export default function ProductDetail() {
                   </div>
                 ) : null}
                 <div style={{ marginTop: "8px", paddingTop: "16px", borderTop: "1px solid var(--p-color-border-secondary, #e1e3e5)" }}>
-                  <div style={{ width: "100%" }}>
-                    <s-button variant="primary" onClick={handleGenerateVideoClick}>
-                      {finalVideoUrl ? "Create new video" : "Generate video"}
-                    </s-button>
+                  <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {finalVideoUrl ? (
+                      <>
+                        <s-button variant="primary" onClick={handleEditVideoClick}>
+                          Edit video
+                        </s-button>
+                        <s-button variant="secondary" onClick={handleCreateNewVideoClick}>
+                          Create new video
+                        </s-button>
+                      </>
+                    ) : (
+                      <s-button variant="primary" onClick={handleGenerateVideoClick}>
+                        Generate video
+                      </s-button>
+                    )}
                   </div>
                   <div style={{ marginTop: "8px" }}>
                     <Link to="/app" style={{ display: "block" }}>
@@ -340,6 +378,7 @@ export default function ProductDetail() {
             price: getProductPrice(product),
             rating: getProductRating(product),
           }}
+          openAsEdit={openAsEdit}
           onClose={() => setWorkflowOpen(false)}
           onDone={(videoUrl) => setProductVideoUrl(videoUrl)}
         />

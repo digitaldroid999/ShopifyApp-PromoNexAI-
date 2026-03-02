@@ -1515,6 +1515,7 @@ export function WorkflowModal({
   productImages: productImagesProp,
   productId,
   product,
+  openAsEdit = false,
 }: {
   onClose: () => void;
   /** Called when user clicks Done after viewing the final video; pass the final video URL to add to product */
@@ -1526,6 +1527,8 @@ export function WorkflowModal({
   productId?: string | null;
   /** Product info for Remotion (scene 1 video generation). */
   product?: WorkflowProduct | null;
+  /** When true, open in edit mode: restore workflow state from DB (Short/Scenes/AudioInfo/bgMusic) so user can edit and re-finalize. */
+  openAsEdit?: boolean;
 }) {
   const shopify = useAppBridge();
   const productImages = productImagesProp?.length ? productImagesProp : defaultProductImages;
@@ -1582,6 +1585,7 @@ export function WorkflowModal({
   const [bgMusicModalOpen, setBgMusicModalOpen] = useState(false);
   const initedAudioFromInfoRef = useRef(false);
   const voicesLoadStartedRef = useRef(false);
+  const restoredFromDbRef = useRef(false);
 
   const [scene1Snapshot, setScene1Snapshot] = useState<WorkflowTempState["scene1"] | null>(null);
   const [scene2Snapshot, setScene2Snapshot] = useState<WorkflowTempState["scene2"] | null>(null);
@@ -1664,6 +1668,34 @@ export function WorkflowModal({
     }
   }, [shortInfo?.shortId, shortInfo?.bgMusic?.id, shortInfo?.bgMusic?.previewUrl, shortInfo?.bgMusic?.name]);
 
+  // When openAsEdit and shortInfo is available, restore workflow state from DB (scenes + showingFinal) so user can edit and re-finalize.
+  useEffect(() => {
+    if (!openAsEdit || !shortInfo?.shortId || restoredFromDbRef.current) return;
+    restoredFromDbRef.current = true;
+    setShowingFinal(false);
+    const s1 = shortInfo.scene1GeneratedVideoUrl?.trim();
+    const s2 = shortInfo.scene2GeneratedVideoUrl?.trim();
+    const s3 = shortInfo.scene3GeneratedVideoUrl?.trim();
+    setScene1Complete(!!s1);
+    setScene2Complete(!!s2);
+    setScene3Complete(!!s3);
+    setScene1Snapshot({
+      ...defaultScene1State(firstImageId),
+      step: s1 ? 3 : 1,
+      sceneVideo: s1 ?? null,
+    });
+    setScene2Snapshot({
+      ...defaultScene2State(firstImageId),
+      step: s2 ? 2 : 1,
+      sceneVideo: s2 ?? null,
+    });
+    setScene3Snapshot({
+      ...defaultScene3State(firstImageId),
+      step: s3 ? 3 : 1,
+      sceneVideo: s3 ?? null,
+    });
+  }, [openAsEdit, shortInfo?.shortId, shortInfo?.scene1GeneratedVideoUrl, shortInfo?.scene2GeneratedVideoUrl, shortInfo?.scene3GeneratedVideoUrl, firstImageId]);
+
   // Load voices and backend config once when audio step becomes relevant (avoid re-fetch loop)
   useEffect(() => {
     if (!allScenesComplete) return;
@@ -1691,7 +1723,7 @@ export function WorkflowModal({
   }, [voicesFetcher.data, selectedVoiceId]);
 
   // Restore workflow state from temp only on initial load (when still "pending").
-  // This prevents revalidation from overwriting state the user just set (e.g. after generating script).
+  // When openAsEdit, skip restoring scene state so restore-from-DB can set it from shortInfo.
   useEffect(() => {
     if (loadedState !== "pending" || loadTempFetcher.state !== "idle" || !loadTempFetcher.data) return;
     const data = loadTempFetcher.data;
@@ -1699,17 +1731,19 @@ export function WorkflowModal({
     setLoadedState(state);
     if (state) {
       setActiveTab(state.activeTab);
-      setScene1Complete(state.scene1Complete);
-      setScene2Complete(state.scene2Complete);
-      setScene3Complete(state.scene3Complete);
       setShowingFinal(state.showingFinal);
       setScriptGenerated(state.scriptGenerated);
       setAudioGenerated(state.audioGenerated);
-      setScene1Snapshot(state.scene1);
-      setScene2Snapshot(state.scene2);
-      setScene3Snapshot(state.scene3);
+      if (!openAsEdit) {
+        setScene1Complete(state.scene1Complete);
+        setScene2Complete(state.scene2Complete);
+        setScene3Complete(state.scene3Complete);
+        setScene1Snapshot(state.scene1);
+        setScene2Snapshot(state.scene2);
+        setScene3Snapshot(state.scene3);
+      }
     }
-  }, [loadedState, loadTempFetcher.state, loadTempFetcher.data]);
+  }, [loadedState, loadTempFetcher.state, loadTempFetcher.data, openAsEdit]);
 
   // Debounced save while workflow is in progress (skip while still loading temp)
   useEffect(() => {
@@ -1990,22 +2024,40 @@ export function WorkflowModal({
                   controls
                   style={{ maxWidth: "100%", maxHeight: "60vh", borderRadius: "12px", border: "1px solid #e1e3e5" }}
                 />
-                <button
-                  type="button"
-                  onClick={handleStartFromScratch}
-                  style={{
-                    padding: "10px 20px",
-                    borderRadius: "8px",
-                    border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                    background: "transparent",
-                    cursor: "pointer",
-                    fontSize: "14px",
-                    fontWeight: 600,
-                    color: "var(--p-color-text-primary, #202223)",
-                  }}
-                >
-                  Start from scratch
-                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", justifyContent: "center" }}>
+                  <button
+                    type="button"
+                    onClick={() => { setShowingFinal(false); setActiveTab("scene1"); }}
+                    style={{
+                      padding: "10px 20px",
+                      borderRadius: "8px",
+                      border: "1px solid var(--p-color-border-info, #2c6ecb)",
+                      background: "var(--p-color-bg-fill-info-secondary, #e3f1fc)",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      color: "var(--p-color-text-info, #2c6ecb)",
+                    }}
+                  >
+                    Edit video
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleStartFromScratch}
+                    style={{
+                      padding: "10px 20px",
+                      borderRadius: "8px",
+                      border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                      background: "transparent",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      color: "var(--p-color-text-primary, #202223)",
+                    }}
+                  >
+                    Start from scratch
+                  </button>
+                </div>
               </>
             ) : (
               <>
@@ -2230,7 +2282,28 @@ export function WorkflowModal({
                                 });
                                 const data = await res.json();
                                 const scriptText = typeof data.script === "string" ? data.script : "";
-                                if (scriptText) { setAudioScript(scriptText); setScriptGenerated(true); } else { alert(data.error || "Failed to generate script"); }
+                                if (scriptText) {
+                                  setAudioScript(scriptText);
+                                  setScriptGenerated(true);
+                                  try {
+                                    const saveRes = await fetch(AUDIO_SAVE_SCRIPT_API, {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({
+                                        short_id: shortInfo.shortId,
+                                        audio_script: scriptText,
+                                        voice_id: selectedVoiceId || undefined,
+                                        voice_name: voicesFetcher.data?.success ? voicesFetcher.data.voices.find((v) => v.voice_id === selectedVoiceId)?.name : undefined,
+                                      }),
+                                    });
+                                    const saveData = await saveRes.json();
+                                    if (saveData.success) { setScriptSavedFeedback(true); setTimeout(() => setScriptSavedFeedback(false), 2000); }
+                                  } catch {
+                                    // non-blocking; script is in state
+                                  }
+                                } else {
+                                  alert(data.error || "Failed to generate script");
+                                }
                               } finally { setScriptGenerateLoading(false); }
                             }}
                             style={{ padding: "10px 20px", borderRadius: "8px", border: "none", background: scriptGenerateLoading || !selectedVoiceId ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)", color: "#fff", fontWeight: 600, cursor: scriptGenerateLoading || !selectedVoiceId ? "not-allowed" : "pointer", fontSize: "14px" }}
@@ -2267,7 +2340,28 @@ export function WorkflowModal({
                                       });
                                       const data = await res.json();
                                       const scriptText = typeof data.script === "string" ? data.script : "";
-                                      if (scriptText) { setAudioScript(scriptText); setScriptGenerated(true); } else { alert(data.error || "Failed to regenerate script"); }
+                                      if (scriptText) {
+                                        setAudioScript(scriptText);
+                                        setScriptGenerated(true);
+                                        try {
+                                          const saveRes = await fetch(AUDIO_SAVE_SCRIPT_API, {
+                                            method: "POST",
+                                            headers: { "Content-Type": "application/json" },
+                                            body: JSON.stringify({
+                                              short_id: shortInfo.shortId,
+                                              audio_script: scriptText,
+                                              voice_id: selectedVoiceId || undefined,
+                                              voice_name: voicesFetcher.data?.success ? voicesFetcher.data.voices.find((v) => v.voice_id === selectedVoiceId)?.name : undefined,
+                                            }),
+                                          });
+                                          const saveData = await saveRes.json();
+                                          if (saveData.success) { setScriptSavedFeedback(true); setTimeout(() => setScriptSavedFeedback(false), 2000); }
+                                        } catch {
+                                          // non-blocking
+                                        }
+                                      } else {
+                                        alert(data.error || "Failed to regenerate script");
+                                      }
                                     } finally { setScriptGenerateLoading(false); }
                                   }}
                                   title={scriptGenerateLoading ? "Regenerating…" : "Regenerate script"}
@@ -2336,7 +2430,30 @@ export function WorkflowModal({
                                   try {
                                     const res = await fetch(AUDIO_GENERATE_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ voice_id: selectedVoiceId, user_id: shortInfo.userId, short_id: shortInfo.shortId, script: audioScript.trim() }) });
                                     const data = await res.json();
-                                    if (data.audio_url) { setGeneratedAudioUrl(data.audio_url); setLastSubtitleTiming(Array.isArray(data.subtitle_timing) ? data.subtitle_timing : null); setAudioGenerated(true); } else { alert(data.error || "Failed to generate audio"); }
+                                    if (data.audio_url) {
+                                      setGeneratedAudioUrl(data.audio_url);
+                                      setLastSubtitleTiming(Array.isArray(data.subtitle_timing) ? data.subtitle_timing : null);
+                                      setAudioGenerated(true);
+                                      try {
+                                        const saveRes = await fetch(AUDIO_SAVE_API, {
+                                          method: "POST",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({
+                                            short_id: shortInfo.shortId,
+                                            generated_audio_url: data.audio_url,
+                                            subtitles: Array.isArray(data.subtitle_timing) ? data.subtitle_timing : undefined,
+                                            voice_id: selectedVoiceId || undefined,
+                                            voice_name: voicesFetcher.data?.success ? voicesFetcher.data.voices.find((v) => v.voice_id === selectedVoiceId)?.name : undefined,
+                                          }),
+                                        });
+                                        const saveData = await saveRes.json();
+                                        if (saveData.success) { setAudioSavedFeedback(true); setTimeout(() => setAudioSavedFeedback(false), 2000); }
+                                      } catch {
+                                        // non-blocking
+                                      }
+                                    } else {
+                                      alert(data.error || "Failed to generate audio");
+                                    }
                                   } finally { setAudioGenerateLoading(false); }
                                 }}
                                 style={{ padding: "12px 24px", borderRadius: "8px", border: "none", background: audioGenerateLoading || !audioScript.trim() ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)", color: "#fff", fontWeight: 600, cursor: audioGenerateLoading || !audioScript.trim() ? "not-allowed" : "pointer", fontSize: "14px" }}
@@ -2375,7 +2492,30 @@ export function WorkflowModal({
                                     try {
                                       const res = await fetch(AUDIO_GENERATE_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ voice_id: selectedVoiceId, user_id: shortInfo.userId, short_id: shortInfo.shortId, script: audioScript.trim() }) });
                                       const data = await res.json();
-                                      if (data.audio_url) { setGeneratedAudioUrl(data.audio_url); setLastSubtitleTiming(Array.isArray(data.subtitle_timing) ? data.subtitle_timing : null); setAudioGenerated(true); } else { alert(data.error || "Failed to regenerate audio"); }
+                                      if (data.audio_url) {
+                                        setGeneratedAudioUrl(data.audio_url);
+                                        setLastSubtitleTiming(Array.isArray(data.subtitle_timing) ? data.subtitle_timing : null);
+                                        setAudioGenerated(true);
+                                        try {
+                                          const saveRes = await fetch(AUDIO_SAVE_API, {
+                                            method: "POST",
+                                            headers: { "Content-Type": "application/json" },
+                                            body: JSON.stringify({
+                                              short_id: shortInfo.shortId,
+                                              generated_audio_url: data.audio_url,
+                                              subtitles: Array.isArray(data.subtitle_timing) ? data.subtitle_timing : undefined,
+                                              voice_id: selectedVoiceId || undefined,
+                                              voice_name: voicesFetcher.data?.success ? voicesFetcher.data.voices.find((v) => v.voice_id === selectedVoiceId)?.name : undefined,
+                                            }),
+                                          });
+                                          const saveData = await saveRes.json();
+                                          if (saveData.success) { setAudioSavedFeedback(true); setTimeout(() => setAudioSavedFeedback(false), 2000); }
+                                        } catch {
+                                          // non-blocking
+                                        }
+                                      } else {
+                                        alert(data.error || "Failed to regenerate audio");
+                                      }
                                     } finally { setAudioGenerateLoading(false); }
                                   }}
                                   style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid var(--p-color-border-secondary, #e1e3e5)", background: "#fff", color: "var(--p-color-text-primary, #202223)", fontWeight: 600, cursor: audioGenerateLoading || !audioScript.trim() ? "not-allowed" : "pointer", fontSize: "13px" }}
@@ -2470,6 +2610,35 @@ export function WorkflowModal({
                         onSelect={(track) => {
                           setSelectedBgMusic(track);
                           setBgMusicModalOpen(false);
+                          if (shortInfo?.shortId) {
+                            setBgMusicSaveLoading(true);
+                            setBgMusicSavedFeedback(false);
+                            fetch(SHORTS_SAVE_BG_MUSIC_API, {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                short_id: shortInfo.shortId,
+                                bg_music: {
+                                  id: track.id,
+                                  name: track.name,
+                                  genre: track.genre,
+                                  duration: track.duration,
+                                  previewUrl: track.previewUrl,
+                                  preview_url: track.previewUrl,
+                                  downloadUrl: track.downloadUrl ?? track.previewUrl,
+                                },
+                              }),
+                            })
+                              .then((r) => r.json())
+                              .then((data) => {
+                                if (data.success) {
+                                  setBgMusicSavedFeedback(true);
+                                  setTimeout(() => setBgMusicSavedFeedback(false), 2000);
+                                }
+                              })
+                              .catch(() => {})
+                              .finally(() => setBgMusicSaveLoading(false));
+                          }
                         }}
                       />
                     </div>
@@ -3231,23 +3400,40 @@ function Scene1Content({
             <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{compositeError}</span>
           )}
           {composited && (
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
               <img src={composited} alt="Composited" style={{ width: "200px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
-              <button
-                type="button"
-                onClick={handleNextStepAfterComposite}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "8px",
-                  border: "none",
-                  background: "var(--p-color-bg-fill-info, #2c6ecb)",
-                  color: "#fff",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                Next step →
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  style={{
+                    padding: "10px 20px",
+                    borderRadius: "8px",
+                    border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                    background: "transparent",
+                    color: "var(--p-color-text-primary, #202223)",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  ← Previous step
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNextStepAfterComposite}
+                  style={{
+                    padding: "10px 20px",
+                    borderRadius: "8px",
+                    border: "none",
+                    background: "var(--p-color-bg-fill-info, #2c6ecb)",
+                    color: "#fff",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Next step →
+                </button>
+              </div>
             </div>
           )}
         </>
@@ -3311,10 +3497,10 @@ function Scene1Content({
               ) : (dbSceneVideoUrl ?? sceneVideo) ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <video src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
-                  {onRegenerate && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                     <button
                       type="button"
-                      onClick={onRegenerate}
+                      onClick={() => setStep(2)}
                       style={{
                         padding: "8px 16px",
                         borderRadius: "8px",
@@ -3323,12 +3509,28 @@ function Scene1Content({
                         cursor: "pointer",
                         fontSize: "14px",
                         fontWeight: 600,
-                        alignSelf: "flex-start",
                       }}
                     >
-                      Regenerate
+                      ← Previous step
                     </button>
-                  )}
+                    {onRegenerate && (
+                      <button
+                        type="button"
+                        onClick={onRegenerate}
+                        style={{
+                          padding: "8px 16px",
+                          borderRadius: "8px",
+                          border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                          background: "transparent",
+                          cursor: "pointer",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Regenerate
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <button
@@ -3718,10 +3920,10 @@ function Scene2Content({
               ) : (dbSceneVideoUrl ?? sceneVideo) ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <video src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "100%", maxHeight: "240px", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
-                  {onRegenerate && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                     <button
                       type="button"
-                      onClick={onRegenerate}
+                      onClick={() => setStep(1)}
                       style={{
                         padding: "8px 16px",
                         borderRadius: "8px",
@@ -3730,12 +3932,28 @@ function Scene2Content({
                         cursor: "pointer",
                         fontSize: "14px",
                         fontWeight: 600,
-                        alignSelf: "flex-start",
                       }}
                     >
-                      Regenerate
+                      ← Previous step
                     </button>
-                  )}
+                    {onRegenerate && (
+                      <button
+                        type="button"
+                        onClick={onRegenerate}
+                        style={{
+                          padding: "8px 16px",
+                          borderRadius: "8px",
+                          border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                          background: "transparent",
+                          cursor: "pointer",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Regenerate
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <button
@@ -4282,23 +4500,40 @@ function Scene3Content({
             <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{compositeError}</span>
           )}
           {composited && (
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
               <img src={composited} alt="Composited" style={{ width: "200px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
-              <button
-                type="button"
-                onClick={handleNextStepAfterComposite}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "8px",
-                  border: "none",
-                  background: "var(--p-color-bg-fill-info, #2c6ecb)",
-                  color: "#fff",
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                Next step →
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  style={{
+                    padding: "10px 20px",
+                    borderRadius: "8px",
+                    border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                    background: "transparent",
+                    color: "var(--p-color-text-primary, #202223)",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  ← Previous step
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNextStepAfterComposite}
+                  style={{
+                    padding: "10px 20px",
+                    borderRadius: "8px",
+                    border: "none",
+                    background: "var(--p-color-bg-fill-info, #2c6ecb)",
+                    color: "#fff",
+                    fontWeight: 600,
+                    cursor: "pointer",
+                  }}
+                >
+                  Next step →
+                </button>
+              </div>
             </div>
           )}
         </>
@@ -4342,10 +4577,10 @@ function Scene3Content({
               ) : (dbSceneVideoUrl ?? sceneVideo) ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                   <video src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
-                  {onRegenerate && (
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                     <button
                       type="button"
-                      onClick={onRegenerate}
+                      onClick={() => setStep(2)}
                       style={{
                         padding: "8px 16px",
                         borderRadius: "8px",
@@ -4354,12 +4589,28 @@ function Scene3Content({
                         cursor: "pointer",
                         fontSize: "14px",
                         fontWeight: 600,
-                        alignSelf: "flex-start",
                       }}
                     >
-                      Regenerate
+                      ← Previous step
                     </button>
-                  )}
+                    {onRegenerate && (
+                      <button
+                        type="button"
+                        onClick={onRegenerate}
+                        style={{
+                          padding: "8px 16px",
+                          borderRadius: "8px",
+                          border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                          background: "transparent",
+                          cursor: "pointer",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Regenerate
+                      </button>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <button
