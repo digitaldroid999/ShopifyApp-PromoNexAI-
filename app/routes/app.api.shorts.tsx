@@ -37,7 +37,32 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const resolvedStatus = currentStatus === "draft" ? "in_progress" : currentStatus;
   const [s1, s2, s3] = short.scenes;
   const sceneStatus = (s: { status?: string } | undefined) => (s?.status?.trim() || "step1");
-  const sceneFetchedMedia = (s: { fetchedMedia?: unknown } | undefined) => (s?.fetchedMedia != null ? s.fetchedMedia : null);
+  const sceneFetchedMediaFromPrisma = (s: { fetchedMedia?: unknown } | undefined) => (s?.fetchedMedia != null ? s.fetchedMedia : null);
+  // Always load fetched_media via raw SQL so it's returned even when Prisma client was generated without that column
+  const sceneIds = [s1?.id, s2?.id, s3?.id].filter((id): id is string => !!id);
+  let scene1FetchedMediaRaw: unknown = sceneFetchedMediaFromPrisma(s1);
+  let scene2FetchedMediaRaw: unknown = sceneFetchedMediaFromPrisma(s2);
+  let scene3FetchedMediaRaw: unknown = sceneFetchedMediaFromPrisma(s3);
+  if (sceneIds.length > 0) {
+    const placeholders = sceneIds.map((_, i) => `$${i + 1}`).join(", ");
+    const rows = await prisma.$queryRawUnsafe<Array<{ id: string; fetched_media: unknown }>>(
+      `SELECT id, fetched_media FROM video_scenes WHERE id IN (${placeholders})`,
+      ...sceneIds
+    );
+    const byId = new Map(rows.map((r) => [r.id, r.fetched_media]));
+    if (s1?.id && byId.has(s1.id)) {
+      const v = byId.get(s1.id);
+      if (v != null) scene1FetchedMediaRaw = v;
+    }
+    if (s2?.id && byId.has(s2.id)) {
+      const v = byId.get(s2.id);
+      if (v != null) scene2FetchedMediaRaw = v;
+    }
+    if (s3?.id && byId.has(s3.id)) {
+      const v = byId.get(s3.id);
+      if (v != null) scene3FetchedMediaRaw = v;
+    }
+  }
   const audioInfo = (short as { audioInfo?: { voiceId: string | null; voiceName: string | null; audioScript: string | null; generatedAudioUrl: string | null; subtitles: unknown } | null }).audioInfo;
   const metadata = short.metadata as {
     bgMusic?: {
@@ -86,9 +111,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     scene1ImageUrl: sceneImageUrl(s1),
     scene2ImageUrl: sceneImageUrl(s2),
     scene3ImageUrl: sceneImageUrl(s3),
-    scene1FetchedMedia: sceneFetchedMedia(s1),
-    scene2FetchedMedia: sceneFetchedMedia(s2),
-    scene3FetchedMedia: sceneFetchedMedia(s3),
+    scene1FetchedMedia: scene1FetchedMediaRaw,
+    scene2FetchedMedia: scene2FetchedMediaRaw,
+    scene3FetchedMedia: scene3FetchedMediaRaw,
     scene1BgRemovedUrl: sceneBgRemovedUrl(s1),
     scene2BgRemovedUrl: sceneBgRemovedUrl(s2),
     scene3BgRemovedUrl: sceneBgRemovedUrl(s3),
