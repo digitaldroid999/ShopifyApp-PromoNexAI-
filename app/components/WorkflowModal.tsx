@@ -1801,6 +1801,8 @@ export function WorkflowModal({
   const initedAudioFromInfoRef = useRef(false);
   const voicesLoadStartedRef = useRef(false);
   const restoredFromDbRef = useRef(false);
+  /** Ensure we only try to create short once per productId when GET returns no short */
+  const ensureShortCreatedRef = useRef(false);
 
   const [scene1Snapshot, setScene1Snapshot] = useState<WorkflowTempState["scene1"] | null>(null);
   const [scene2Snapshot, setScene2Snapshot] = useState<WorkflowTempState["scene2"] | null>(null);
@@ -1908,12 +1910,34 @@ export function WorkflowModal({
     });
   }, [confirmGoPrevious, refetchShort]);
 
+  // Reset ensure-short ref when productId changes (e.g. open modal for different product)
+  useEffect(() => {
+    ensureShortCreatedRef.current = false;
+  }, [productId]);
+
   // Load short + scene ids from DB when modal opens with productId
   useEffect(() => {
     if (productId?.trim() && loadShortFetcher.state === "idle" && !loadShortFetcher.data) {
       loadShortFetcher.load(`${SHORTS_API}?productId=${encodeURIComponent(productId.trim())}`);
     }
   }, [productId, loadShortFetcher.state, loadShortFetcher.data]);
+
+  // If GET returned no short, create one so we have scene IDs for fetched_media / status updates
+  useEffect(() => {
+    const data = loadShortFetcher.data;
+    if (!productId?.trim() || !data || (data as { shortId?: string | null }).shortId != null) return;
+    if (ensureShortCreatedRef.current) return;
+    ensureShortCreatedRef.current = true;
+    fetch(SHORTS_API, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ productId: productId.trim(), title: "Promo video" }),
+    })
+      .then((res) => res.ok ? undefined : Promise.reject(new Error("Create short failed")))
+      .then(() => refetchShort())
+      .catch(() => { ensureShortCreatedRef.current = false; });
+  }, [productId, loadShortFetcher.data, refetchShort]);
 
   // Load temp when modal opens and we have productId
   useEffect(() => {
@@ -3677,7 +3701,7 @@ function Scene1Content({
               onClose={() => setFetchModalOpen(false)}
               onSelect={(url, item) => {
                 setBgImage(url);
-                if (videoSceneId && updateSceneFetchedMedia && item) updateSceneFetchedMedia(videoSceneId, { type: "image", id: item.id, url });
+                if (videoSceneId && updateSceneFetchedMedia) updateSceneFetchedMedia(videoSceneId, { type: "image", id: item?.id, url });
               }}
             />
             <div
@@ -4883,7 +4907,7 @@ function Scene3Content({
               onClose={() => setFetchModalOpen(false)}
               onSelect={(url, item) => {
                 setBgImage(url);
-                if (videoSceneId && updateSceneFetchedMedia && item) updateSceneFetchedMedia(videoSceneId, { type: "image", id: item.id, url });
+                if (videoSceneId && updateSceneFetchedMedia) updateSceneFetchedMedia(videoSceneId, { type: "image", id: item?.id, url });
               }}
             />
             <div style={{ position: "absolute", left: "50%", top: "50%", transform: "translate(-50%, -50%)", zIndex: 2 }}>
