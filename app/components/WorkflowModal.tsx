@@ -1999,7 +1999,7 @@ export function WorkflowModal({
     }
   }, [shortInfo?.audioInfo]);
 
-  // Init selected bg music from short when loaded
+  // Init selected bg music from short when loaded (or clear when short has none)
   useEffect(() => {
     const saved = shortInfo?.bgMusic;
     if (saved && (saved.id || saved.previewUrl || (saved as { preview_url?: string }).preview_url)) {
@@ -2012,6 +2012,8 @@ export function WorkflowModal({
         previewUrl: p.previewUrl ?? p.preview_url ?? null,
         downloadUrl: p.downloadUrl ?? p.previewUrl ?? p.preview_url ?? null,
       });
+    } else {
+      setSelectedBgMusic(null);
     }
   }, [shortInfo?.shortId, shortInfo?.bgMusic?.id, shortInfo?.bgMusic?.previewUrl, shortInfo?.bgMusic?.name]);
 
@@ -2813,6 +2815,33 @@ export function WorkflowModal({
                                 >
                                   {audioGenerateLoading ? "Regenerating audio…" : "Regenerate audio"}
                                 </button>
+                                <button
+                                  type="button"
+                                  disabled={!shortInfo?.shortId}
+                                  onClick={async () => {
+                                    if (!shortInfo?.shortId) return;
+                                    try {
+                                      const res = await fetch(AUDIO_CLEAR_GENERATED_API, {
+                                        method: "POST",
+                                        headers: { "Content-Type": "application/json" },
+                                        body: JSON.stringify({ short_id: shortInfo.shortId }),
+                                      });
+                                      const data = await res.json();
+                                      if (data.success) {
+                                        setGeneratedAudioUrl(null);
+                                        setLastSubtitleTiming(null);
+                                        refetchShort();
+                                      } else {
+                                        setPlatformAlert(data.error || "Failed to remove audio");
+                                      }
+                                    } catch {
+                                      setPlatformAlert("Failed to remove audio");
+                                    }
+                                  }}
+                                  style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid var(--p-color-border-secondary, #e1e3e5)", background: "#fff", color: "var(--p-color-text-subdued, #6d7175)", fontWeight: 600, cursor: shortInfo?.shortId ? "pointer" : "not-allowed", fontSize: "13px" }}
+                                >
+                                  Skip
+                                </button>
                               </div>
                             )}
                           </div>
@@ -2847,6 +2876,32 @@ export function WorkflowModal({
                               style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid var(--p-color-border-secondary, #e1e3e5)", background: "#fff", color: "var(--p-color-text-primary, #202223)", fontWeight: 600, cursor: "pointer", fontSize: "13px" }}
                             >
                               Change music
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!shortInfo?.shortId}
+                              onClick={async () => {
+                                if (!shortInfo?.shortId) return;
+                                try {
+                                  const res = await fetch(SHORTS_SAVE_BG_MUSIC_API, {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ short_id: shortInfo.shortId, bg_music: null }),
+                                  });
+                                  const data = await res.json();
+                                  if (data.success) {
+                                    setSelectedBgMusic(null);
+                                    refetchShort();
+                                  } else {
+                                    setPlatformAlert(data.error || "Failed to remove background music");
+                                  }
+                                } catch {
+                                  setPlatformAlert("Failed to remove background music");
+                                }
+                              }}
+                              style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid var(--p-color-border-secondary, #e1e3e5)", background: "#fff", color: "var(--p-color-text-subdued, #6d7175)", fontWeight: 600, cursor: shortInfo?.shortId ? "pointer" : "not-allowed", fontSize: "13px" }}
+                            >
+                              Skip
                             </button>
                             {bgMusicSavedFeedback && <span style={{ fontSize: "14px", color: "var(--p-color-text-success, #008060)", fontWeight: 600 }}>Saved</span>}
                           </div>
@@ -3075,6 +3130,7 @@ const AUDIO_GENERATE_SCRIPT_API = "/app/api/audio/generate-script";
 const AUDIO_GENERATE_API = "/app/api/audio/generate";
 const AUDIO_SAVE_SCRIPT_API = "/app/api/audio/save-script";
 const AUDIO_SAVE_API = "/app/api/audio/save";
+const AUDIO_CLEAR_GENERATED_API = "/app/api/audio/clear-generated";
 const AUDIO_CONFIG_API = "/app/api/audio/config";
 const STORYBLOCKS_MUSIC_API = "/app/api/storyblocks/music";
 const LOCAL_MUSIC_API = "/app/api/music/local";
