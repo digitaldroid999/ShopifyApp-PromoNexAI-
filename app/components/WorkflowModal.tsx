@@ -1832,6 +1832,8 @@ export function WorkflowModal({
   const [finalizeProgress, setFinalizeProgress] = useState<number | null>(null);
   /** Final video URL from merge (set after finalize completes; used when showing final view) */
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
+  /** Cache-bust key for final video so re-finalize (same URL, new file) forces browser to reload */
+  const [finalVideoCacheBust, setFinalVideoCacheBust] = useState(0);
   /** Platform confirm modal (replaces window.confirm for "go previous") */
   const [confirmGoPrevious, setConfirmGoPrevious] = useState<{ message: string; sceneId: string } | null>(null);
   /** Platform alert modal (replaces window.alert for errors) */
@@ -2127,6 +2129,7 @@ export function WorkflowModal({
           const url = statusData.final_video_url;
           console.log("[Finalize] completed task_id=", taskId, "final_video_url=", url?.slice(0, 80), "...");
           setFinalVideoUrl(url);
+          setFinalVideoCacheBust(Date.now());
           try {
             await fetch(SHORTS_SAVE_FINAL_VIDEO_API, {
               method: "POST",
@@ -2326,7 +2329,8 @@ export function WorkflowModal({
             {displayedFinalVideoUrl ? (
               <>
                 <video
-                  src={displayedFinalVideoUrl}
+                  key={finalVideoCacheBust}
+                  src={`${displayedFinalVideoUrl}${displayedFinalVideoUrl.includes("?") ? "&" : "?"}t=${finalVideoCacheBust}`}
                   controls
                   style={{ maxWidth: "100%", maxHeight: "60vh", borderRadius: "12px", border: "1px solid #e1e3e5" }}
                 />
