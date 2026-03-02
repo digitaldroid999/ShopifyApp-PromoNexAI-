@@ -3298,11 +3298,14 @@ function Scene1Content({
     if (data.ok && data.url) {
       setBgRemoved(data.url);
       setBgRemovedError(null);
-      if (videoSceneId && updateSceneStatus) updateSceneStatus(videoSceneId, "bg_removed");
+      if (videoSceneId) {
+        if (updateSceneStatus) updateSceneStatus(videoSceneId, "bg_removed");
+        if (updateSceneBgRemovedUrl) updateSceneBgRemovedUrl(videoSceneId, data.url);
+      }
     } else {
       setBgRemovedError(data.error ?? "Remove BG failed");
     }
-  }, [removeBgFetcher.state, removeBgFetcher.data, videoSceneId, updateSceneStatus]);
+  }, [removeBgFetcher.state, removeBgFetcher.data, videoSceneId, updateSceneStatus, updateSceneBgRemovedUrl]);
 
   const handleRemoveBg = () => {
     const img = productImagesProp.find((i) => i.id === selectedImage);
@@ -4522,11 +4525,14 @@ function Scene3Content({
     if (data.ok && data.url) {
       setBgRemoved(data.url);
       setBgRemovedError(null);
-      if (videoSceneId && updateSceneStatus) updateSceneStatus(videoSceneId, "bg_removed");
+      if (videoSceneId) {
+        if (updateSceneStatus) updateSceneStatus(videoSceneId, "bg_removed");
+        if (updateSceneBgRemovedUrl) updateSceneBgRemovedUrl(videoSceneId, data.url);
+      }
     } else {
       setBgRemovedError(data.error ?? "Remove BG failed");
     }
-  }, [removeBgFetcher.state, removeBgFetcher.data, videoSceneId, updateSceneStatus]);
+  }, [removeBgFetcher.state, removeBgFetcher.data, videoSceneId, updateSceneStatus, updateSceneBgRemovedUrl]);
 
   const handleRemoveBg = () => {
     const img = productImagesProp.find((i) => i.id === selectedImage);
