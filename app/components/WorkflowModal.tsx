@@ -3569,20 +3569,32 @@ function Scene1Content({
           )}
         </div>
         <div>
-          {step === 1 && (bgRemoved || skipRemoveBg) && (
+          {step === 1 && (
             <button
               type="button"
+              disabled={!bgRemoved && !skipRemoveBg}
               onClick={() => {
                 const next = getNextStatus?.(sceneStatus ?? "step1");
                 if (videoSceneId && next && updateSceneStatus) updateSceneStatus(videoSceneId, next);
               }}
-              style={navBtnPrimaryStyle}
+              style={{
+                ...navBtnPrimaryStyle,
+                ...(!(bgRemoved || skipRemoveBg) ? { background: "#9ca3af", cursor: "not-allowed" } : {}),
+              }}
             >
               Next step →
             </button>
           )}
-          {step === 2 && composited && (
-            <button type="button" onClick={handleNextStepAfterComposite} style={navBtnPrimaryStyle}>
+          {step === 2 && (
+            <button
+              type="button"
+              disabled={!composited}
+              onClick={handleNextStepAfterComposite}
+              style={{
+                ...navBtnPrimaryStyle,
+                ...(!composited ? { background: "#9ca3af", cursor: "not-allowed" } : {}),
+              }}
+            >
               Next step →
             </button>
           )}
@@ -4170,14 +4182,18 @@ function Scene2Content({
           )}
         </div>
         <div>
-          {step === 1 && (bgRemoved || skipRemoveBg) && (
+          {step === 1 && (
             <button
               type="button"
+              disabled={!bgRemoved && !skipRemoveBg}
               onClick={() => {
                 const next = getNextStatus?.(sceneStatus ?? "step1");
                 if (scene2Id && next && updateSceneStatus) updateSceneStatus(scene2Id, next);
               }}
-              style={navBtnPrimaryStyle}
+              style={{
+                ...navBtnPrimaryStyle,
+                ...(!(bgRemoved || skipRemoveBg) ? { background: "#9ca3af", cursor: "not-allowed" } : {}),
+              }}
             >
               Next step →
             </button>
@@ -4814,20 +4830,32 @@ function Scene3Content({
           )}
         </div>
         <div>
-          {step === 1 && (bgRemoved || skipRemoveBg) && (
+          {step === 1 && (
             <button
               type="button"
+              disabled={!bgRemoved && !skipRemoveBg}
               onClick={() => {
                 const next = getNextStatus?.(sceneStatus ?? "step1");
                 if (videoSceneId && next && updateSceneStatus) updateSceneStatus(videoSceneId, next);
               }}
-              style={navBtnPrimaryStyle}
+              style={{
+                ...navBtnPrimaryStyle,
+                ...(!(bgRemoved || skipRemoveBg) ? { background: "#9ca3af", cursor: "not-allowed" } : {}),
+              }}
             >
               Next step →
             </button>
           )}
-          {step === 2 && composited && (
-            <button type="button" onClick={handleNextStepAfterComposite} style={navBtnPrimaryStyle}>
+          {step === 2 && (
+            <button
+              type="button"
+              disabled={!composited}
+              onClick={handleNextStepAfterComposite}
+              style={{
+                ...navBtnPrimaryStyle,
+                ...(!composited ? { background: "#9ca3af", cursor: "not-allowed" } : {}),
+              }}
+            >
               Next step →
             </button>
           )}
