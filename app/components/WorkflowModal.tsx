@@ -3256,11 +3256,16 @@ function Scene1Content({
   const [skipRemoveBg, setSkipRemoveBg] = useState(initialScene1?.skipRemoveBg ?? false);
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
   const [bgRemovedError, setBgRemovedError] = useState<string | null>(null);
-  const bgImageFromDb = dbFetchedMedia && typeof dbFetchedMedia === "object" && "url" in dbFetchedMedia ? (dbFetchedMedia as { url?: string }).url : null;
+  const m1 = dbFetchedMedia;
+  const isImageMedia1 = m1 && typeof m1 === "object" && (m1 as { type?: string }).type !== "video" && "url" in m1;
+  const bgImageFromDb = isImageMedia1 ? (m1 as { url: string }).url : null;
   const [bgImage, setBgImage] = useState<string | null>(initialScene1?.bgImage ?? bgImageFromDb ?? null);
   useEffect(() => {
     if (bgImageFromDb && !initialScene1?.bgImage) setBgImage((prev) => prev || bgImageFromDb);
   }, [bgImageFromDb, initialScene1?.bgImage]);
+  useEffect(() => {
+    if (bgImageFromDb && stepFromStatus === 1) setStep(2);
+  }, [bgImageFromDb, stepFromStatus]);
   const [bgLoading, setBgLoading] = useState(false);
   const [bgError, setBgError] = useState<string | null>(null);
   const [fetchModalOpen, setFetchModalOpen] = useState(false);
@@ -3955,8 +3960,11 @@ function Scene2Content({
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
   const [bgRemovedError, setBgRemovedError] = useState<string | null>(null);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
-  const videoUrlFromDb = dbFetchedMedia && typeof dbFetchedMedia === "object" && "url" in dbFetchedMedia ? (dbFetchedMedia as { url?: string }).url : null;
-  const videoDownloadUrlFromDb = dbFetchedMedia && typeof dbFetchedMedia === "object" && "downloadUrl" in dbFetchedMedia ? (dbFetchedMedia as { downloadUrl?: string }).downloadUrl : null;
+  const m2 = dbFetchedMedia;
+  const type2 = m2 && typeof m2 === "object" ? (m2 as { type?: string }).type : undefined;
+  const isVideoMedia2 = m2 && typeof m2 === "object" && "url" in m2 && (type2 === "video" || type2 === undefined);
+  const videoUrlFromDb = isVideoMedia2 ? (m2 as { url: string }).url : null;
+  const videoDownloadUrlFromDb = isVideoMedia2 && "downloadUrl" in m2 ? (m2 as { downloadUrl?: string }).downloadUrl ?? null : null;
   const [selectedStockVideoUrl, setSelectedStockVideoUrl] = useState<string | null>(initialScene2?.selectedStockVideoUrl ?? videoUrlFromDb ?? null);
   useEffect(() => {
     if (videoUrlFromDb && !initialScene2?.selectedStockVideoUrl) setSelectedStockVideoUrl((prev) => prev || videoUrlFromDb);
@@ -3965,6 +3973,9 @@ function Scene2Content({
   useEffect(() => {
     if (videoDownloadUrlFromDb) setSelectedStockVideoDownloadUrl((prev) => prev || videoDownloadUrlFromDb);
   }, [videoDownloadUrlFromDb]);
+  useEffect(() => {
+    if (videoUrlFromDb && stepFromStatus === 1) setStep(2);
+  }, [videoUrlFromDb, stepFromStatus]);
   const [sceneVideo, setSceneVideo] = useState<string | null>(initialScene2?.sceneVideo ?? null);
   const [sceneLoading, setSceneLoading] = useState(false);
   const [sceneError, setSceneError] = useState<string | null>(null);
@@ -4483,11 +4494,16 @@ function Scene3Content({
   const [skipRemoveBg, setSkipRemoveBg] = useState(initialScene3?.skipRemoveBg ?? false);
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
   const [bgRemovedError, setBgRemovedError] = useState<string | null>(null);
-  const bgImageFromDbScene3 = dbFetchedMedia && typeof dbFetchedMedia === "object" && "url" in dbFetchedMedia ? (dbFetchedMedia as { url?: string }).url : null;
+  const m3 = dbFetchedMedia;
+  const isImageMedia3 = m3 && typeof m3 === "object" && (m3 as { type?: string }).type !== "video" && "url" in m3;
+  const bgImageFromDbScene3 = isImageMedia3 ? (m3 as { url: string }).url : null;
   const [bgImage, setBgImage] = useState<string | null>(initialScene3?.bgImage ?? bgImageFromDbScene3 ?? null);
   useEffect(() => {
     if (bgImageFromDbScene3 && !initialScene3?.bgImage) setBgImage((prev) => prev || bgImageFromDbScene3);
   }, [bgImageFromDbScene3, initialScene3?.bgImage]);
+  useEffect(() => {
+    if (bgImageFromDbScene3 && stepFromStatus === 1) setStep(2);
+  }, [bgImageFromDbScene3, stepFromStatus]);
   const [bgLoading, setBgLoading] = useState(false);
   const [bgError, setBgError] = useState<string | null>(null);
   const [fetchModalOpen, setFetchModalOpen] = useState(false);
