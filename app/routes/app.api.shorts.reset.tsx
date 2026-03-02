@@ -29,23 +29,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const shortDelegate = (prisma as any).short;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const videoScene = (prisma as any).videoScene;
 
     await shortDelegate.update({
       where: { id: shortId },
       data: { finalVideoUrl: null, status: "draft" },
     });
 
-    await videoScene.updateMany({
-      where: { shortId },
-      data: {
-        imageUrl: null,
-        generatedVideoUrl: null,
-        fetchedMedia: null,
-        status: "step1",
-      },
-    });
+    // Use raw SQL for scene fields (fetched_media, metadata) so this works even when
+    // Prisma client was generated without those columns.
+    await prisma.$executeRaw`
+      UPDATE video_scenes
+      SET image_url = NULL, generated_video_url = NULL, fetched_media = NULL,
+          metadata = COALESCE(metadata, '{}'::jsonb) - 'bgRemovedUrl',
+          status = 'step1', updated_at = now()
+      WHERE short_id = ${shortId}
+    `;
 
     return Response.json({ ok: true });
   } catch (err) {

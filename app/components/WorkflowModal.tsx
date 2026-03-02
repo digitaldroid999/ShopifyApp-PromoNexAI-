@@ -1665,6 +1665,9 @@ type ShortInfo = {
   scene1FetchedMedia: FetchedMediaSnapshot | null;
   scene2FetchedMedia: FetchedMediaSnapshot | null;
   scene3FetchedMedia: FetchedMediaSnapshot | null;
+  scene1BgRemovedUrl: string | null;
+  scene2BgRemovedUrl: string | null;
+  scene3BgRemovedUrl: string | null;
   scene1GeneratedVideoUrl: string | null;
   scene2GeneratedVideoUrl: string | null;
   scene3GeneratedVideoUrl: string | null;
@@ -1769,6 +1772,9 @@ export function WorkflowModal({
           scene1FetchedMedia: (loadShortFetcher.data as { scene1FetchedMedia?: FetchedMediaSnapshot | null }).scene1FetchedMedia ?? null,
           scene2FetchedMedia: (loadShortFetcher.data as { scene2FetchedMedia?: FetchedMediaSnapshot | null }).scene2FetchedMedia ?? null,
           scene3FetchedMedia: (loadShortFetcher.data as { scene3FetchedMedia?: FetchedMediaSnapshot | null }).scene3FetchedMedia ?? null,
+          scene1BgRemovedUrl: (loadShortFetcher.data as { scene1BgRemovedUrl?: string | null }).scene1BgRemovedUrl ?? null,
+          scene2BgRemovedUrl: (loadShortFetcher.data as { scene2BgRemovedUrl?: string | null }).scene2BgRemovedUrl ?? null,
+          scene3BgRemovedUrl: (loadShortFetcher.data as { scene3BgRemovedUrl?: string | null }).scene3BgRemovedUrl ?? null,
           scene1GeneratedVideoUrl: (loadShortFetcher.data as { scene1GeneratedVideoUrl?: string | null }).scene1GeneratedVideoUrl ?? null,
           scene2GeneratedVideoUrl: (loadShortFetcher.data as { scene2GeneratedVideoUrl?: string | null }).scene2GeneratedVideoUrl ?? null,
           scene3GeneratedVideoUrl: (loadShortFetcher.data as { scene3GeneratedVideoUrl?: string | null }).scene3GeneratedVideoUrl ?? null,
@@ -1883,6 +1889,20 @@ export function WorkflowModal({
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({ sceneId, imageUrl }),
+      });
+      if (res.ok) refetchShort();
+    },
+    [refetchShort]
+  );
+
+  /** Save scene metadata.bgRemovedUrl (BG-removed image URL) to DB then refetch. */
+  const updateSceneBgRemovedUrl = useCallback(
+    async (sceneId: string, bgRemovedUrl: string | null) => {
+      const res = await fetch(SHORTS_SCENES_API, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ sceneId, bgRemovedUrl }),
       });
       if (res.ok) refetchShort();
     },
@@ -2940,6 +2960,7 @@ export function WorkflowModal({
                   sceneStatus={shortInfo?.scene1Status ?? undefined}
                   dbImageUrl={shortInfo?.scene1ImageUrl ?? undefined}
                   dbFetchedMedia={shortInfo?.scene1FetchedMedia ?? undefined}
+                  dbBgRemovedUrl={shortInfo?.scene1BgRemovedUrl ?? undefined}
                   initialScene1={scene1Regenerated ? undefined : (scene1Snapshot ?? defaultScene1State(firstImageId))}
                   dbSceneVideoUrl={scene1Regenerated ? undefined : (shortInfo?.scene1GeneratedVideoUrl ?? undefined)}
                   onScene1Change={setScene1Snapshot}
@@ -2952,6 +2973,7 @@ export function WorkflowModal({
                   updateSceneStatus={updateSceneStatus}
                   updateSceneFetchedMedia={updateSceneFetchedMedia}
                   updateSceneImageUrl={updateSceneImageUrl}
+                  updateSceneBgRemovedUrl={updateSceneBgRemovedUrl}
                   goPreviousWithConfirm={goPreviousWithConfirm}
                   getNextStatus={getNextStatusScene13}
                 />
@@ -2990,6 +3012,7 @@ export function WorkflowModal({
                   sceneStatus={shortInfo?.scene3Status ?? undefined}
                   dbImageUrl={shortInfo?.scene3ImageUrl ?? undefined}
                   dbFetchedMedia={shortInfo?.scene3FetchedMedia ?? undefined}
+                  dbBgRemovedUrl={shortInfo?.scene3BgRemovedUrl ?? undefined}
                   initialScene3={scene3Regenerated ? undefined : (scene3Snapshot ?? defaultScene3State(firstImageId))}
                   dbSceneVideoUrl={scene3Regenerated ? undefined : (shortInfo?.scene3GeneratedVideoUrl ?? undefined)}
                   onScene3Change={setScene3Snapshot}
@@ -3002,6 +3025,7 @@ export function WorkflowModal({
                   updateSceneStatus={updateSceneStatus}
                   updateSceneFetchedMedia={updateSceneFetchedMedia}
                   updateSceneImageUrl={updateSceneImageUrl}
+                  updateSceneBgRemovedUrl={updateSceneBgRemovedUrl}
                   goPreviousWithConfirm={goPreviousWithConfirm}
                   getNextStatus={getNextStatusScene13}
                 />
@@ -3184,6 +3208,7 @@ function Scene1Content({
   sceneStatus,
   dbImageUrl,
   dbFetchedMedia,
+  dbBgRemovedUrl,
   initialScene1,
   dbSceneVideoUrl,
   onScene1Change,
@@ -3193,6 +3218,7 @@ function Scene1Content({
   updateSceneStatus,
   updateSceneFetchedMedia,
   updateSceneImageUrl,
+  updateSceneBgRemovedUrl,
   goPreviousWithConfirm,
   getNextStatus,
 }: {
@@ -3205,6 +3231,7 @@ function Scene1Content({
   sceneStatus?: string | null;
   dbImageUrl?: string | null;
   dbFetchedMedia?: FetchedMediaSnapshot | null;
+  dbBgRemovedUrl?: string | null;
   initialScene1?: Scene1State | null;
   dbSceneVideoUrl?: string | null;
   onScene1Change?: (s: Scene1State) => void;
@@ -3214,6 +3241,7 @@ function Scene1Content({
   updateSceneStatus?: (sceneId: string, status: string) => void | Promise<void>;
   updateSceneFetchedMedia?: (sceneId: string, media: FetchedMediaSnapshot) => void | Promise<void>;
   updateSceneImageUrl?: (sceneId: string, imageUrl: string) => void | Promise<void>;
+  updateSceneBgRemovedUrl?: (sceneId: string, bgRemovedUrl: string | null) => void | Promise<void>;
   goPreviousWithConfirm?: (sceneId: string) => void | Promise<void>;
   getNextStatus?: (current: string) => string | null;
 }) {
@@ -3224,7 +3252,7 @@ function Scene1Content({
     setStep(scene13StatusToStep(sceneStatus));
   }, [sceneStatus]);
   const [selectedImage, setSelectedImage] = useState<string | null>(initialScene1?.selectedImage ?? firstId);
-  const [bgRemoved, setBgRemoved] = useState<string | null>(initialScene1?.bgRemoved ?? null);
+  const [bgRemoved, setBgRemoved] = useState<string | null>(initialScene1?.bgRemoved ?? dbBgRemovedUrl ?? null);
   const [skipRemoveBg, setSkipRemoveBg] = useState(initialScene1?.skipRemoveBg ?? false);
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
   const [bgRemovedError, setBgRemovedError] = useState<string | null>(null);
@@ -4404,6 +4432,7 @@ function Scene3Content({
   sceneStatus,
   dbImageUrl,
   dbFetchedMedia,
+  dbBgRemovedUrl,
   initialScene3,
   dbSceneVideoUrl,
   onScene3Change,
@@ -4413,6 +4442,7 @@ function Scene3Content({
   updateSceneStatus,
   updateSceneFetchedMedia,
   updateSceneImageUrl,
+  updateSceneBgRemovedUrl,
   goPreviousWithConfirm,
   getNextStatus,
 }: {
@@ -4425,6 +4455,7 @@ function Scene3Content({
   sceneStatus?: string | null;
   dbImageUrl?: string | null;
   dbFetchedMedia?: FetchedMediaSnapshot | null;
+  dbBgRemovedUrl?: string | null;
   initialScene3?: Scene3State | null;
   dbSceneVideoUrl?: string | null;
   onScene3Change?: (s: Scene3State) => void;
@@ -4434,6 +4465,7 @@ function Scene3Content({
   updateSceneStatus?: (sceneId: string, status: string) => void | Promise<void>;
   updateSceneFetchedMedia?: (sceneId: string, media: FetchedMediaSnapshot) => void | Promise<void>;
   updateSceneImageUrl?: (sceneId: string, imageUrl: string) => void | Promise<void>;
+  updateSceneBgRemovedUrl?: (sceneId: string, bgRemovedUrl: string | null) => void | Promise<void>;
   goPreviousWithConfirm?: (sceneId: string) => void | Promise<void>;
   getNextStatus?: (current: string) => string | null;
 }) {
@@ -4444,7 +4476,7 @@ function Scene3Content({
     setStep(scene13StatusToStep(sceneStatus));
   }, [sceneStatus]);
   const [selectedImage, setSelectedImage] = useState<string | null>(initialScene3?.selectedImage ?? firstId);
-  const [bgRemoved, setBgRemoved] = useState<string | null>(initialScene3?.bgRemoved ?? null);
+  const [bgRemoved, setBgRemoved] = useState<string | null>(initialScene3?.bgRemoved ?? dbBgRemovedUrl ?? null);
   const [skipRemoveBg, setSkipRemoveBg] = useState(initialScene3?.skipRemoveBg ?? false);
   const [bgRemovedLoading, setBgRemovedLoading] = useState(false);
   const [bgRemovedError, setBgRemovedError] = useState<string | null>(null);

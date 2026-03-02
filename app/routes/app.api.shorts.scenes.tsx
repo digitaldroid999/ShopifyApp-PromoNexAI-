@@ -15,9 +15,18 @@ const DEFAULT_DURATION_SEC = 8;
 export const action = async ({ request }: ActionFunctionArgs) => {
   await authenticate.admin(request);
 
-  // PATCH: update scene imageUrl, status, fetchedMedia, reset, or goPrevious (clear current step data and set previous status)
+  // PATCH: update scene imageUrl, status, fetched_media, metadata.bgRemovedUrl, reset, or goPrevious
+  // Uses raw SQL for fetched_media so it works even when Prisma client was generated before that column existed.
   if (request.method === "PATCH") {
-    let body: { sceneId?: string; imageUrl?: string; reset?: boolean; status?: string; goPrevious?: boolean; fetchedMedia?: unknown };
+    let body: {
+      sceneId?: string;
+      imageUrl?: string;
+      reset?: boolean;
+      status?: string;
+      goPrevious?: boolean;
+      fetchedMedia?: unknown;
+      bgRemovedUrl?: string | null;
+    };
     try {
       body = await request.json();
     } catch {
@@ -36,10 +45,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           data: {
             imageUrl: null,
             generatedVideoUrl: null,
-            fetchedMedia: null,
             status: "step1",
           },
         });
+        await prisma.$executeRaw`UPDATE video_scenes SET fetched_media = NULL, metadata = COALESCE(metadata, '{}'::jsonb) - 'bgRemovedUrl' WHERE id = ${sceneId}`;
         return Response.json({ ok: true, reset: true });
       }
       if (body.goPrevious === true) {
@@ -60,11 +69,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           sceneNumber === 2
             ? getScene2ClearFieldsWhenGoingPrevious(currentStatus)
             : getScene13ClearFieldsWhenGoingPrevious(currentStatus);
-        const data: { status: string; imageUrl?: null; generatedVideoUrl?: null; fetchedMedia?: null } = { status: prevStatus };
+        const data: { status: string; imageUrl?: null; generatedVideoUrl?: null } = { status: prevStatus };
         if (clearFields.imageUrl) data.imageUrl = null;
         if (clearFields.generatedVideoUrl) data.generatedVideoUrl = null;
-        if (clearFields.fetchedMedia) data.fetchedMedia = null;
         await videoScene.update({ where: { id: sceneId }, data });
+        if (clearFields.fetchedMedia) {
+          await prisma.$executeRaw`UPDATE video_scenes SET fetched_media = NULL WHERE id = ${sceneId}`;
+        }
+        if (prevStatus === "step1") {
+          await prisma.$executeRaw`UPDATE video_scenes SET metadata = COALESCE(metadata, '{}'::jsonb) - 'bgRemovedUrl' WHERE id = ${sceneId}`;
+        }
         return Response.json({ ok: true, status: prevStatus, goPrevious: true });
       }
       const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl.trim() : undefined;
@@ -73,20 +87,41 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           ? body.status.trim()
           : undefined;
       const fetchedMedia = body.fetchedMedia;
+      const bgRemovedUrl = typeof body.bgRemovedUrl === "string" ? body.bgRemovedUrl.trim() : body.bgRemovedUrl === null ? null : undefined;
       const validScene13 = status && SCENE13_STATUSES.includes(status as never);
       const validScene2 = status && SCENE2_STATUSES.includes(status as never);
-      const data: { imageUrl?: string | null; status?: string; fetchedMedia?: unknown } = {};
-      if (imageUrl !== undefined) data.imageUrl = imageUrl ?? null;
-      if (status && (validScene13 || validScene2)) data.status = status;
-      if (fetchedMedia !== undefined) data.fetchedMedia = fetchedMedia === null ? null : fetchedMedia;
-      if (Object.keys(data).length === 0) {
+
+      const setClauses: string[] = [];
+      const values: unknown[] = [];
+      let paramIndex = 0;
+      if (imageUrl !== undefined) {
+        setClauses.push(`image_url = $${++paramIndex}`);
+        values.push(imageUrl || null);
+      }
+      if (status && (validScene13 || validScene2)) {
+        setClauses.push(`status = $${++paramIndex}`);
+        values.push(status);
+      }
+      if (fetchedMedia !== undefined) {
+        setClauses.push(`fetched_media = $${++paramIndex}::jsonb`);
+        values.push(fetchedMedia === null ? null : JSON.stringify(fetchedMedia));
+      }
+      if (bgRemovedUrl !== undefined) {
+        if (bgRemovedUrl === null) {
+          setClauses.push(`metadata = COALESCE(metadata, '{}'::jsonb) - 'bgRemovedUrl'`);
+        } else {
+          setClauses.push(`metadata = COALESCE(metadata, '{}'::jsonb) || $${++paramIndex}::jsonb`);
+          values.push(JSON.stringify({ bgRemovedUrl }));
+        }
+      }
+      if (setClauses.length === 0) {
         return Response.json({ ok: true });
       }
-      await videoScene.update({
-        where: { id: sceneId },
-        data,
-      });
-      return Response.json({ ok: true, ...(data.status ? { status: data.status } : {}) });
+      setClauses.push(`updated_at = now()`);
+      values.push(sceneId);
+      const query = `UPDATE video_scenes SET ${setClauses.join(", ")} WHERE id = $${++paramIndex}`;
+      await prisma.$executeRawUnsafe(query, ...values);
+      return Response.json({ ok: true, ...(status ? { status } : {}) });
     } catch (err) {
       console.error("[app.api.shorts.scenes] VideoScene update failed:", err);
       return Response.json(

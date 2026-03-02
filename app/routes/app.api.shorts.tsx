@@ -20,7 +20,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     },
   });
     if (!short) {
-    return Response.json({ shortId: null, userId: null, status: null, scene1Id: null, scene2Id: null, scene3Id: null, scene1Status: null, scene2Status: null, scene3Status: null, audioInfo: null, bgMusic: null, scene1FetchedMedia: null, scene2FetchedMedia: null, scene3FetchedMedia: null, scene1GeneratedVideoUrl: null, scene2GeneratedVideoUrl: null, scene3GeneratedVideoUrl: null, finalVideoUrl: null });
+    return Response.json({ shortId: null, userId: null, status: null, scene1Id: null, scene2Id: null, scene3Id: null, scene1Status: null, scene2Status: null, scene3Status: null, audioInfo: null, bgMusic: null, scene1FetchedMedia: null, scene2FetchedMedia: null, scene3FetchedMedia: null, scene1BgRemovedUrl: null, scene2BgRemovedUrl: null, scene3BgRemovedUrl: null, scene1GeneratedVideoUrl: null, scene2GeneratedVideoUrl: null, scene3GeneratedVideoUrl: null, finalVideoUrl: null });
   }
   // When loading a short that is still draft, mark as in_progress (user is working on it)
   const currentStatus = (short as { status?: string }).status?.trim() || "draft";
@@ -54,6 +54,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const bgMusic = metadata?.bgMusic ?? null;
   const sceneWithUrl = (s: { generatedVideoUrl?: string | null } | undefined) => (s?.generatedVideoUrl?.trim() ? s.generatedVideoUrl : null) ?? null;
   const sceneImageUrl = (s: { imageUrl?: string | null } | undefined) => (s?.imageUrl?.trim() ? s.imageUrl : null) ?? null;
+  const sceneBgRemovedUrl = (s: { metadata?: unknown } | undefined) => {
+    const m = s?.metadata;
+    if (m && typeof m === "object" && m !== null && "bgRemovedUrl" in m) {
+      const v = (m as { bgRemovedUrl?: string }).bgRemovedUrl;
+      return typeof v === "string" && v.trim() ? v.trim() : null;
+    }
+    return null;
+  };
   const finalVideoUrl = (short as { finalVideoUrl?: string | null }).finalVideoUrl?.trim() || null;
   const bgMusicPayload = bgMusic && typeof bgMusic === "object"
     ? {
@@ -81,6 +89,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     scene1FetchedMedia: sceneFetchedMedia(s1),
     scene2FetchedMedia: sceneFetchedMedia(s2),
     scene3FetchedMedia: sceneFetchedMedia(s3),
+    scene1BgRemovedUrl: sceneBgRemovedUrl(s1),
+    scene2BgRemovedUrl: sceneBgRemovedUrl(s2),
+    scene3BgRemovedUrl: sceneBgRemovedUrl(s3),
     scene1GeneratedVideoUrl: sceneWithUrl(s1),
     scene2GeneratedVideoUrl: sceneWithUrl(s2),
     scene3GeneratedVideoUrl: sceneWithUrl(s3),
@@ -134,6 +145,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       const sceneWithUrl = (s: { generatedVideoUrl?: string | null } | undefined) => (s?.generatedVideoUrl?.trim() ? s.generatedVideoUrl : null) ?? null;
       const sceneImageUrl = (s: { imageUrl?: string | null } | undefined) => (s?.imageUrl?.trim() ? s.imageUrl : null) ?? null;
       const sceneFetchedMediaExisting = (s: { fetchedMedia?: unknown } | undefined) => (s?.fetchedMedia != null ? s.fetchedMedia : null);
+      const sceneBgRemovedUrlExisting = (s: { metadata?: unknown } | undefined) => {
+        const m = s?.metadata;
+        if (m && typeof m === "object" && m !== null && "bgRemovedUrl" in m) {
+          const v = (m as { bgRemovedUrl?: string }).bgRemovedUrl;
+          return typeof v === "string" && v.trim() ? v.trim() : null;
+        }
+        return null;
+      };
       const meta = existing.metadata as {
         bgMusic?: {
           id?: string | null;
@@ -174,6 +193,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
         scene1FetchedMedia: sceneFetchedMediaExisting(s1),
         scene2FetchedMedia: sceneFetchedMediaExisting(s2),
         scene3FetchedMedia: sceneFetchedMediaExisting(s3),
+        scene1BgRemovedUrl: sceneBgRemovedUrlExisting(s1),
+        scene2BgRemovedUrl: sceneBgRemovedUrlExisting(s2),
+        scene3BgRemovedUrl: sceneBgRemovedUrlExisting(s3),
         scene1GeneratedVideoUrl: sceneWithUrl(s1),
         scene2GeneratedVideoUrl: sceneWithUrl(s2),
         scene3GeneratedVideoUrl: sceneWithUrl(s3),
