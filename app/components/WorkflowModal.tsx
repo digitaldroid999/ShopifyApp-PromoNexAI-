@@ -1834,6 +1834,8 @@ export function WorkflowModal({
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
   /** Cache-bust key for final video so re-finalize (same URL, new file) forces browser to reload */
   const [finalVideoCacheBust, setFinalVideoCacheBust] = useState(0);
+  /** Blob URL for final video (fetched with no-cache) so re-finalize always shows new file */
+  const [finalVideoBlobUrl, setFinalVideoBlobUrl] = useState<string | null>(null);
   /** Platform confirm modal (replaces window.confirm for "go previous") */
   const [confirmGoPrevious, setConfirmGoPrevious] = useState<{ message: string; sceneId: string } | null>(null);
   /** Platform alert modal (replaces window.alert for errors) */
@@ -2086,6 +2088,34 @@ export function WorkflowModal({
     return () => clearTimeout(timer);
   }, [productId, loadedState, activeTab, showingFinal, activePhase]);
 
+  // Fetch final video with no-cache and show via blob URL so re-finalize (same URL, new file) always displays new content
+  useEffect(() => {
+    if (!showingFinal || !displayedFinalVideoUrl) {
+      setFinalVideoBlobUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+      return;
+    }
+    let cancelled = false;
+    const urlToFetch = `${displayedFinalVideoUrl}${displayedFinalVideoUrl.includes("?") ? "&" : "?"}t=${finalVideoCacheBust}`;
+    fetch(urlToFetch, { cache: "reload", credentials: "include", headers: { Pragma: "no-cache", "Cache-Control": "no-cache" } })
+      .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(r.statusText))))
+      .then((blob) => {
+        if (cancelled) return;
+        setFinalVideoBlobUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return URL.createObjectURL(blob);
+        });
+      })
+      .catch(() => {
+        if (!cancelled) setFinalVideoBlobUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [showingFinal, displayedFinalVideoUrl, finalVideoCacheBust]);
+
   const handleFinalize = async () => {
     if (!shortInfo?.shortId) {
       setFinalizeError("Short not loaded. Please close and reopen the workflow.");
@@ -2329,8 +2359,8 @@ export function WorkflowModal({
             {displayedFinalVideoUrl ? (
               <>
                 <video
-                  key={finalVideoCacheBust}
-                  src={`${displayedFinalVideoUrl}${displayedFinalVideoUrl.includes("?") ? "&" : "?"}t=${finalVideoCacheBust}`}
+                  key={finalVideoBlobUrl ?? `fallback-${finalVideoCacheBust}`}
+                  src={finalVideoBlobUrl ?? `${displayedFinalVideoUrl}${displayedFinalVideoUrl.includes("?") ? "&" : "?"}t=${finalVideoCacheBust}`}
                   controls
                   style={{ maxWidth: "100%", maxHeight: "60vh", borderRadius: "12px", border: "1px solid #e1e3e5" }}
                 />
