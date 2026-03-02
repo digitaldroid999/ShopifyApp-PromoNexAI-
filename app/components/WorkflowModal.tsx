@@ -1935,12 +1935,12 @@ export function WorkflowModal({
     ensureShortCreatedRef.current = false;
   }, [productId]);
 
-  // Load short + scene ids from DB when modal opens with productId
+  // Fetch short from DB whenever modal opens (productId set) so fetched_media and bgRemovedUrl are current on reopen/refresh
   useEffect(() => {
-    if (productId?.trim() && loadShortFetcher.state === "idle" && !loadShortFetcher.data) {
+    if (productId?.trim()) {
       loadShortFetcher.load(`${SHORTS_API}?productId=${encodeURIComponent(productId.trim())}`);
     }
-  }, [productId, loadShortFetcher.state, loadShortFetcher.data]);
+  }, [productId]);
 
   // If GET returned no short, create one so we have scene IDs for fetched_media / status updates
   useEffect(() => {
