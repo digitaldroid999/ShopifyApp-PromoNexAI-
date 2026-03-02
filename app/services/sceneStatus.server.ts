@@ -29,9 +29,9 @@ export type Scene2Status = (typeof SCENE2_STATUSES)[number];
 export const NORMALIZE_PENDING = "step1";
 
 /**
- * Scene 1 & 3: Previous is not step-by-step.
- * - From video_generated or step3 → images_compositied (step 2)
- * - From images_compositied / step2 / bg_image_fetched_generated → bg_removed (step 1)
+ * Scene 1 & 3: Previous is not step-by-step (unlike forward).
+ * - From video_generated or step3 → previous → images_compositied
+ * - From images_compositied (or step2 / bg_image_fetched_generated) → previous → bg_removed
  * - From bg_removed / step1 → already at first step (null)
  */
 export function getScene13PreviousStatus(current: string): Scene13Status | null {
@@ -42,9 +42,9 @@ export function getScene13PreviousStatus(current: string): Scene13Status | null 
 }
 
 /**
- * Scene 2: Previous is not step-by-step.
- * - From video_generated (step 2) → bg_removed (step 1)
- * - From bg_video_fetched / step2 → bg_removed
+ * Scene 2: Previous is not step-by-step (unlike forward).
+ * - From video_generated → previous → bg_removed
+ * - From bg_video_fetched / step2 → previous → bg_removed
  * - From bg_removed / step1 → already at first step (null)
  */
 export function getScene2PreviousStatus(current: string): Scene2Status | null {

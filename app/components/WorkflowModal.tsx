@@ -4062,10 +4062,11 @@ function Scene2Content({
     setSceneMessage(null);
     setSceneLoading(true);
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const urlForMerge = selectedStockVideoDownloadUrl ?? selectedStockVideoUrl;
+    const backgroundVideoUrlForMerge = selectedStockVideoDownloadUrl ?? selectedStockVideoUrl;
     try {
       const product_image_url = effectiveOverlayUrl.startsWith("http") ? effectiveOverlayUrl : `${origin}${effectiveOverlayUrl}`;
-      const background_video_url = urlForMerge.startsWith("http") ? urlForMerge : `${origin}${urlForMerge}`;
+      const background_video_url = backgroundVideoUrlForMerge.startsWith("http") ? backgroundVideoUrlForMerge : `${origin}${backgroundVideoUrlForMerge}`;
+      // Use download URL for merge so backend gets the direct file; preview URL is only for display
       const res = await fetch(VIDEO_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -4436,11 +4437,18 @@ function Scene2Content({
             open={videoModalOpen}
             onClose={() => setVideoModalOpen(false)}
             forScene2Merge
-            onSelect={(url, options) => {
-              setSelectedStockVideoUrl(url);
-              const downloadUrl = options?.downloadUrl ?? url;
+            onSelect={(previewUrl, options) => {
+              const downloadUrl = options?.downloadUrl ?? previewUrl;
+              setSelectedStockVideoUrl(previewUrl);
               setSelectedStockVideoDownloadUrl(downloadUrl);
-              if (scene2Id && updateSceneFetchedMedia) updateSceneFetchedMedia(scene2Id, { type: "video", id: options?.id, url, downloadUrl });
+              if (scene2Id && updateSceneFetchedMedia) {
+                updateSceneFetchedMedia(scene2Id, {
+                  type: "video",
+                  id: options?.id,
+                  url: previewUrl,
+                  downloadUrl,
+                });
+              }
               if (scene2Id && updateSceneStatus) updateSceneStatus(scene2Id, "bg_video_fetched");
               setVideoModalOpen(false);
             }}
