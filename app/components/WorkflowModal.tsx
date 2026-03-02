@@ -1182,10 +1182,13 @@ function FetchVideoModal({
   open,
   onClose,
   onSelect,
+  /** When true, onSelect is called with (url, { downloadUrl }) so the caller can send the download URL for merge. */
+  forScene2Merge,
 }: {
   open: boolean;
   onClose: () => void;
-  onSelect: (url: string) => void;
+  onSelect: (url: string, options?: { downloadUrl?: string }) => void;
+  forScene2Merge?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -1233,10 +1236,14 @@ function FetchVideoModal({
   };
 
   const handleSelect = (item: (typeof videos)[0]) => {
-    // Prefer download_url (actual video file) for merge; fall back to preview_url for display-only sources
     const url = item.download_url || item.preview_url;
     if (url) {
-      onSelect(url);
+      if (forScene2Merge) {
+        // Scene 2 merge must receive the download URL (direct video file) for the backend.
+        onSelect(url, { downloadUrl: item.download_url ?? url });
+      } else {
+        onSelect(url);
+      }
       onClose();
     }
   };
@@ -1728,32 +1735,37 @@ export function WorkflowModal({
     }
   }, [voicesFetcher.data, selectedVoiceId]);
 
-  // Restore only ephemeral UI from temp (activeTab, showingFinal). Asset data always comes from Short.
+  // Restore ephemeral UI from temp (activeTab, showingFinal, activePhase). Asset data always comes from Short.
   useEffect(() => {
     if (loadedState !== "pending" || loadTempFetcher.state !== "idle" || !loadTempFetcher.data) return;
     const data = loadTempFetcher.data;
-    const state = data?.state ?? null;
+    const state = data?.state as WorkflowTempStateSlim | null | undefined;
     if (state && (state.activeTab === "scene2" || state.activeTab === "scene3" || state.activeTab === "scene1")) {
-      const slim = { activeTab: state.activeTab, showingFinal: Boolean(state.showingFinal) };
+      const slim: WorkflowTempStateSlim = {
+        activeTab: state.activeTab,
+        showingFinal: Boolean(state.showingFinal),
+        activePhase: (state.activePhase === "audio" || state.activePhase === "finalize" ? state.activePhase : "scenes"),
+      };
       setLoadedState(slim);
       setActiveTab(slim.activeTab);
       setShowingFinal(slim.showingFinal);
+      setActivePhase(slim.activePhase);
     } else {
       setLoadedState(null);
     }
   }, [loadedState, loadTempFetcher.state, loadTempFetcher.data]);
 
-  // Debounced save of ephemeral UI only (activeTab, showingFinal). Asset data lives in Short.
+  // Debounced save of ephemeral UI (activeTab, showingFinal, activePhase). Asset data lives in Short.
   useEffect(() => {
     if (!productId?.trim() || loadedState === "pending") return;
     const timer = setTimeout(() => {
       saveTempFetcher.submit(
-        { productId: productId.trim(), state: { activeTab, showingFinal } },
+        { productId: productId.trim(), state: { activeTab, showingFinal, activePhase } },
         { method: "post", action: WORKFLOW_TEMP_API, encType: "application/json" }
       );
     }, 2000);
     return () => clearTimeout(timer);
-  }, [productId, loadedState, activeTab, showingFinal]);
+  }, [productId, loadedState, activeTab, showingFinal, activePhase]);
 
   const handleFinalize = async () => {
     if (!shortInfo?.shortId) {
@@ -1927,6 +1939,7 @@ export function WorkflowModal({
     setScene2ResetKey((k) => k + 1);
     setScene3ResetKey((k) => k + 1);
     setActiveTab("scene1");
+    setActivePhase("scenes");
     setFinalVideoUrl(null);
     if (productId?.trim()) {
       deleteTempFetcher.submit(null, {
@@ -2006,7 +2019,7 @@ export function WorkflowModal({
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", justifyContent: "center" }}>
                   <button
                     type="button"
-                    onClick={() => { setShowingFinal(false); setActiveTab("scene1"); }}
+                    onClick={() => { setShowingFinal(false); setActiveTab("scene1"); setActivePhase("scenes"); }}
                     style={{
                       padding: "10px 20px",
                       borderRadius: "8px",
@@ -2759,10 +2772,11 @@ async function parseCompositeApiResponse(
   return { ok: false, error: errorMessage };
 }
 
-/** Slim state persisted to temp API (server only stores activeTab + showingFinal) */
+/** Slim state persisted to temp API (server stores activeTab, showingFinal, activePhase) */
 export type WorkflowTempStateSlim = {
   activeTab: "scene1" | "scene2" | "scene3";
   showingFinal: boolean;
+  activePhase: "scenes" | "audio" | "finalize";
 };
 
 /** Full workflow state shape (scene snapshots used in-memory only; temp API uses WorkflowTempStateSlim) */
@@ -3434,24 +3448,6 @@ function Scene1Content({
             title="Generate scene video"
             description="Create the final ~8 second video for this scene from the composited image using Remotion. Click Generate scene to start."
           />
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-            <button
-              type="button"
-              onClick={() => setStep(2)}
-              style={{
-                padding: "8px 16px",
-                borderRadius: "8px",
-                border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                background: "transparent",
-                color: "var(--p-color-text-primary, #202223)",
-                fontWeight: 600,
-                cursor: "pointer",
-                fontSize: "14px",
-              }}
-            >
-              ← Previous
-            </button>
-          </div>
           <div style={twoPartLayout}>
             <div style={{ ...boxStyle, borderRight: "none", borderTopRightRadius: 0, borderBottomRightRadius: 0 }}>
               {composited ? (
@@ -3558,6 +3554,21 @@ function Scene1Content({
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                   <button
                     type="button"
+                    onClick={() => setStep(2)}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                      background: "transparent",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    ← Previous
+                  </button>
+                  <button
+                    type="button"
                     onClick={handleGenerateScene}
                     disabled={!composited}
                     style={{
@@ -3615,6 +3626,8 @@ function Scene2Content({
   const [bgRemovedError, setBgRemovedError] = useState<string | null>(null);
   const [videoModalOpen, setVideoModalOpen] = useState(false);
   const [selectedStockVideoUrl, setSelectedStockVideoUrl] = useState<string | null>(initialScene2?.selectedStockVideoUrl ?? null);
+  /** Download URL sent to merge API (direct video file); when set, use this for scene 2 generate. */
+  const [selectedStockVideoDownloadUrl, setSelectedStockVideoDownloadUrl] = useState<string | null>(null);
   const [sceneVideo, setSceneVideo] = useState<string | null>(initialScene2?.sceneVideo ?? null);
   const [sceneLoading, setSceneLoading] = useState(false);
   const [sceneError, setSceneError] = useState<string | null>(null);
@@ -3685,9 +3698,10 @@ function Scene2Content({
     setSceneMessage(null);
     setSceneLoading(true);
     const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const urlForMerge = selectedStockVideoDownloadUrl ?? selectedStockVideoUrl;
     try {
       const product_image_url = effectiveOverlayUrl.startsWith("http") ? effectiveOverlayUrl : `${origin}${effectiveOverlayUrl}`;
-      const background_video_url = selectedStockVideoUrl.startsWith("http") ? selectedStockVideoUrl : `${origin}${selectedStockVideoUrl}`;
+      const background_video_url = urlForMerge.startsWith("http") ? urlForMerge : `${origin}${urlForMerge}`;
       const res = await fetch(VIDEO_API, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -3901,24 +3915,6 @@ function Scene2Content({
             title="Select stock video & generate scene"
             description="Search and pick a stock video from Pexels, Pixabay, or Coverr as the background. Then click Generate video to composite your subject onto it and create the scene (~8s)."
           />
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-            <button
-              type="button"
-              onClick={() => setStep(1)}
-              style={{
-                padding: "8px 16px",
-                borderRadius: "8px",
-                border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                background: "transparent",
-                color: "var(--p-color-text-primary, #202223)",
-                fontWeight: 600,
-                cursor: "pointer",
-                fontSize: "14px",
-              }}
-            >
-              ← Previous
-            </button>
-          </div>
           <div style={{ display: "flex", flexDirection: "row", gap: "24px", alignItems: "flex-start", flexWrap: "wrap" }}>
             <div style={{ flex: "1 1 260px", minWidth: "240px", display: "flex", flexDirection: "column", gap: "16px" }}>
               {effectiveOverlayUrl ? (
@@ -4071,6 +4067,21 @@ function Scene2Content({
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                   <button
                     type="button"
+                    onClick={() => setStep(1)}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                      background: "transparent",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    ← Previous
+                  </button>
+                  <button
+                    type="button"
                     onClick={handleGenerateVideo}
                     disabled={!selectedStockVideoUrl || !effectiveOverlayUrl || !scene2Id || !shortUserId || sceneLoading}
                     style={{
@@ -4095,7 +4106,12 @@ function Scene2Content({
           <FetchVideoModal
             open={videoModalOpen}
             onClose={() => setVideoModalOpen(false)}
-            onSelect={(url) => { setSelectedStockVideoUrl(url); setVideoModalOpen(false); }}
+            forScene2Merge
+            onSelect={(url, options) => {
+              setSelectedStockVideoUrl(url);
+              setSelectedStockVideoDownloadUrl(options?.downloadUrl ?? url);
+              setVideoModalOpen(false);
+            }}
           />
         </>
       )}
@@ -4696,24 +4712,6 @@ function Scene3Content({
             title="Generate scene video (different style)"
             description="Create the ~8 second video for this scene from the composited image using Remotion with a different style than Scene 1. Click Generate scene to start."
           />
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-            <button
-              type="button"
-              onClick={() => setStep(2)}
-              style={{
-                padding: "8px 16px",
-                borderRadius: "8px",
-                border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                background: "transparent",
-                color: "var(--p-color-text-primary, #202223)",
-                fontWeight: 600,
-                cursor: "pointer",
-                fontSize: "14px",
-              }}
-            >
-              ← Previous
-            </button>
-          </div>
           <div style={twoPartLayout}>
             <div style={{ ...boxStyle, borderRight: "none", borderTopRightRadius: 0, borderBottomRightRadius: 0 }}>
               {composited ? (
@@ -4798,6 +4796,21 @@ function Scene3Content({
                 </div>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => setStep(2)}
+                    style={{
+                      padding: "8px 16px",
+                      borderRadius: "8px",
+                      border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                      background: "transparent",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                    }}
+                  >
+                    ← Previous
+                  </button>
                   <button
                     type="button"
                     onClick={handleGenerateScene}

@@ -345,17 +345,37 @@ async function searchCoverr(
       thumbnail?: string;
       urls?: { mp4?: string; mp4_preview?: string; mp4_download?: string };
     }>;
+    videos?: Array<{ id: string; title?: string; mp4?: string; poster?: string; duration?: number }>;
     total?: number;
   };
 
-  const images: NormalizedStockImage[] = (data.hits || []).map((hit) => ({
-    id: `coverr-${hit.id}`,
-    title: hit.title || "Coverr video",
-    thumbnail_url: hit.thumbnail || hit.poster,
-    preview_url: hit.urls?.mp4_preview || hit.urls?.mp4,
-    download_url: hit.urls?.mp4_download || hit.urls?.mp4 || hit.urls?.mp4_preview,
-    type: "video",
-  }));
+  // Prefer videos[].mp4 (API-provided direct URL) for selected video; fallback to hits[].urls
+  if (data.videos && data.videos.length > 0) {
+    const images: NormalizedStockImage[] = data.videos.map((v) => {
+      const videoUrl = v.mp4 ?? undefined;
+      return {
+        id: `coverr-${v.id}`,
+        title: v.title || "Coverr video",
+        thumbnail_url: v.poster,
+        preview_url: videoUrl,
+        download_url: videoUrl,
+        type: "video",
+      };
+    });
+    return { images, total: data.total ?? images.length };
+  }
+
+  const images: NormalizedStockImage[] = (data.hits || []).map((hit) => {
+    const videoUrl = hit.urls?.mp4_download || hit.urls?.mp4 || hit.urls?.mp4_preview;
+    return {
+      id: `coverr-${hit.id}`,
+      title: hit.title || "Coverr video",
+      thumbnail_url: hit.thumbnail || hit.poster,
+      preview_url: videoUrl,
+      download_url: videoUrl,
+      type: "video",
+    };
+  });
 
   return { images, total: data.total ?? images.length };
 }
@@ -510,7 +530,7 @@ async function searchPexelsVideos(
     videos?: Array<{
       id: number;
       image?: string;
-      video_files?: Array<{ link?: string; quality?: string }>;
+      video_files?: Array<{ link?: string; quality?: string; file_type?: string }>;
       video_pictures?: Array<{ picture?: string }>;
       user?: { name?: string };
     }>;
@@ -518,14 +538,22 @@ async function searchPexelsVideos(
   };
 
   const images: NormalizedStockImage[] = (data.videos || []).map((v) => {
-    const file = v.video_files?.find((f) => f.quality === "hd" || f.quality === "sd") || v.video_files?.[0];
+    // Use API-provided link for selected video: prefer video/mp4, then hd/sd
+    const files = v.video_files || [];
+    const file =
+      files.find((f) => f.file_type === "video/mp4" && (f.quality === "hd" || f.quality === "sd")) ||
+      files.find((f) => f.file_type === "video/mp4") ||
+      files.find((f) => f.quality === "hd") ||
+      files.find((f) => f.quality === "sd") ||
+      files[0];
+    const videoUrl = file?.link ?? undefined;
     const picture = v.video_pictures?.[0]?.picture || v.image;
     return {
       id: `pexels-v-${v.id}`,
       title: `Video by ${v.user?.name || "Pexels"}`,
       thumbnail_url: picture,
-      preview_url: file?.link,
-      download_url: file?.link,
+      preview_url: videoUrl,
+      download_url: videoUrl,
       type: "video",
     };
   });
@@ -558,9 +586,9 @@ async function searchPixabayVideos(
       tags?: string;
       user?: string;
       videos?: {
+        large?: { url?: string; thumbnail?: string };
         medium?: { url?: string; thumbnail?: string };
         small?: { url?: string; thumbnail?: string };
-        large?: { url?: string; thumbnail?: string };
       };
     }>;
     total?: number;
@@ -568,13 +596,15 @@ async function searchPixabayVideos(
   };
 
   const images: NormalizedStockImage[] = (data.hits || []).map((hit) => {
-    const v = hit.videos?.medium || hit.videos?.small || hit.videos?.large;
+    // Use API-provided URL for selected video: prefer large (direct mp4)
+    const v = hit.videos?.large || hit.videos?.medium || hit.videos?.small;
+    const videoUrl = v?.url ?? undefined;
     return {
       id: `pixabay-v-${hit.id}`,
       title: hit.tags?.split(",")[0]?.trim() || `Video by ${hit.user || "Pixabay"}`,
       thumbnail_url: v?.thumbnail,
-      preview_url: v?.url,
-      download_url: v?.url,
+      preview_url: videoUrl,
+      download_url: videoUrl,
       type: "video",
     };
   });
