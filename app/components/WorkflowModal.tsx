@@ -2384,36 +2384,6 @@ export function WorkflowModal({
                 </button>
               </>
             )}
-            <button
-              type="button"
-              onClick={async () => {
-                if (!displayedFinalVideoUrl) return;
-                try {
-                  await fetch(SHORTS_COMPLETE_API, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    credentials: "include",
-                    body: JSON.stringify({ shortId: shortInfo?.shortId ?? null, productId: productId?.trim() ?? null }),
-                  });
-                } catch {
-                  // continue to close
-                }
-                onDone?.(displayedFinalVideoUrl);
-                onClose();
-              }}
-              disabled={!displayedFinalVideoUrl}
-              style={{
-                padding: "12px 24px",
-                borderRadius: "8px",
-                border: "none",
-                background: displayedFinalVideoUrl ? "var(--p-color-bg-fill-info, #2c6ecb)" : "#9ca3af",
-                color: "#fff",
-                fontWeight: 600,
-                cursor: displayedFinalVideoUrl ? "pointer" : "not-allowed",
-              }}
-            >
-              Done
-            </button>
           </div>
         ) : loadedState === "pending" ? (
           <div style={{ padding: "48px 24px", textAlign: "center", color: "var(--p-color-text-subdued, #6d7175)" }}>
@@ -2547,6 +2517,48 @@ export function WorkflowModal({
                 <div style={{ padding: "20px", flex: 1, minHeight: 0, overflowY: "auto" }}>
                   {audioStepTab === "voiceover" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px", flexWrap: "wrap", padding: "12px 14px", borderRadius: "10px", background: "var(--p-color-bg-surface-secondary, #f6f6f7)", border: "1px solid var(--p-color-border-secondary, #e1e3e5)" }}>
+                        <p style={{ margin: 0, fontSize: "13px", color: "var(--p-color-text-subdued, #6d7175)", flex: "1 1 200px" }}>
+                          If you skip voiceover, you can merge the final video without audio. Generate a voiceover from script (optional).
+                        </p>
+                        <button
+                          type="button"
+                          disabled={!audioGenerated}
+                          onClick={async () => {
+                            if (!shortInfo?.shortId) return;
+                            try {
+                              const res = await fetch(AUDIO_CLEAR_GENERATED_API, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ short_id: shortInfo.shortId }),
+                              });
+                              const data = await res.json();
+                              if (data.success) {
+                                setGeneratedAudioUrl(null);
+                                setLastSubtitleTiming(null);
+                                refetchShort();
+                              } else {
+                                setPlatformAlert(data.error || "Failed to remove audio");
+                              }
+                            } catch {
+                              setPlatformAlert("Failed to remove audio");
+                            }
+                          }}
+                          style={{
+                            padding: "10px 20px",
+                            borderRadius: "8px",
+                            border: "2px solid var(--p-color-border-caution, #ffc453)",
+                            background: audioGenerated ? "var(--p-color-bg-fill-caution-secondary, #fff4e5)" : "var(--p-color-bg-fill-secondary, #f1f2f4)",
+                            color: audioGenerated ? "var(--p-color-text-caution, #b98900)" : "var(--p-color-text-subdued, #8c9196)",
+                            fontWeight: 700,
+                            cursor: audioGenerated ? "pointer" : "not-allowed",
+                            fontSize: "14px",
+                            flexShrink: 0,
+                          }}
+                        >
+                          Skip voiceover
+                        </button>
+                      </div>
                       <p style={{ margin: 0, fontSize: "13px", color: "var(--p-color-text-subdued, #6d7175)" }}>Generate a voiceover from script (optional).</p>
                       <div style={{ display: "flex", alignItems: "flex-end", gap: "16px", flexWrap: "wrap", width: "100%" }}>
                         <div style={{ flex: "1 1 200px", minWidth: 0 }}>
@@ -2815,33 +2827,6 @@ export function WorkflowModal({
                                 >
                                   {audioGenerateLoading ? "Regenerating audio…" : "Regenerate audio"}
                                 </button>
-                                <button
-                                  type="button"
-                                  disabled={!shortInfo?.shortId}
-                                  onClick={async () => {
-                                    if (!shortInfo?.shortId) return;
-                                    try {
-                                      const res = await fetch(AUDIO_CLEAR_GENERATED_API, {
-                                        method: "POST",
-                                        headers: { "Content-Type": "application/json" },
-                                        body: JSON.stringify({ short_id: shortInfo.shortId }),
-                                      });
-                                      const data = await res.json();
-                                      if (data.success) {
-                                        setGeneratedAudioUrl(null);
-                                        setLastSubtitleTiming(null);
-                                        refetchShort();
-                                      } else {
-                                        setPlatformAlert(data.error || "Failed to remove audio");
-                                      }
-                                    } catch {
-                                      setPlatformAlert("Failed to remove audio");
-                                    }
-                                  }}
-                                  style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid var(--p-color-border-secondary, #e1e3e5)", background: "#fff", color: "var(--p-color-text-subdued, #6d7175)", fontWeight: 600, cursor: shortInfo?.shortId ? "pointer" : "not-allowed", fontSize: "13px" }}
-                                >
-                                  Skip
-                                </button>
                               </div>
                             )}
                           </div>
@@ -2851,6 +2836,47 @@ export function WorkflowModal({
                   )}
                   {audioStepTab === "bgMusic" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px", flexWrap: "wrap", padding: "12px 14px", borderRadius: "10px", background: "var(--p-color-bg-surface-secondary, #f6f6f7)", border: "1px solid var(--p-color-border-secondary, #e1e3e5)" }}>
+                        <p style={{ margin: 0, fontSize: "13px", color: "var(--p-color-text-subdued, #6d7175)", flex: "1 1 200px" }}>
+                          If you skip background music, you can merge the final video without music. Select a track below (optional).
+                        </p>
+                        <button
+                          type="button"
+                          disabled={!selectedBgMusic}
+                          onClick={async () => {
+                            if (!shortInfo?.shortId) return;
+                            try {
+                              const res = await fetch(SHORTS_SAVE_BG_MUSIC_API, {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ short_id: shortInfo.shortId, bg_music: null }),
+                              });
+                              const data = await res.json();
+                              if (data.success) {
+                                setSelectedBgMusic(null);
+                                refetchShort();
+                              } else {
+                                setPlatformAlert(data.error || "Failed to remove background music");
+                              }
+                            } catch {
+                              setPlatformAlert("Failed to remove background music");
+                            }
+                          }}
+                          style={{
+                            padding: "10px 20px",
+                            borderRadius: "8px",
+                            border: "2px solid var(--p-color-border-caution, #ffc453)",
+                            background: selectedBgMusic ? "var(--p-color-bg-fill-caution-secondary, #fff4e5)" : "var(--p-color-bg-fill-secondary, #f1f2f4)",
+                            color: selectedBgMusic ? "var(--p-color-text-caution, #b98900)" : "var(--p-color-text-subdued, #8c9196)",
+                            fontWeight: 700,
+                            cursor: selectedBgMusic ? "pointer" : "not-allowed",
+                            fontSize: "14px",
+                            flexShrink: 0,
+                          }}
+                        >
+                          Skip background music
+                        </button>
+                      </div>
                       <p style={{ margin: 0, fontSize: "13px", color: "var(--p-color-text-subdued, #6d7175)" }}>Select background music from Storyblocks. Open the picker to search and choose a track; your selection is shown here.</p>
                       {selectedBgMusic && (selectedBgMusic.previewUrl || selectedBgMusic.name) ? (
                         <div style={{ padding: "16px", borderRadius: "10px", background: "#fff", border: "1px solid var(--p-color-border-secondary, #e1e3e5)" }}>
@@ -2876,32 +2902,6 @@ export function WorkflowModal({
                               style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid var(--p-color-border-secondary, #e1e3e5)", background: "#fff", color: "var(--p-color-text-primary, #202223)", fontWeight: 600, cursor: "pointer", fontSize: "13px" }}
                             >
                               Change music
-                            </button>
-                            <button
-                              type="button"
-                              disabled={!shortInfo?.shortId}
-                              onClick={async () => {
-                                if (!shortInfo?.shortId) return;
-                                try {
-                                  const res = await fetch(SHORTS_SAVE_BG_MUSIC_API, {
-                                    method: "POST",
-                                    headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({ short_id: shortInfo.shortId, bg_music: null }),
-                                  });
-                                  const data = await res.json();
-                                  if (data.success) {
-                                    setSelectedBgMusic(null);
-                                    refetchShort();
-                                  } else {
-                                    setPlatformAlert(data.error || "Failed to remove background music");
-                                  }
-                                } catch {
-                                  setPlatformAlert("Failed to remove background music");
-                                }
-                              }}
-                              style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid var(--p-color-border-secondary, #e1e3e5)", background: "#fff", color: "var(--p-color-text-subdued, #6d7175)", fontWeight: 600, cursor: shortInfo?.shortId ? "pointer" : "not-allowed", fontSize: "13px" }}
-                            >
-                              Skip
                             </button>
                             {bgMusicSavedFeedback && <span style={{ fontSize: "14px", color: "var(--p-color-text-success, #008060)", fontWeight: 600 }}>Saved</span>}
                           </div>
