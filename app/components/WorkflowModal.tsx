@@ -1697,6 +1697,15 @@ function scene2StatusToStep(status: string | null | undefined): number {
   return 2;
 }
 
+/** Normalize media URL for display (img/video src): prepend origin if relative. */
+function normalizeMediaUrl(url: string | null | undefined): string {
+  if (!url || typeof url !== "string") return "";
+  const u = url.trim();
+  if (u.startsWith("http://") || u.startsWith("https://")) return u;
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  return u.startsWith("/") ? `${origin}${u}` : `${origin}/${u}`;
+}
+
 /** Next status for scene 1/3 when advancing (e.g. Next button). step3→video_generated is set by task completion. */
 function getNextStatusScene13(current: string): string | null {
   const map: Record<string, string> = {
@@ -3407,16 +3416,17 @@ function Scene1Content({
   };
 
   const effectiveOverlayUrl = bgRemoved ?? (skipRemoveBg ? (productImagesProp.find((i) => i.id === selectedImage)?.src ?? null) : null);
+  const displayBgImage = bgImageFromDb ?? bgImage;
 
   const handleComposite = async () => {
-    if (!effectiveOverlayUrl || !bgImage) return;
+    if (!effectiveOverlayUrl || !displayBgImage) return;
     setCompositeError(null);
     setCompositeLoading(true);
     const sceneLabel = "Scene 1";
     try {
       const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const overlayUrl = effectiveOverlayUrl.startsWith("http") ? effectiveOverlayUrl : `${origin}${effectiveOverlayUrl}`;
-      const backgroundUrl = bgImage.startsWith("http") ? bgImage : `${origin}${bgImage}`;
+      const overlayUrl = effectiveOverlayUrl.startsWith("http") ? effectiveOverlayUrl : `${origin}${effectiveOverlayUrl.startsWith("/") ? effectiveOverlayUrl : `/${effectiveOverlayUrl}`}`;
+      const backgroundUrl = displayBgImage.startsWith("http") ? displayBgImage : `${origin}${displayBgImage.startsWith("/") ? displayBgImage : `/${displayBgImage}`}`;
       const scene_id = videoSceneId ?? (productId ? `${productId}-scene1` : `scene1-${Date.now()}`);
       const user_id = shortUserId ?? "anonymous";
       const payload = {
@@ -3652,7 +3662,7 @@ function Scene1Content({
                 {bgRemoved && (
                   <img
                     key={bgRemoved}
-                    src={bgRemoved}
+                    src={normalizeMediaUrl(bgRemoved)}
                     alt="BG removed"
                     style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }}
                   />
@@ -3677,7 +3687,7 @@ function Scene1Content({
           <div style={twoPartLayout}>
             <div style={{ ...boxStyle, borderRight: "none", borderTopRightRadius: 0, borderBottomRightRadius: 0 }}>
               {effectiveOverlayUrl ? (
-                <img src={effectiveOverlayUrl} alt="Subject" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
+                <img src={normalizeMediaUrl(effectiveOverlayUrl)} alt="Subject" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
               ) : null}
             </div>
             <div style={{ ...boxStyle, borderTopLeftRadius: 0, borderBottomLeftRadius: 0, position: "relative" }}>
@@ -3725,8 +3735,8 @@ function Scene1Content({
                   </button>
                 </div>
               )}
-              {bgImage ? (
-                <img key={bgImage} src={bgImage} alt="Background" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
+              {displayBgImage ? (
+                <img key={displayBgImage} src={normalizeMediaUrl(displayBgImage)} alt="Background" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
               ) : null}
             </div>
             <AIBackgroundModal
@@ -3758,7 +3768,7 @@ function Scene1Content({
               <button
                 type="button"
                 onClick={handleComposite}
-                disabled={!bgImage || !effectiveOverlayUrl || compositeLoading}
+                disabled={!displayBgImage || !effectiveOverlayUrl || compositeLoading}
                 style={{
                   padding: "12px 24px",
                   borderRadius: "8px",
@@ -3766,7 +3776,7 @@ function Scene1Content({
                   background: compositeLoading ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
                   color: "#fff",
                   fontWeight: 600,
-                  cursor: !bgImage || !effectiveOverlayUrl || compositeLoading ? "not-allowed" : "pointer",
+                  cursor: !displayBgImage || !effectiveOverlayUrl || compositeLoading ? "not-allowed" : "pointer",
                   boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                 }}
               >
@@ -4039,7 +4049,8 @@ function Scene2Content({
     );
   };
 
-  const effectiveOverlayUrl = bgRemoved ?? (skipRemoveBg ? (productImagesProp.find((i) => i.id === selectedImage)?.src ?? null) : null);
+  const effectiveOverlayUrl = bgRemoved ?? dbImageUrl ?? (skipRemoveBg ? (productImagesProp.find((i) => i.id === selectedImage)?.src ?? null) : null);
+  const displayVideoUrl = videoUrlFromDb ?? selectedStockVideoUrl;
 
   const handleGenerateVideo = async () => {
     if (!effectiveOverlayUrl || !selectedStockVideoUrl || !scene2Id || !shortUserId) {
@@ -4244,7 +4255,7 @@ function Scene2Content({
             {(bgRemoved || skipRemoveBg) && (
               <>
                 {bgRemoved && (
-                  <img key={bgRemoved} src={bgRemoved} alt="BG removed" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
+                  <img key={bgRemoved} src={normalizeMediaUrl(bgRemoved)} alt="BG removed" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
                 )}
                 {skipRemoveBg && !bgRemoved && (
                   <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Using image as-is</span>
@@ -4269,7 +4280,7 @@ function Scene2Content({
                 <div style={{ ...boxStyle, padding: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
                   <p style={{ margin: 0, fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>Subject (BG removed)</p>
                   <img
-                    src={effectiveOverlayUrl}
+                    src={normalizeMediaUrl(effectiveOverlayUrl)}
                     alt="Subject overlay"
                     style={{
                       width: "100%",
@@ -4282,12 +4293,12 @@ function Scene2Content({
                   />
                 </div>
               ) : null}
-              {selectedStockVideoUrl ? (
+              {displayVideoUrl ? (
                 <div style={{ ...boxStyle, padding: "12px", display: "flex", flexDirection: "column", gap: "12px" }}>
                   <p style={{ margin: 0, fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>Selected stock video</p>
                   <video
-                    key={selectedStockVideoUrl}
-                    src={selectedStockVideoUrl.startsWith("http") ? selectedStockVideoUrl : (typeof window !== "undefined" ? window.location.origin : "") + (selectedStockVideoUrl.startsWith("/") ? selectedStockVideoUrl : `/${selectedStockVideoUrl}`)}
+                    key={displayVideoUrl}
+                    src={normalizeMediaUrl(displayVideoUrl)}
                     controls
                     muted
                     playsInline
@@ -4578,6 +4589,7 @@ function Scene3Content({
   };
 
   const effectiveOverlayUrl = bgRemoved ?? (skipRemoveBg ? (productImagesProp.find((i) => i.id === selectedImage)?.src ?? null) : null);
+  const displayBgImageScene3 = bgImageFromDbScene3 ?? bgImage;
 
   const handleGenerateBg = async (opts: AIBackgroundGenerateOpts) => {
     const LOG_BG = "[BG Scene3]";
@@ -4653,14 +4665,14 @@ function Scene3Content({
   };
 
   const handleComposite = async () => {
-    if (!effectiveOverlayUrl || !bgImage) return;
+    if (!effectiveOverlayUrl || !displayBgImageScene3) return;
     setCompositeError(null);
     setCompositeLoading(true);
     const sceneLabel = "Scene 3";
     try {
       const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const overlayUrl = effectiveOverlayUrl.startsWith("http") ? effectiveOverlayUrl : `${origin}${effectiveOverlayUrl}`;
-      const backgroundUrl = bgImage.startsWith("http") ? bgImage : `${origin}${bgImage}`;
+      const overlayUrl = effectiveOverlayUrl.startsWith("http") ? effectiveOverlayUrl : `${origin}${effectiveOverlayUrl.startsWith("/") ? effectiveOverlayUrl : `/${effectiveOverlayUrl}`}`;
+      const backgroundUrl = displayBgImageScene3.startsWith("http") ? displayBgImageScene3 : `${origin}${displayBgImageScene3.startsWith("/") ? displayBgImageScene3 : `/${displayBgImageScene3}`}`;
       const scene_id = videoSceneId ?? (productId ? `${productId}-scene3` : `scene3-${Date.now()}`);
       const user_id = shortUserId ?? "anonymous";
       const payload = {
@@ -4885,7 +4897,7 @@ function Scene3Content({
             {(bgRemoved || skipRemoveBg) && (
               <>
                 {bgRemoved && (
-                  <img key={bgRemoved} src={bgRemoved} alt="BG removed" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
+                  <img key={bgRemoved} src={normalizeMediaUrl(bgRemoved)} alt="BG removed" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
                 )}
                 {skipRemoveBg && !bgRemoved && (
                   <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Using image as-is</span>
@@ -4907,7 +4919,7 @@ function Scene3Content({
           <div style={twoPartLayout}>
             <div style={{ ...boxStyle, borderRight: "none", borderTopRightRadius: 0, borderBottomRightRadius: 0 }}>
               {effectiveOverlayUrl ? (
-                <img src={effectiveOverlayUrl} alt="Subject" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
+                <img src={normalizeMediaUrl(effectiveOverlayUrl)} alt="Subject" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
               ) : null}
             </div>
             <div style={{ ...boxStyle, borderTopLeftRadius: 0, borderBottomLeftRadius: 0, position: "relative" }}>
@@ -4955,8 +4967,8 @@ function Scene3Content({
                   </button>
                 </div>
               )}
-              {bgImage ? (
-                <img key={bgImage} src={bgImage} alt="Background" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
+              {displayBgImageScene3 ? (
+                <img key={displayBgImageScene3} src={normalizeMediaUrl(displayBgImageScene3)} alt="Background" style={{ maxWidth: "100%", maxHeight: "260px", objectFit: "contain" }} />
               ) : null}
             </div>
             <AIBackgroundModal
@@ -4980,7 +4992,7 @@ function Scene3Content({
               <button
                 type="button"
                 onClick={handleComposite}
-                disabled={!bgImage || !effectiveOverlayUrl || compositeLoading}
+                disabled={!displayBgImageScene3 || !effectiveOverlayUrl || compositeLoading}
                 style={{
                   padding: "12px 24px",
                   borderRadius: "8px",
@@ -4988,7 +5000,7 @@ function Scene3Content({
                   background: compositeLoading ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
                   color: "#fff",
                   fontWeight: 600,
-                  cursor: !bgImage || !effectiveOverlayUrl || compositeLoading ? "not-allowed" : "pointer",
+                  cursor: !displayBgImageScene3 || !effectiveOverlayUrl || compositeLoading ? "not-allowed" : "pointer",
                   boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                 }}
               >
