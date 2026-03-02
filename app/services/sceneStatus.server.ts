@@ -31,13 +31,13 @@ export const NORMALIZE_PENDING = "step1";
 /**
  * Scene 1 & 3: Previous is not step-by-step (unlike forward).
  * - From video_generated or step3 → previous → images_compositied
- * - From images_compositied (or step2 / bg_image_fetched_generated) → previous → bg_removed
+ * - If step2 <= status < step3 (step2 | bg_image_fetched_generated | images_compositied) → previous → bg_removed (step1)
  * - From bg_removed / step1 → already at first step (null)
  */
 export function getScene13PreviousStatus(current: string): Scene13Status | null {
   const s = current?.trim() || "step1";
   if (s === "video_generated" || s === "step3") return "images_compositied";
-  if (s === "images_compositied" || s === "step2" || s === "bg_image_fetched_generated") return "bg_removed";
+  if (s === "step2" || s === "bg_image_fetched_generated" || s === "images_compositied") return "bg_removed";
   return null;
 }
 
