@@ -1608,13 +1608,9 @@ export function WorkflowModal({
   const allScenesComplete = scene1Complete && scene2Complete && scene3Complete;
   const audioComplete = scriptGenerated && audioGenerated && !!shortInfo?.bgMusic;
   type WorkflowPhase = "scenes" | "audio" | "finalize" | "finalView";
-  const workflowPhase: WorkflowPhase = showingFinal
-    ? "finalView"
-    : !allScenesComplete
-      ? "scenes"
-      : !audioComplete
-        ? "audio"
-        : "finalize";
+  /** User-selected tab: which phase content to show. Audio/Finalize only visible when their tab is selected. */
+  const [activePhase, setActivePhase] = useState<"scenes" | "audio" | "finalize">("scenes");
+  const workflowPhase: WorkflowPhase = showingFinal ? "finalView" : activePhase;
 
   /** Resolved final video URL: from merge result or from short (e.g. after reload) */
   const displayedFinalVideoUrl = finalVideoUrl ?? shortInfo?.finalVideoUrl ?? null;
@@ -2093,7 +2089,7 @@ export function WorkflowModal({
           </div>
         ) : (
           <>
-            {/* Phase strip: 1. Scenes | 2. Audio | 3. Finalize */}
+            {/* Phase strip: clickable tabs — 1. Scenes | 2. Audio | 3. Finalize */}
             <div
               style={{
                 display: "flex",
@@ -2106,29 +2102,40 @@ export function WorkflowModal({
               }}
             >
               {[
-                { phase: "scenes" as const, label: "1. Scenes", done: allScenesComplete, active: workflowPhase === "scenes" },
-                { phase: "audio" as const, label: "2. Audio", done: audioComplete, active: workflowPhase === "audio" },
-                { phase: "finalize" as const, label: "3. Finalize", done: workflowPhase === "finalView", active: workflowPhase === "finalize" },
-              ].map((item, index) => (
-                <div key={item.phase} style={{ display: "flex", alignItems: "center" }}>
-                  <span
-                    style={{
-                      padding: "6px 12px",
-                      borderRadius: "8px",
-                      fontSize: "14px",
-                      fontWeight: 600,
-                      background: item.active ? "var(--p-color-bg-fill-info, #2c6ecb)" : item.done ? "var(--p-color-bg-fill-success-secondary, #d3f0d9)" : "transparent",
-                      color: item.active ? "#fff" : item.done ? "var(--p-color-text-success, #008060)" : "var(--p-color-text-subdued, #6d7175)",
-                      border: item.active || item.done ? "none" : "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                    }}
-                  >
-                    {item.done ? "✓ " : ""}{item.label}
-                  </span>
-                  {index < 2 && (
-                    <span style={{ width: "24px", height: "2px", margin: "0 4px", background: item.done ? "var(--p-color-border-success, #008060)" : "var(--p-color-border-secondary, #e1e3e5)" }} aria-hidden />
-                  )}
-                </div>
-              ))}
+                { phase: "scenes" as const, label: "1. Scenes", done: allScenesComplete, enabled: true },
+                { phase: "audio" as const, label: "2. Audio", done: audioComplete, enabled: allScenesComplete },
+                { phase: "finalize" as const, label: "3. Finalize", done: workflowPhase === "finalView", enabled: audioComplete },
+              ].map((item, index) => {
+                const active = activePhase === item.phase;
+                return (
+                  <div key={item.phase} style={{ display: "flex", alignItems: "center" }}>
+                    <button
+                      type="button"
+                      onClick={() => item.enabled && setActivePhase(item.phase)}
+                      disabled={!item.enabled}
+                      style={{
+                        padding: "6px 12px",
+                        borderRadius: "8px",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                        border: "none",
+                        cursor: item.enabled ? "pointer" : "not-allowed",
+                        background: active ? "var(--p-color-bg-fill-info, #2c6ecb)" : item.done ? "var(--p-color-bg-fill-success-secondary, #d3f0d9)" : "transparent",
+                        color: active ? "#fff" : item.done ? "var(--p-color-text-success, #008060)" : "var(--p-color-text-subdued, #6d7175)",
+                        boxShadow: !active && !item.done ? "none" : undefined,
+                        borderWidth: 1,
+                        borderStyle: "solid",
+                        borderColor: active || item.done ? "transparent" : "var(--p-color-border-secondary, #e1e3e5)",
+                      }}
+                    >
+                      {item.done ? "✓ " : ""}{item.label}
+                    </button>
+                    {index < 2 && (
+                      <span style={{ width: "24px", height: "2px", margin: "0 4px", background: item.done ? "var(--p-color-border-success, #008060)" : "var(--p-color-border-secondary, #e1e3e5)" }} aria-hidden />
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             {workflowPhase === "scenes" && (
@@ -2705,6 +2712,15 @@ const SHORTS_SAVE_FINAL_VIDEO_API = "/app/api/shorts/save-final-video";
 const PER_PAGE = 12;
 const POLL_INTERVAL_MS = 5000;
 const POLL_MAX_ATTEMPTS = 60; // 5 min at 5s
+
+/** Normalize scene video URL for <video src>: relative paths become absolute with current origin. */
+function normalizeSceneVideoUrl(url: string | null | undefined): string | undefined {
+  const u = typeof url === "string" ? url.trim() : "";
+  if (!u) return undefined;
+  if (u.startsWith("http://") || u.startsWith("https://")) return u;
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  return origin + (u.startsWith("/") ? u : `/${u}`);
+}
 
 /** Response shape from POST /app/api/image/composite (JSON only) */
 type CompositeApiResponse = {
@@ -3485,7 +3501,7 @@ function Scene1Content({
                 </div>
               ) : (dbSceneVideoUrl ?? sceneVideo) ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <video key={dbSceneVideoUrl ?? sceneVideo ?? ""} src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
+                  <video key={dbSceneVideoUrl ?? sceneVideo ?? ""} src={normalizeSceneVideoUrl(dbSceneVideoUrl ?? sceneVideo)} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                     <button
                       type="button"
@@ -3904,19 +3920,36 @@ function Scene2Content({
             </button>
           </div>
           <div style={{ display: "flex", flexDirection: "row", gap: "24px", alignItems: "flex-start", flexWrap: "wrap" }}>
-            <div style={{ flex: "1 1 260px", minWidth: "240px", display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div style={{ flex: "1 1 260px", minWidth: "240px", display: "flex", flexDirection: "column", gap: "16px" }}>
+              {effectiveOverlayUrl ? (
+                <div style={{ ...boxStyle, padding: "12px", display: "flex", flexDirection: "column", gap: "8px" }}>
+                  <p style={{ margin: 0, fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>Subject (BG removed)</p>
+                  <img
+                    src={effectiveOverlayUrl}
+                    alt="Subject overlay"
+                    style={{
+                      width: "100%",
+                      maxHeight: "160px",
+                      objectFit: "contain",
+                      borderRadius: "8px",
+                      border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                      background: "#fff",
+                    }}
+                  />
+                </div>
+              ) : null}
               {selectedStockVideoUrl ? (
                 <div style={{ ...boxStyle, padding: "12px", display: "flex", flexDirection: "column", gap: "12px" }}>
                   <p style={{ margin: 0, fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>Selected stock video</p>
                   <video
                     key={selectedStockVideoUrl}
-                    src={selectedStockVideoUrl}
+                    src={selectedStockVideoUrl.startsWith("http") ? selectedStockVideoUrl : (typeof window !== "undefined" ? window.location.origin : "") + (selectedStockVideoUrl.startsWith("/") ? selectedStockVideoUrl : `/${selectedStockVideoUrl}`)}
                     controls
                     muted
                     playsInline
                     style={{
                       width: "100%",
-                      maxHeight: "260px",
+                      maxHeight: "200px",
                       objectFit: "contain",
                       borderRadius: "8px",
                       border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
@@ -3981,7 +4014,7 @@ function Scene2Content({
                 </div>
               ) : (dbSceneVideoUrl ?? sceneVideo) ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <video key={dbSceneVideoUrl ?? sceneVideo ?? ""} src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "100%", maxHeight: "240px", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
+                  <video key={dbSceneVideoUrl ?? sceneVideo ?? ""} src={normalizeSceneVideoUrl(dbSceneVideoUrl ?? sceneVideo)} controls style={{ maxWidth: "100%", maxHeight: "240px", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                     <button
                       type="button"
@@ -4710,7 +4743,7 @@ function Scene3Content({
                 </div>
               ) : (dbSceneVideoUrl ?? sceneVideo) ? (
                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <video key={dbSceneVideoUrl ?? sceneVideo ?? ""} src={dbSceneVideoUrl ?? sceneVideo ?? undefined} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
+                  <video key={dbSceneVideoUrl ?? sceneVideo ?? ""} src={normalizeSceneVideoUrl(dbSceneVideoUrl ?? sceneVideo)} controls style={{ maxWidth: "100%", maxHeight: "260px", borderRadius: "8px" }} />
                   <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                     <button
                       type="button"
