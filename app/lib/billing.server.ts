@@ -14,18 +14,14 @@ const CURRENT_INSTALLATION_QUERY = `#graphql
         status
         createdAt
         currentPeriodEnd
-        lineItems(first: 10) {
-          edges {
-            node {
-              id
-              plan {
-                ... on AppRecurringPricing {
-                  interval
-                  price {
-                    amount
-                    currencyCode
-                  }
-                }
+        lineItems {
+          id
+          plan {
+            ... on AppRecurringPricing {
+              interval
+              price {
+                amount
+                currencyCode
               }
             }
           }
@@ -66,17 +62,13 @@ export async function getBillingStatus(admin: AdminApiContext["admin"]): Promise
           status: string;
           createdAt: string;
           currentPeriodEnd: string | null;
-          lineItems: {
-            edges: Array<{
-              node: {
-                id: string;
-                plan: {
-                  interval: string;
-                  price: { amount: string; currencyCode: string };
-                };
-              };
-            }>;
-          };
+          lineItems?: Array<{
+            id: string;
+            plan: {
+              interval: string;
+              price: { amount: string; currencyCode: string };
+            };
+          }>;
         }>;
       };
     };
@@ -89,9 +81,9 @@ export async function getBillingStatus(admin: AdminApiContext["admin"]): Promise
     status: sub.status,
     createdAt: sub.createdAt,
     currentPeriodEnd: sub.currentPeriodEnd ?? null,
-    lineItems: (sub.lineItems?.edges ?? []).map((e) => ({
-      id: e.node.id,
-      plan: e.node.plan,
+    lineItems: (sub.lineItems ?? []).map((li) => ({
+      id: li.id,
+      plan: li.plan,
     })),
   }));
 
