@@ -17,11 +17,13 @@ const CURRENT_INSTALLATION_QUERY = `#graphql
         lineItems {
           id
           plan {
-            ... on AppRecurringPricing {
-              interval
-              price {
-                amount
-                currencyCode
+            pricingDetails {
+              ... on AppRecurringPricing {
+                interval
+                price {
+                  amount
+                  currencyCode
+                }
               }
             }
           }
@@ -65,8 +67,10 @@ export async function getBillingStatus(admin: AdminApiContext["admin"]): Promise
           lineItems?: Array<{
             id: string;
             plan: {
-              interval: string;
-              price: { amount: string; currencyCode: string };
+              pricingDetails?: {
+                interval?: string;
+                price?: { amount: string; currencyCode: string };
+              } | null;
             };
           }>;
         }>;
@@ -81,10 +85,19 @@ export async function getBillingStatus(admin: AdminApiContext["admin"]): Promise
     status: sub.status,
     createdAt: sub.createdAt,
     currentPeriodEnd: sub.currentPeriodEnd ?? null,
-    lineItems: (sub.lineItems ?? []).map((li) => ({
-      id: li.id,
-      plan: li.plan,
-    })),
+    lineItems: (sub.lineItems ?? [])
+      .map((li) => {
+        const details = li.plan?.pricingDetails;
+        if (!details?.price) return null;
+        return {
+          id: li.id,
+          plan: {
+            interval: details.interval ?? "EVERY_30_DAYS",
+            price: details.price,
+          },
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null),
   }));
 
   const hasActiveSubscription = activeSubscriptions.some(
