@@ -1013,6 +1013,12 @@ function StoryblocksMusicModal({
         </div>
 
         {/* Tabs: Local library | Storyblocks */}
+        <div style={{ padding: "10px 20px", borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)", display: "flex", alignItems: "center", gap: "8px", background: "linear-gradient(135deg, #fef9e7 0%, #fcf4e3 100%)", borderLeft: "4px solid var(--p-color-border-caution, #ffc453)" }}>
+          <span style={{ fontSize: "16px" }} aria-hidden>★</span>
+          <p style={{ margin: 0, fontSize: "13px", color: "var(--p-color-text-primary, #202223)", flex: 1 }}>
+            Upgrade to <a href="/app/subscription" target="_blank" rel="noopener noreferrer" style={{ fontWeight: 600, color: "var(--p-color-text-info, #2c6ecb)" }}>Premium Music</a> in Subscription to use 10,000+ tracks from Storyblocks.
+          </p>
+        </div>
         <div style={{ padding: "0 20px", borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)", display: "flex", gap: "0" }}>
           <button
             type="button"
@@ -2551,6 +2557,12 @@ export function WorkflowModal({
                 <div style={{ padding: "20px", flex: 1, minHeight: 0, overflowY: "auto" }}>
                   {audioStepTab === "voiceover" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "8px", padding: "10px 12px", borderRadius: "8px", background: "linear-gradient(135deg, #fef9e7 0%, #fcf4e3 100%)", border: "1px solid var(--p-color-border-caution, #ffc453)" }}>
+                        <span style={{ fontSize: "18px" }} aria-hidden>★</span>
+                        <p style={{ margin: 0, fontSize: "13px", color: "var(--p-color-text-primary, #202223)", flex: 1 }}>
+                          Upgrade to <a href="/app/subscription" target="_blank" rel="noopener noreferrer" style={{ fontWeight: 600, color: "var(--p-color-text-info, #2c6ecb)" }}>Premium Voices</a> in Subscription to use 50 professional voices.
+                        </p>
+                      </div>
                       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px", flexWrap: "wrap", padding: "12px 14px", borderRadius: "10px", background: "var(--p-color-bg-surface-secondary, #f6f6f7)", border: "1px solid var(--p-color-border-secondary, #e1e3e5)" }}>
                         <p style={{ margin: 0, fontSize: "13px", color: "var(--p-color-text-subdued, #6d7175)", flex: "1 1 200px" }}>
                           If you skip voiceover, you can merge the final video without audio. Generate a voiceover from script (optional).

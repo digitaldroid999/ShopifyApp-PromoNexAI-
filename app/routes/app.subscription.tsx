@@ -339,12 +339,12 @@ export default function SubscriptionPage() {
         )}
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "16px" }}>
-          <PlanCard planKey="starter_monthly" price="$49" period="/month" videos="10 videos" />
-          <PlanCard planKey="starter_yearly" price="$470" period="/year" videos="10 videos/month (save $118)" />
-          <PlanCard planKey="pro_monthly" price="$99" period="/month" videos="30 videos" highlighted />
-          <PlanCard planKey="pro_yearly" price="$950" period="/year" videos="30 videos/month (save $238)" />
-          <PlanCard planKey="business_monthly" price="$199" period="/month" videos="75 videos" />
-          <PlanCard planKey="business_yearly" price="$1,910" period="/year" videos="75 videos/month (save $478)" />
+          <PlanCard planKey="starter_monthly" price="$49" period="/month" videos="10 videos" currentPlanId={subscriptionDetails?.planId ?? null} />
+          <PlanCard planKey="starter_yearly" price="$470" period="/year" videos="10 videos/month (save $118)" currentPlanId={subscriptionDetails?.planId ?? null} />
+          <PlanCard planKey="pro_monthly" price="$99" period="/month" videos="30 videos" highlighted currentPlanId={subscriptionDetails?.planId ?? null} />
+          <PlanCard planKey="pro_yearly" price="$950" period="/year" videos="30 videos/month (save $238)" currentPlanId={subscriptionDetails?.planId ?? null} />
+          <PlanCard planKey="business_monthly" price="$199" period="/month" videos="75 videos" currentPlanId={subscriptionDetails?.planId ?? null} />
+          <PlanCard planKey="business_yearly" price="$1,910" period="/year" videos="75 videos/month (save $478)" currentPlanId={subscriptionDetails?.planId ?? null} />
         </div>
       </s-section>
 
@@ -380,25 +380,45 @@ function PlanCard({
   period,
   videos,
   highlighted,
+  currentPlanId,
 }: {
   planKey: string;
   price: string;
   period: string;
   videos: string;
   highlighted?: boolean;
+  currentPlanId?: string | null;
 }) {
   const name = PLAN_LABELS[planKey] ?? planKey;
+  const isCurrentPlan = !!currentPlanId && currentPlanId === planKey;
   return (
     <div
       style={{
         padding: "20px",
         borderRadius: "12px",
-        border: highlighted ? "2px solid var(--p-color-border-info, #2c6ecb)" : "1px solid var(--p-color-border-secondary, #e1e3e5)",
-        background: highlighted ? "var(--p-color-bg-surface-selected, #f1f8ff)" : "var(--p-color-bg-surface-primary, #fff)",
+        border: isCurrentPlan ? "2px solid var(--p-color-border-success, #008060)" : highlighted ? "2px solid var(--p-color-border-info, #2c6ecb)" : "1px solid var(--p-color-border-secondary, #e1e3e5)",
+        background: isCurrentPlan ? "var(--p-color-bg-fill-success-secondary, #d3f0d9)" : highlighted ? "var(--p-color-bg-surface-selected, #f1f8ff)" : "var(--p-color-bg-surface-primary, #fff)",
         position: "relative",
       }}
     >
-      {highlighted && (
+      {isCurrentPlan && (
+        <span
+          style={{
+            position: "absolute",
+            top: "-1px",
+            right: "12px",
+            padding: "4px 8px",
+            fontSize: "11px",
+            fontWeight: 600,
+            background: "var(--p-color-bg-fill-success, #008060)",
+            color: "#fff",
+            borderRadius: "0 0 8px 8px",
+          }}
+        >
+          Current plan
+        </span>
+      )}
+      {highlighted && !isCurrentPlan && (
         <span
           style={{
             position: "absolute",
@@ -422,13 +442,17 @@ function PlanCard({
       </div>
       <s-paragraph color="subdued">{videos}</s-paragraph>
       <div style={{ marginTop: "16px" }}>
-        <Form method="post" action="/app/subscription">
-          <input type="hidden" name="intent" value="checkout_subscription" />
-          <input type="hidden" name="planKey" value={planKey} />
-          <s-button type="submit" variant={highlighted ? "primary" : "secondary"}>
-            Subscribe
-          </s-button>
-        </Form>
+        {isCurrentPlan ? (
+          <s-button variant="secondary" disabled>Current plan</s-button>
+        ) : (
+          <Form method="post" action="/app/subscription">
+            <input type="hidden" name="intent" value="checkout_subscription" />
+            <input type="hidden" name="planKey" value={planKey} />
+            <s-button type="submit" variant={highlighted ? "primary" : "secondary"}>
+              Subscribe
+            </s-button>
+          </Form>
+        )}
       </div>
     </div>
   );
