@@ -135,3 +135,45 @@ model LegalAgreement {
 
   @@map("legal_agreements")
 }
+
+// Stripe customer per shop (for Checkout and Portal)
+model StripeCustomer {
+  id                 String   @id @default(cuid())
+  shop               String   @unique
+  stripeCustomerId   String   @unique @map("stripe_customer_id")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("stripe_customers")
+}
+
+// Billing state per shop: subscription + addon balance + free credits + premium flags
+model BillingState {
+  id                          String    @id @default(cuid())
+  shop                        String    @unique
+  stripeSubscriptionId        String?   @map("stripe_subscription_id")
+  planId                      String?   @map("plan_id")
+  subscriptionCreditsPerPeriod Int      @default(0) @map("subscription_credits_per_period")
+  periodEnd                   DateTime? @map("period_end")
+  addonCreditsBalance         Int       @default(0) @map("addon_credits_balance")
+  freeCreditsGranted          Boolean   @default(false) @map("free_credits_granted")
+  premiumMusic                Boolean   @default(false) @map("premium_music")
+  premiumVoices               Boolean   @default(false) @map("premium_voices")
+  createdAt                   DateTime  @default(now()) @map("created_at")
+  updatedAt                   DateTime  @updatedAt @map("updated_at")
+
+  @@map("billing_states")
+}
+
+// Credits used per shop per billing period
+model CreditUsage {
+  id          String   @id @default(cuid())
+  shop        String
+  periodEnd   DateTime @map("period_end")
+  creditsUsed Int      @default(0) @map("credits_used")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([shop, periodEnd])
+  @@map("credit_usage")
+}

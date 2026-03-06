@@ -2,6 +2,7 @@ import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { startShopifyVideo } from "../services/remotion.server";
+import { getCredits } from "../lib/credits.server";
 
 const LOG_PREFIX = "[Remotion Start API]";
 const DEFAULT_TEMPLATE = "product-modern-v1";
@@ -11,6 +12,17 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (request.method !== "POST") {
     return Response.json({ error: "Method not allowed" }, { status: 405 });
+  }
+
+  const shop = (session as { shop?: string }).shop ?? "";
+  if (shop) {
+    const credits = await getCredits(shop);
+    if (credits.remaining <= 0) {
+      return Response.json(
+        { error: "No credits left. Upgrade or buy addon credits to create more videos." },
+        { status: 402 }
+      );
+    }
   }
 
   let body: {

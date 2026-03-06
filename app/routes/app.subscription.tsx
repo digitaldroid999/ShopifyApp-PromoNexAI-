@@ -1,77 +1,108 @@
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { Form, redirect, useActionData, useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
-import { getBillingStatus, createAppSubscription, SUBSCRIPTION_PLANS } from "../lib/billing.server";
+import { getCredits } from "../lib/credits.server";
+import { createCheckoutSession, createPortalSession, STRIPE_PRICES } from "../lib/stripe-billing.server";
+import prisma from "../db.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 
+const PLAN_LABELS: Record<string, string> = {
+  starter_monthly: "Starter Monthly",
+  starter_yearly: "Starter Yearly",
+  pro_monthly: "Professional Monthly",
+  pro_yearly: "Professional Yearly",
+  business_monthly: "Business Monthly",
+  business_yearly: "Business Yearly",
+};
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
-  const billing = await getBillingStatus(admin);
+  const { session } = await authenticate.admin(request);
+  const shop = (session as { shop?: string }).shop ?? "";
+  const credits = shop ? await getCredits(shop) : null;
+  const hasStripeCustomer = shop
+    ? !!(await prisma.stripeCustomer.findUnique({ where: { shop }, select: { id: true } }))
+    : false;
   const url = new URL(request.url);
   const approved = url.searchParams.get("approved") === "1";
   return {
-    ...billing,
-    plans: SUBSCRIPTION_PLANS,
+    shop,
+    credits,
+    hasStripeCustomer,
     approved,
   };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { admin } = await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
+  const shop = (session as { shop?: string }).shop ?? "";
+  if (!shop) return { error: "Session missing shop" };
+
   const formData = await request.formData();
-  const intent = formData.get("intent");
-
-  if (intent !== "createSubscription") {
-    return { error: "Invalid action" };
-  }
-
-  const planId = formData.get("planId") as string | null;
-  if (!planId) {
-    return { error: "Please select a plan" };
-  }
-
-  const plan = SUBSCRIPTION_PLANS.find((p) => p.id === planId);
-  if (!plan) {
-    return { error: "Invalid plan" };
-  }
-
+  const intent = formData.get("intent") as string | null;
   const baseUrl = new URL(request.url).origin;
-  const returnUrl = `${baseUrl}/app/subscription?approved=1`;
+  const successUrl = `${baseUrl}/app/subscription?approved=1`;
+  const cancelUrl = `${baseUrl}/app/subscription`;
 
-  const isTest =
-    process.env.NODE_ENV !== "production" ||
-    process.env.SHOPIFY_BILLING_TEST === "true";
-
-  const result = await createAppSubscription(admin, {
-    name: plan.name,
-    returnUrl,
-    lineItems: [
-      {
-        plan: {
-          appRecurringPricingDetails: {
-            interval: plan.interval,
-            price: { amount: plan.price, currencyCode: plan.currencyCode },
-          },
-        },
-      },
-    ],
-    test: isTest,
-  });
-
-  if (!result.success) {
-    const message = result.userErrors?.map((e) => e.message).join(", ") ?? result.userErrors?.[0]?.message ?? "Failed to create subscription";
-    return { error: message };
+  if (intent === "portal") {
+    const result = await createPortalSession(shop, successUrl);
+    if (result.error) return { error: result.error };
+    if (result.url) throw redirect(result.url);
+    return { error: "Could not create portal session" };
   }
 
-  if (result.confirmationUrl) {
-    throw redirect(result.confirmationUrl);
+  if (intent === "checkout_subscription") {
+    const planKey = formData.get("planKey") as string | null;
+    if (!planKey || !STRIPE_PRICES[planKey]) return { error: "Invalid plan" };
+    const priceId = STRIPE_PRICES[planKey];
+    const result = await createCheckoutSession({
+      shop,
+      mode: "subscription",
+      priceIds: [priceId],
+      successUrl,
+      cancelUrl,
+    });
+    if (result.error) return { error: result.error };
+    if (result.url) throw redirect(result.url);
+    return { error: "Could not create checkout" };
   }
 
-  return { error: "No confirmation URL received" };
+  if (intent === "checkout_addon") {
+    const addonKey = formData.get("addonKey") as string | null;
+    if (!addonKey || !STRIPE_PRICES[addonKey]) return { error: "Invalid addon" };
+    const priceId = STRIPE_PRICES[addonKey];
+    const result = await createCheckoutSession({
+      shop,
+      mode: "one_time",
+      priceIds: [priceId],
+      successUrl,
+      cancelUrl,
+    });
+    if (result.error) return { error: result.error };
+    if (result.url) throw redirect(result.url);
+    return { error: "Could not create checkout" };
+  }
+
+  if (intent === "checkout_premium") {
+    const premiumKey = formData.get("premiumKey") as string | null;
+    if (!premiumKey || !STRIPE_PRICES[premiumKey]) return { error: "Invalid premium add-on" };
+    const priceId = STRIPE_PRICES[premiumKey];
+    const result = await createCheckoutSession({
+      shop,
+      mode: "subscription",
+      priceIds: [priceId],
+      successUrl,
+      cancelUrl,
+    });
+    if (result.error) return { error: result.error };
+    if (result.url) throw redirect(result.url);
+    return { error: "Could not create checkout" };
+  }
+
+  return { error: "Invalid action" };
 };
 
 export default function SubscriptionPage() {
-  const { hasActiveSubscription, activeSubscriptions, plans, approved } = useLoaderData<typeof loader>();
+  const { shop, credits, hasStripeCustomer, approved } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const error = actionData?.error;
 
@@ -87,12 +118,12 @@ export default function SubscriptionPage() {
             color: "var(--p-color-text-success, #008060)",
           }}
         >
-          <s-text type="strong">Subscription approved.</s-text> You now have access to your plan. You can close this and continue using the app.
+          <s-text type="strong">Success.</s-text> Your billing has been updated. You can close this and continue using the app.
         </div>
       )}
 
-      {hasActiveSubscription && activeSubscriptions.length > 0 && (
-        <s-section heading="Current plan">
+      {credits && (
+        <s-section heading="Credits">
           <div
             style={{
               padding: "16px",
@@ -102,56 +133,39 @@ export default function SubscriptionPage() {
               marginBottom: "24px",
             }}
           >
-            {activeSubscriptions.map((sub) => (
-              <div key={sub.id} style={{ marginBottom: sub.id !== activeSubscriptions[activeSubscriptions.length - 1]?.id ? "12px" : 0 }}>
-                <s-text type="strong">{sub.name}</s-text>
-                <span
-                  style={{
-                    marginLeft: "8px",
-                    padding: "2px 8px",
-                    borderRadius: "999px",
-                    fontSize: "12px",
-                    fontWeight: 500,
-                    background:
-                      sub.status === "ACTIVE"
-                        ? "var(--p-color-bg-fill-success-secondary, #d3f0d9)"
-                        : "var(--p-color-bg-fill-caution-secondary, #fcf1e0)",
-                    color:
-                      sub.status === "ACTIVE"
-                        ? "var(--p-color-text-success, #008060)"
-                        : "var(--p-color-text-caution, #b98900)",
-                  }}
-                >
-                  {sub.status}
-                </span>
-                {sub.lineItems.length > 0 && (
-                  <div style={{ marginTop: "8px" }}>
-                    {sub.lineItems.map((li) => (
-                      <s-text key={li.id} color="subdued">
-                        {li.plan.price.currencyCode} {li.plan.price.amount} / {li.plan.interval === "EVERY_30_DAYS" ? "month" : "year"}
-                      </s-text>
-                    ))}
-                  </div>
-                )}
-                {sub.currentPeriodEnd && (
-                  <div style={{ display: "block", marginTop: "4px" }}>
-                    <s-text color="subdued">
-                      Current period ends: {new Date(sub.currentPeriodEnd).toLocaleDateString()}
-                    </s-text>
-                  </div>
-                )}
+            <s-text type="strong">Videos this period: {credits.used} / {credits.allowed}</s-text>
+            {credits.remaining <= 0 && (
+              <div style={{ marginTop: "8px" }}>
+                <s-text color="critical">No credits left. Upgrade or buy addon credits to create more videos.</s-text>
               </div>
-            ))}
+            )}
+            {credits.planId && (
+              <div style={{ marginTop: "8px" }}>
+                <s-text color="subdued">Plan: {PLAN_LABELS[credits.planId] ?? credits.planId}</s-text>
+              </div>
+            )}
+            {credits.periodEnd && (
+              <div style={{ marginTop: "4px" }}>
+                <s-text color="subdued">Period ends: {new Date(credits.periodEnd).toLocaleDateString()}</s-text>
+              </div>
+            )}
           </div>
         </s-section>
       )}
 
-      <s-section heading={hasActiveSubscription ? "Change plan" : "Choose a plan"}>
-        <div style={{ marginBottom: "24px" }}>
+      {hasStripeCustomer && (
+        <s-section heading="Manage billing">
+          <Form method="post" action="/app/subscription">
+            <input type="hidden" name="intent" value="portal" />
+            <s-button type="submit" variant="secondary">Manage subscription & payment method</s-button>
+          </Form>
+        </s-section>
+      )}
+
+      <s-section heading="Plans">
+        <div style={{ marginBottom: "16px" }}>
           <s-paragraph color="subdued">
-            {hasActiveSubscription
-              ? "Select a new plan below. Your existing subscription will be replaced after confirmation."
-              : "Subscribe to create promo videos. Billing is handled securely through Shopify."}
+            Subscribe to get monthly credits. 1 credit = 1 complete video (all scenes + voice + music + export). Unused credits do not carry over.
           </s-paragraph>
         </div>
 
@@ -170,98 +184,119 @@ export default function SubscriptionPage() {
           </div>
         )}
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-            gap: "20px",
-          }}
-        >
-          {plans.map((plan) => (
-            <div
-              key={plan.id}
-              style={{
-                padding: "24px",
-                borderRadius: "12px",
-                border: plan.highlighted
-                  ? "2px solid var(--p-color-border-info, #2c6ecb)"
-                  : "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                background: plan.highlighted
-                  ? "var(--p-color-bg-surface-selected, #f1f8ff)"
-                  : "var(--p-color-bg-surface-primary, #fff)",
-                position: "relative",
-              }}
-            >
-              {plan.highlighted && (
-                <span
-                  style={{
-                    position: "absolute",
-                    top: "-1px",
-                    right: "16px",
-                    padding: "4px 10px",
-                    fontSize: "11px",
-                    fontWeight: 600,
-                    background: "var(--p-color-bg-fill-info, #2c6ecb)",
-                    color: "#fff",
-                    borderRadius: "0 0 8px 8px",
-                  }}
-                >
-                  Popular
-                </span>
-              )}
-              <div style={{ fontSize: "18px" }}>
-                <s-text type="strong">{plan.name}</s-text>
-              </div>
-              <div style={{ marginTop: "4px", marginBottom: "16px" }}>
-                <s-paragraph color="subdued">{plan.description}</s-paragraph>
-              </div>
-              <div style={{ marginBottom: "16px" }}>
-                <span style={{ fontSize: "28px", fontWeight: 700 }}>
-                  ${plan.price}
-                </span>
-                <s-text color="subdued">/month</s-text>
-              </div>
-              <ul
-                style={{
-                  listStyle: "none",
-                  padding: 0,
-                  margin: "0 0 20px 0",
-                  fontSize: "14px",
-                }}
-              >
-                {plan.features.map((f) => (
-                  <li
-                    key={f}
-                    style={{
-                      padding: "4px 0",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "8px",
-                    }}
-                  >
-                    <span style={{ color: "var(--p-color-text-success, #008060)" }}>✓</span>
-                    <s-text>{f}</s-text>
-                  </li>
-                ))}
-              </ul>
-              <Form method="post" action="/app/subscription" target="_top">
-                <input type="hidden" name="intent" value="createSubscription" />
-                <input type="hidden" name="planId" value={plan.id} />
-                <s-button type="submit" variant={plan.highlighted ? "primary" : "secondary"}>
-                  {hasActiveSubscription ? "Switch to this plan" : "Subscribe"}
-                </s-button>
-              </Form>
-            </div>
-          ))}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "16px" }}>
+          <PlanCard planKey="starter_monthly" price="$49" period="/month" videos="10 videos" />
+          <PlanCard planKey="starter_yearly" price="$470" period="/year" videos="10 videos/month (save $118)" />
+          <PlanCard planKey="pro_monthly" price="$99" period="/month" videos="30 videos" highlighted />
+          <PlanCard planKey="pro_yearly" price="$950" period="/year" videos="30 videos/month (save $238)" />
+          <PlanCard planKey="business_monthly" price="$199" period="/month" videos="75 videos" />
+          <PlanCard planKey="business_yearly" price="$1,910" period="/year" videos="75 videos/month (save $478)" />
+        </div>
+      </s-section>
+
+      <s-section heading="Add credits (one-time)">
+        <s-paragraph color="subdued">Add more videos immediately. Credits do not expire.</s-paragraph>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", marginTop: "12px" }}>
+          <AddonButton addonKey="addon_10" label="Extra 10 credits — $39" />
+          <AddonButton addonKey="addon_25" label="Extra 25 credits — $79" />
+          <AddonButton addonKey="addon_50" label="Extra 50 credits — $149" />
+        </div>
+      </s-section>
+
+      <s-section heading="Premium add-ons">
+        <s-paragraph color="subdued">Feature unlocks. Same credit cost per video.</s-paragraph>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "12px", marginTop: "12px" }}>
+          <PremiumButton premiumKey="premium_music" label="Premium Music Library — $9/month (10,000 tracks)" />
+          <PremiumButton premiumKey="premium_voices" label="Premium Voices — $15/month (50 voices)" />
         </div>
       </s-section>
 
       <s-section slot="aside" heading="Billing">
         <s-paragraph color="subdued">
-          You can cancel or change your plan at any time from your Shopify admin billing page. Charges appear on your Shopify bill.
+          Billing is handled securely by Stripe. You can cancel or change your plan at any time via the manage link above.
         </s-paragraph>
       </s-section>
     </s-page>
+  );
+}
+
+function PlanCard({
+  planKey,
+  price,
+  period,
+  videos,
+  highlighted,
+}: {
+  planKey: string;
+  price: string;
+  period: string;
+  videos: string;
+  highlighted?: boolean;
+}) {
+  const name = PLAN_LABELS[planKey] ?? planKey;
+  return (
+    <div
+      style={{
+        padding: "20px",
+        borderRadius: "12px",
+        border: highlighted ? "2px solid var(--p-color-border-info, #2c6ecb)" : "1px solid var(--p-color-border-secondary, #e1e3e5)",
+        background: highlighted ? "var(--p-color-bg-surface-selected, #f1f8ff)" : "var(--p-color-bg-surface-primary, #fff)",
+        position: "relative",
+      }}
+    >
+      {highlighted && (
+        <span
+          style={{
+            position: "absolute",
+            top: "-1px",
+            right: "12px",
+            padding: "4px 8px",
+            fontSize: "11px",
+            fontWeight: 600,
+            background: "var(--p-color-bg-fill-info, #2c6ecb)",
+            color: "#fff",
+            borderRadius: "0 0 8px 8px",
+          }}
+        >
+          Most popular
+        </span>
+      )}
+      <s-text type="strong">{name}</s-text>
+      <div style={{ marginTop: "8px", marginBottom: "12px" }}>
+        <span style={{ fontSize: "24px", fontWeight: 700 }}>{price}</span>
+        <s-text color="subdued">{period}</s-text>
+      </div>
+      <s-paragraph color="subdued">{videos}</s-paragraph>
+      <div style={{ marginTop: "16px" }}>
+        <Form method="post" action="/app/subscription">
+          <input type="hidden" name="intent" value="checkout_subscription" />
+          <input type="hidden" name="planKey" value={planKey} />
+          <s-button type="submit" variant={highlighted ? "primary" : "secondary"}>
+            Subscribe
+          </s-button>
+        </Form>
+      </div>
+    </div>
+  );
+}
+
+function AddonButton({ addonKey, label }: { addonKey: string; label: string }) {
+  return (
+    <Form method="post" action="/app/subscription">
+      <input type="hidden" name="intent" value="checkout_addon" />
+      <input type="hidden" name="addonKey" value={addonKey} />
+      <s-button type="submit" variant="secondary">{label}</s-button>
+    </Form>
+  );
+}
+
+function PremiumButton({ premiumKey, label }: { premiumKey: string; label: string }) {
+  return (
+    <Form method="post" action="/app/subscription">
+      <input type="hidden" name="intent" value="checkout_premium" />
+      <input type="hidden" name="premiumKey" value={premiumKey} />
+      <s-button type="submit" variant="secondary">{label}</s-button>
+    </Form>
   );
 }
 

@@ -2,6 +2,7 @@ import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
 import { finalizeShortStart } from "../services/promonexai.server";
+import { getCredits } from "../lib/credits.server";
 
 const LOG = "[API merge/finalize]";
 
@@ -37,6 +38,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (!userId) {
     console.log(`${LOG} Short has no user_id short_id=${shortId}`);
     return Response.json({ error: "Short has no user_id; cannot finalize" }, { status: 400 });
+  }
+  const credits = await getCredits(userId);
+  if (credits.remaining <= 0) {
+    return Response.json(
+      { error: "No credits left. Upgrade or buy addon credits to create more videos." },
+      { status: 402 }
+    );
   }
   console.log(`${LOG} Starting finalize short_id=${shortId} user_id=${userId}`);
 

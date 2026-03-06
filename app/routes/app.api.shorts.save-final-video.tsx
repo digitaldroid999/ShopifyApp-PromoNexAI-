@@ -1,8 +1,9 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
+import { consumeCredit } from "../lib/credits.server";
 
-/** POST — save final video URL to Short.finalVideoUrl */
+/** POST — save final video URL to Short.finalVideoUrl. Consumes 1 credit when a final video is saved. */
 export const action = async ({ request }: ActionFunctionArgs) => {
   await authenticate.admin(request);
   if (request.method !== "POST") {
@@ -26,7 +27,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   try {
     const short = await (prisma as any).short.findUnique({
       where: { id: shortId },
-      select: { id: true },
+      select: { id: true, userId: true },
     });
     if (!short) {
       return Response.json({ error: "Short not found" }, { status: 404 });
@@ -36,6 +37,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       where: { id: shortId },
       data: { finalVideoUrl, status: finalVideoUrl ? "finished" : "in_progress" },
     });
+
+    if (finalVideoUrl && short.userId) {
+      const consumed = await consumeCredit(short.userId);
+      if (!consumed.ok) {
+        console.warn("[app.api.shorts.save-final-video] consumeCredit failed:", consumed.error);
+      }
+    }
 
     return Response.json({ success: true, final_video_url: finalVideoUrl });
   } catch (e) {

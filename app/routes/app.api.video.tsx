@@ -2,9 +2,10 @@ import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import { removeBackground, mergeVideoStart } from "../services/promonexai.server";
 import prisma from "../db.server";
+import { getCredits } from "../lib/credits.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  await authenticate.admin(request);
+  const { session } = await authenticate.admin(request);
 
   if (request.method !== "POST") {
     return Response.json({ ok: false, error: "Method not allowed" }, { status: 405 });
@@ -35,6 +36,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
 
   if (step === "mergeVideo") {
+    const shop = (session as { shop?: string }).shop ?? "";
+    if (shop) {
+      const credits = await getCredits(shop);
+      if (credits.remaining <= 0) {
+        return Response.json(
+          { error: "No credits left. Upgrade or buy addon credits to create more videos." },
+          { status: 402 }
+        );
+      }
+    }
     const product_image_url = body.product_image_url;
     const background_video_url = body.background_video_url;
     const scene_id = body.scene_id;

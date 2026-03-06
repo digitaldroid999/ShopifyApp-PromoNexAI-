@@ -68,18 +68,19 @@ To use the App, you must:
 
 4. Subscription and Billing
 4.1 Payment Terms
-• All payments are processed through Shopify's billing system
-• Charges are billed monthly in advance
+• All payments are processed through Stripe
+• Subscriptions are billed monthly or yearly in advance
 • All prices are in USD unless otherwise specified
 • Prices are subject to change with 30 days notice
-4.2 Free Trial
-• New users receive 1 free video generation
-• Free trial videos include a PromoNexAI watermark
-• Limited to one trial per Shopify store
+• Plans: Starter ($49/mo or $470/year, 10 videos/month), Professional ($99/mo or $950/year, 30 videos/month), Business ($199/mo or $1,910/year, 75 videos/month)
+• One-time add-ons: Extra 10/25/50 credits. Premium add-ons: Premium Music ($9/mo), Premium Voices ($15/mo)
+4.2 Free Credits
+• New users receive 3 free credits (one-time) to create 3 complete videos
+• 1 credit = 1 complete video (all scenes, voice-over, music, export)
 4.3 Refund Policy
 No Refunds: All payments are non-refundable. Due to the nature of our service (video generation consumes resources immediately), we cannot offer refunds for completed video generations. You may cancel your subscription at any time to prevent future charges.
 4.4 Cancellation
-• You may cancel your subscription at any time
+• You may cancel your subscription at any time via the subscription management link or Stripe Customer Portal
 • Cancellation takes effect at the end of the current billing period
 • You retain access to the service until the end of the paid period
 • Unused video credits do not carry over and are not refundable
