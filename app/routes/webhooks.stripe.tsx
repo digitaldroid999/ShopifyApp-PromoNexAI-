@@ -22,12 +22,19 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return new Response("Webhook secret not configured", { status: 500 });
   }
 
-  const rawBody = await request.text();
   const sig = request.headers.get("stripe-signature");
   if (!sig) {
     console.error(`${LOG} Missing stripe-signature header`);
     return new Response("Missing signature", { status: 400 });
   }
+
+  // Stripe requires the exact raw body for signature verification. Read as Buffer so the
+  // bytes match what Stripe signed. If verification still fails: (1) Use the signing secret
+  // for the *exact* endpoint Stripe is calling (Dashboard → Webhooks → endpoint → Signing secret).
+  // (2) Test vs live: secret must match the endpoint’s mode. (3) If behind a proxy, ensure
+  // it does not modify the request body.
+  const arrayBuffer = await request.arrayBuffer();
+  const rawBody = Buffer.from(arrayBuffer);
 
   let event: { type: string; data?: { object?: unknown }; id?: string };
   try {
