@@ -1,5 +1,6 @@
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { Form, redirect, useActionData, useLoaderData } from "react-router";
+import { Form, useActionData, useLoaderData } from "react-router";
+import { useEffect, useRef } from "react";
 import { authenticate } from "../shopify.server";
 import { getCredits } from "../lib/credits.server";
 import { createCheckoutSession, createPortalSession, STRIPE_PRICES } from "../lib/stripe-billing.server";
@@ -43,10 +44,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const successUrl = `${baseUrl}/app/subscription?approved=1`;
   const cancelUrl = `${baseUrl}/app/subscription`;
 
+  // Return redirectUrl for client-side top-level redirect (embedded app iframe cannot load Stripe).
   if (intent === "portal") {
     const result = await createPortalSession(shop, successUrl);
     if (result.error) return { error: result.error };
-    if (result.url) throw redirect(result.url);
+    if (result.url) return { redirectUrl: result.url };
     return { error: "Could not create portal session" };
   }
 
@@ -62,7 +64,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       cancelUrl,
     });
     if (result.error) return { error: result.error };
-    if (result.url) throw redirect(result.url);
+    if (result.url) return { redirectUrl: result.url };
     return { error: "Could not create checkout" };
   }
 
@@ -78,7 +80,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       cancelUrl,
     });
     if (result.error) return { error: result.error };
-    if (result.url) throw redirect(result.url);
+    if (result.url) return { redirectUrl: result.url };
     return { error: "Could not create checkout" };
   }
 
@@ -94,7 +96,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       cancelUrl,
     });
     if (result.error) return { error: result.error };
-    if (result.url) throw redirect(result.url);
+    if (result.url) return { redirectUrl: result.url };
     return { error: "Could not create checkout" };
   }
 
@@ -105,9 +107,39 @@ export default function SubscriptionPage() {
   const { shop, credits, hasStripeCustomer, approved } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const error = actionData?.error;
+  const redirectUrl = actionData && "redirectUrl" in actionData ? actionData.redirectUrl : undefined;
+  const didRedirect = useRef(false);
+
+  // Embedded app: redirect must happen at top level so Stripe loads (not inside iframe).
+  useEffect(() => {
+    if (!redirectUrl || didRedirect.current) return;
+    didRedirect.current = true;
+    try {
+      if (typeof window !== "undefined" && window.top) {
+        window.top.location.href = redirectUrl;
+      }
+    } catch {
+      // If blocked (e.g. cross-origin), user can use the fallback link below.
+    }
+  }, [redirectUrl]);
 
   return (
     <s-page heading="Subscription">
+      {redirectUrl && (
+        <div
+          style={{
+            marginBottom: "16px",
+            padding: "12px 16px",
+            background: "var(--p-color-bg-fill-info-secondary, #e3f1ff)",
+            borderRadius: "8px",
+          }}
+        >
+          <s-text>Redirecting to checkout…</s-text>{" "}
+          <a href={redirectUrl} target="_top" rel="noopener noreferrer" style={{ marginLeft: "8px", fontWeight: 600 }}>
+            Click here if you’re not redirected
+          </a>
+        </div>
+      )}
       {approved && (
         <div
           style={{
