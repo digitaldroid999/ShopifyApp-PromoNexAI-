@@ -151,8 +151,11 @@ export async function createPortalSession(shop: string, returnUrl: string): Prom
 /**
  * Sync BillingState from a Stripe subscription object (e.g. after webhook or on subscription page load).
  */
-export async function syncBillingStateFromSubscription(shop: string, subscription: { id: string; current_period_end: number; items: { data: Array<{ price: { id: string } }> } }): Promise<void> {
-  const periodEnd = new Date(subscription.current_period_end * 1000);
+export async function syncBillingStateFromSubscription(shop: string, subscription: { id: string; current_period_end?: number; items: { data: Array<{ price: { id: string } }> } }): Promise<void> {
+  const raw = subscription.current_period_end;
+  const ts = typeof raw === "number" && Number.isFinite(raw) ? raw : typeof raw === "string" ? parseInt(raw, 10) : NaN;
+  const periodEnd = Number.isFinite(ts) ? new Date(ts * 1000) : null;
+  const periodEndValid = periodEnd && !Number.isNaN(periodEnd.getTime()) ? periodEnd : null;
   let planId: string | null = null;
   let subscriptionCreditsPerPeriod = 0;
   let premiumMusic = false;
@@ -175,7 +178,7 @@ export async function syncBillingStateFromSubscription(shop: string, subscriptio
       stripeSubscriptionId: subscription.id,
       planId,
       subscriptionCreditsPerPeriod,
-      periodEnd,
+      periodEnd: periodEndValid,
       premiumMusic,
       premiumVoices,
     },
@@ -183,7 +186,7 @@ export async function syncBillingStateFromSubscription(shop: string, subscriptio
       stripeSubscriptionId: subscription.id,
       planId,
       subscriptionCreditsPerPeriod,
-      periodEnd,
+      periodEnd: periodEndValid,
       premiumMusic,
       premiumVoices,
     },
