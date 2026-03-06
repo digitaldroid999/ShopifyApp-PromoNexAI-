@@ -524,8 +524,8 @@ export default function Index() {
                           borderRadius: "999px",
                           fontSize: "11px",
                           fontWeight: 500,
-                          background: s.status === "finished" ? "var(--p-color-bg-fill-success-secondary, #d3f0d9)" : s.status === "finalizing" || s.status === "in_progress" ? "var(--p-color-bg-fill-caution-secondary, #fcf1e0)" : s.status === "completed" ? "var(--p-color-bg-fill-secondary, #e1e3e5)" : "var(--p-color-bg-fill-secondary, #e1e3e5)",
-                          color: s.status === "finished" ? "var(--p-color-text-success, #008060)" : s.status === "finalizing" || s.status === "in_progress" ? "var(--p-color-text-caution, #b98900)" : "var(--p-color-text-subdued, #6d7175)",
+                          background: s.status === "finished" ? "var(--p-color-bg-fill-success-secondary, #d3f0d9)" : s.status === "finalizing" || s.status === "in_progress" ? "var(--p-color-bg-fill-caution-secondary, #fcf1e0)" : s.status === "completed" ? "var(--p-color-bg-fill-info-secondary, #e3f1ff)" : "var(--p-color-bg-fill-secondary, #e1e3e5)",
+                          color: s.status === "finished" ? "var(--p-color-text-success, #008060)" : s.status === "finalizing" || s.status === "in_progress" ? "var(--p-color-text-caution, #b98900)" : s.status === "completed" ? "var(--p-color-text-info, #2c6ecb)" : "var(--p-color-text-subdued, #6d7175)",
                         }}
                       >
                         {s.status}
