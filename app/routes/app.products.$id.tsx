@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs } from "react-router";
 import { Link, useLoaderData, useRouteError, useFetcher } from "react-router";
 import { useState, useEffect } from "react";
 import { authenticate } from "../shopify.server";
+import { getCredits } from "../lib/credits.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { WorkflowModal } from "../components/WorkflowModal";
 
@@ -90,10 +91,14 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
         },
       },
       isSample: true,
+      isPremiumMusic: false,
+      isPremiumVoices: false,
     };
   }
 
-  const { admin } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
+  const shop = (session as { shop?: string }).shop ?? "";
+  const credits = shop ? await getCredits(shop) : null;
   const gid = id?.startsWith("gid://") ? id : `gid://shopify/Product/${id}`;
   const response = await admin.graphql(PRODUCT_QUERY, { variables: { id: gid } });
   const json = await response.json();
@@ -101,7 +106,12 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
   if (!product) {
     throw new Response("Product not found", { status: 404 });
   }
-  return { product, isSample: false };
+  return {
+    product,
+    isSample: false,
+    isPremiumMusic: credits?.isPremiumMusic ?? false,
+    isPremiumVoices: credits?.isPremiumVoices ?? false,
+  };
 };
 
 const SHORTS_API = "/app/api/shorts";
@@ -109,7 +119,7 @@ const SHORTS_API = "/app/api/shorts";
 const SHORTS_RESET_API = "/app/api/shorts/reset";
 
 export default function ProductDetail() {
-  const { product, isSample } = useLoaderData<typeof loader>();
+  const { product, isSample, isPremiumMusic, isPremiumVoices } = useLoaderData<typeof loader>();
   const [workflowOpen, setWorkflowOpen] = useState(false);
   const [productVideoUrl, setProductVideoUrl] = useState<string | null>(null);
   const shortsFetcher = useFetcher<{ shortId?: string | null; finalVideoUrl?: string | null; status?: string | null }>();
@@ -389,6 +399,8 @@ export default function ProductDetail() {
             setProductVideoUrl(videoUrl);
             if (product?.id) shortsFetcher.load(`${SHORTS_API}?productId=${encodeURIComponent(product.id)}`);
           }}
+          isPremiumMusic={isPremiumMusic}
+          isPremiumVoices={isPremiumVoices}
         />
       )}
     </>
