@@ -1,6 +1,5 @@
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { Form, useActionData, useLoaderData } from "react-router";
-import { useEffect, useRef } from "react";
 import { authenticate } from "../shopify.server";
 import { getCredits } from "../lib/credits.server";
 import { createCheckoutSession, createPortalSession, getSubscriptionDetails, STRIPE_PRICES } from "../lib/stripe-billing.server";
@@ -111,20 +110,9 @@ export default function SubscriptionPage() {
   const actionData = useActionData<typeof action>();
   const error = actionData?.error;
   const redirectUrl = actionData && "redirectUrl" in actionData ? actionData.redirectUrl : undefined;
-  const didRedirect = useRef(false);
 
-  // Embedded app: redirect must happen at top level so Stripe loads (not inside iframe).
-  useEffect(() => {
-    if (!redirectUrl || didRedirect.current) return;
-    didRedirect.current = true;
-    try {
-      if (typeof window !== "undefined" && window.top) {
-        window.top.location.href = redirectUrl;
-      }
-    } catch {
-      // If blocked (e.g. cross-origin), user can use the fallback link below.
-    }
-  }, [redirectUrl]);
+  // No automatic redirect: in embedded apps it can cause the host to reload the iframe and trigger an infinite loader loop.
+  // User clicks the link below (target="_top") to open Stripe in the top window.
 
   return (
     <s-page heading="Subscription">
@@ -137,8 +125,8 @@ export default function SubscriptionPage() {
             borderRadius: "8px",
           }}
         >
-          <s-text>Redirecting to checkout…</s-text>{" "}
-          <a href={redirectUrl} target="_top" rel="noopener noreferrer" style={{ marginLeft: "8px", fontWeight: 600 }}>
+          <s-text>Continue to checkout:</s-text>{" "}
+          <a href={redirectUrl} target="_top" rel="noopener noreferrer" style={{ marginLeft: "4px", fontWeight: 600 }}>
             Click here if you’re not redirected
           </a>
         </div>
