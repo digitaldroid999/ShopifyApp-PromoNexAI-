@@ -1,5 +1,6 @@
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { Form, useActionData, useLoaderData } from "react-router";
+import { useEffect, useRef } from "react";
 import { authenticate } from "../shopify.server";
 import { getCredits } from "../lib/credits.server";
 import { createCheckoutSession, createPortalSession, getSubscriptionDetails, STRIPE_PRICES } from "../lib/stripe-billing.server";
@@ -72,8 +73,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   // Return redirectUrl for client-side top-level redirect (embedded app iframe cannot load Stripe).
   if (intent === "portal") {
     const result = await createPortalSession(shop, successUrl);
-    if (result.error) return { error: result.error };
-    if (result.url) return { redirectUrl: result.url };
+    if ("error" in result && result.error) return { error: result.error };
+    if ("url" in result && result.url) return { redirectUrl: result.url };
     return { error: "Could not create portal session" };
   }
 
@@ -88,8 +89,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       successUrl,
       cancelUrl,
     });
-    if (result.error) return { error: result.error };
-    if (result.url) return { redirectUrl: result.url };
+    if ("error" in result && result.error) return { error: result.error };
+    if ("url" in result && result.url) return { redirectUrl: result.url };
     return { error: "Could not create checkout" };
   }
 
@@ -104,8 +105,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       successUrl,
       cancelUrl,
     });
-    if (result.error) return { error: result.error };
-    if (result.url) return { redirectUrl: result.url };
+    if ("error" in result && result.error) return { error: result.error };
+    if ("url" in result && result.url) return { redirectUrl: result.url };
     return { error: "Could not create checkout" };
   }
 
@@ -120,8 +121,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       successUrl,
       cancelUrl,
     });
-    if (result.error) return { error: result.error };
-    if (result.url) return { redirectUrl: result.url };
+    if ("error" in result && result.error) return { error: result.error };
+    if ("url" in result && result.url) return { redirectUrl: result.url };
     return { error: "Could not create checkout" };
   }
 
@@ -133,9 +134,25 @@ export default function SubscriptionPage() {
   const actionData = useActionData<typeof action>();
   const error = actionData?.error;
   const redirectUrl = actionData && "redirectUrl" in actionData ? actionData.redirectUrl : undefined;
+  const didRedirect = useRef(false);
 
-  // No automatic redirect: in embedded apps it can cause the host to reload the iframe and trigger an infinite loader loop.
-  // User clicks the link below (target="_top") to open Stripe in the top window.
+  // Auto-redirect to Stripe (top window). Use sessionStorage to avoid redirect loop if iframe reloads.
+  useEffect(() => {
+    if (!redirectUrl || didRedirect.current) return;
+    const key = "stripe_redirect_ts";
+    const now = Date.now();
+    const last = parseInt(sessionStorage.getItem(key) ?? "0", 10);
+    if (now - last < 5000) return; // Already redirected in last 5s (e.g. iframe reloaded)
+    didRedirect.current = true;
+    sessionStorage.setItem(key, String(now));
+    try {
+      if (typeof window !== "undefined" && window.top) {
+        window.top.location.href = redirectUrl;
+      }
+    } catch {
+      // If blocked (e.g. cross-origin), user can use the fallback link.
+    }
+  }, [redirectUrl]);
 
   return (
     <s-page heading="Subscription">
@@ -243,8 +260,8 @@ export default function SubscriptionPage() {
                   <s-text color="subdued">{credits.remaining} remaining</s-text>
                 </div>
                 {credits.remaining <= 0 && (
-                  <div style={{ marginTop: "8px" }}>
-                    <s-text color="critical">
+                  <div style={{ marginTop: "8px", color: "var(--p-color-text-critical, #d72c0d)" }}>
+                    <s-text>
                       No credits left. Upgrade or buy add-on credits to create more videos.
                     </s-text>
                   </div>
