@@ -149,13 +149,20 @@ export async function createPortalSession(shop: string, returnUrl: string): Prom
 }
 
 /**
- * Sync BillingState from a Stripe subscription object (e.g. after webhook or on subscription page load).
+ * Parse current_period_end from a subscription into a valid Date or null.
+ */
+function parsePeriodEnd(sub: { current_period_end?: number }): Date | null {
+  const raw = sub.current_period_end;
+  const ts = typeof raw === "number" && Number.isFinite(raw) ? raw : typeof raw === "string" ? parseInt(raw, 10) : NaN;
+  const d = Number.isFinite(ts) ? new Date(ts * 1000) : null;
+  return d && !Number.isNaN(d.getTime()) ? d : null;
+}
+
+/**
+ * Sync BillingState from a single Stripe subscription (used when you have one subscription only).
  */
 export async function syncBillingStateFromSubscription(shop: string, subscription: { id: string; current_period_end?: number; items: { data: Array<{ price: { id: string } }> } }): Promise<void> {
-  const raw = subscription.current_period_end;
-  const ts = typeof raw === "number" && Number.isFinite(raw) ? raw : typeof raw === "string" ? parseInt(raw, 10) : NaN;
-  const periodEnd = Number.isFinite(ts) ? new Date(ts * 1000) : null;
-  const periodEndValid = periodEnd && !Number.isNaN(periodEnd.getTime()) ? periodEnd : null;
+  const periodEndValid = parsePeriodEnd(subscription);
   let planId: string | null = null;
   let subscriptionCreditsPerPeriod = 0;
   let premiumMusic = false;
@@ -184,6 +191,83 @@ export async function syncBillingStateFromSubscription(shop: string, subscriptio
     },
     update: {
       stripeSubscriptionId: subscription.id,
+      planId,
+      subscriptionCreditsPerPeriod,
+      periodEnd: periodEndValid,
+      premiumMusic,
+      premiumVoices,
+    },
+  });
+}
+
+/**
+ * Sync BillingState from ALL active subscriptions for a Stripe customer.
+ * A customer can have multiple subscriptions (e.g. one for plan, one for premium add-ons).
+ * We merge line items from every active/trialing subscription so the plan is not lost when
+ * a second subscription (e.g. premium_music) is added.
+ */
+export async function syncBillingStateFromStripeCustomer(shop: string, stripeCustomerId: string): Promise<void> {
+  const stripe = getStripe();
+  const subs = await stripe.subscriptions.list({
+    customer: stripeCustomerId,
+    status: "active",
+    limit: 100,
+  });
+  const trialing = await stripe.subscriptions.list({
+    customer: stripeCustomerId,
+    status: "trialing",
+    limit: 100,
+  });
+  const all = [...subs.data, ...trialing.data];
+
+  if (all.length === 0) {
+    await clearSubscriptionState(shop);
+    return;
+  }
+
+  let planId: string | null = null;
+  let subscriptionCreditsPerPeriod = 0;
+  let periodEndValid: Date | null = null;
+  let primarySubscriptionId: string | null = null;
+  let premiumMusic = false;
+  let premiumVoices = false;
+
+  for (const sub of all) {
+    const periodEnd = parsePeriodEnd(sub);
+    for (const item of sub.items.data) {
+      const priceId = typeof item.price === "string" ? item.price : (item.price as { id?: string } | undefined)?.id;
+      const key = priceId ? priceIdToKey(priceId) : null;
+      if (!key) continue;
+      if (PLAN_CREDITS[key] !== undefined) {
+        planId = key;
+        subscriptionCreditsPerPeriod = PLAN_CREDITS[key];
+        if (periodEnd) {
+          periodEndValid = periodEnd;
+          primarySubscriptionId = sub.id;
+        }
+      } else if (key === "premium_music") premiumMusic = true;
+      else if (key === "premium_voices") premiumVoices = true;
+    }
+  }
+
+  if (!primarySubscriptionId && all.length > 0) {
+    primarySubscriptionId = all[0].id;
+    if (!periodEndValid) periodEndValid = parsePeriodEnd(all[0]);
+  }
+
+  await getBillingState().upsert({
+    where: { shop },
+    create: {
+      shop,
+      stripeSubscriptionId: primarySubscriptionId,
+      planId,
+      subscriptionCreditsPerPeriod,
+      periodEnd: periodEndValid,
+      premiumMusic,
+      premiumVoices,
+    },
+    update: {
+      stripeSubscriptionId: primarySubscriptionId,
       planId,
       subscriptionCreditsPerPeriod,
       periodEnd: periodEndValid,

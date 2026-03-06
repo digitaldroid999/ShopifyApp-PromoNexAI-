@@ -1,7 +1,7 @@
 import type { ActionFunctionArgs } from "react-router";
 import { getStripe } from "../lib/stripe.server";
 import {
-  syncBillingStateFromSubscription,
+  syncBillingStateFromStripeCustomer,
   clearSubscriptionState,
   addAddonCredits,
   priceIdToKey,
@@ -69,15 +69,11 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           break;
         }
         if (sub.status === "active" || sub.status === "trialing") {
-          await syncBillingStateFromSubscription(row.shop, {
-            id: sub.id,
-            current_period_end: sub.current_period_end,
-            items: sub.items,
-          });
+          await syncBillingStateFromStripeCustomer(row.shop, customerId);
           console.log(`${LOG} Synced subscription for shop ${row.shop}`);
         } else {
-          await clearSubscriptionState(row.shop);
-          console.log(`${LOG} Cleared subscription state for shop ${row.shop} status=${sub.status}`);
+          await syncBillingStateFromStripeCustomer(row.shop, customerId);
+          console.log(`${LOG} Re-synced subscription state for shop ${row.shop} (status=${sub.status})`);
         }
         break;
       }
@@ -90,8 +86,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
           select: { shop: true },
         });
         if (row) {
-          await clearSubscriptionState(row.shop);
-          console.log(`${LOG} Cleared subscription (deleted) for shop ${row.shop}`);
+          await syncBillingStateFromStripeCustomer(row.shop, customerId);
+          console.log(`${LOG} Re-synced after subscription deleted for shop ${row.shop}`);
         }
         break;
       }
