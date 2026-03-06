@@ -8,6 +8,42 @@ import prisma from "../db.server";
 const FREE_CREDITS_INITIAL = 3;
 const ADDON_ONLY_PERIOD_END = new Date("2099-12-31T23:59:59Z");
 
+/** End of current month UTC (last moment of the month). */
+function endOfCurrentMonthUTC(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 0, 23, 59, 59, 999));
+}
+
+/** Start of current month UTC. */
+function startOfCurrentMonthUTC(): Date {
+  const now = new Date();
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+}
+
+/**
+ * For yearly plans, credits reset each calendar month until the subscription ends.
+ * For monthly plans (or addon-only), the period is the Stripe billing period (single periodEnd).
+ */
+function getEffectivePeriodEnd(state: { planId: string | null; periodEnd: Date | null }): Date {
+  if (state.planId?.endsWith("_yearly") && state.periodEnd) {
+    const endOfMonth = endOfCurrentMonthUTC();
+    return state.periodEnd < endOfMonth ? state.periodEnd : endOfMonth;
+  }
+  return state.periodEnd ?? ADDON_ONLY_PERIOD_END;
+}
+
+/** Subscription credits available for the current period (month for yearly, billing period for monthly). */
+function getSubscriptionCreditsThisPeriod(state: {
+  planId: string | null;
+  periodEnd: Date | null;
+  subscriptionCreditsPerPeriod: number;
+}): number {
+  if (state.planId?.endsWith("_yearly") && state.periodEnd) {
+    return state.periodEnd >= startOfCurrentMonthUTC() ? state.subscriptionCreditsPerPeriod : 0;
+  }
+  return state.subscriptionCreditsPerPeriod;
+}
+
 // Delegate access; Prisma client must be generated with BillingState and CreditUsage models
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const prismaAny = prisma as any;
@@ -64,8 +100,9 @@ export async function getCredits(shop: string): Promise<CreditsResult> {
     });
   }
 
-  const periodEnd = state.periodEnd ?? ADDON_ONLY_PERIOD_END;
-  const allowed = state.subscriptionCreditsPerPeriod + state.addonCreditsBalance;
+  const periodEnd = getEffectivePeriodEnd(state);
+  const subscriptionCreditsThisPeriod = getSubscriptionCreditsThisPeriod(state);
+  const allowed = subscriptionCreditsThisPeriod + state.addonCreditsBalance;
 
   const creditUsage = getCreditUsage();
   let usage = await creditUsage.findUnique({
@@ -106,7 +143,8 @@ export async function consumeCredit(shop: string): Promise<{ ok: true } | { ok: 
     return { ok: false, error: "No billing state" };
   }
 
-  const periodEnd = state.periodEnd ?? ADDON_ONLY_PERIOD_END;
+  const periodEnd = getEffectivePeriodEnd(state);
+  const allowedForPeriod = getSubscriptionCreditsThisPeriod(state);
 
   if (state.addonCreditsBalance > 0) {
     await billingState.update({
@@ -121,8 +159,6 @@ export async function consumeCredit(shop: string): Promise<{ ok: true } | { ok: 
     create: { shop, periodEnd, creditsUsed: 1 },
     update: { creditsUsed: { increment: 1 } },
   });
-
-  const allowedForPeriod = state.subscriptionCreditsPerPeriod;
   if (usage.creditsUsed > allowedForPeriod) {
     await creditUsage.update({
       where: { shop_periodEnd: { shop, periodEnd } },
