@@ -15,6 +15,31 @@ const PLAN_LABELS: Record<string, string> = {
   business_yearly: "Business Yearly",
 };
 
+/**
+ * Build return URLs for Stripe so redirects open the app inside Shopify Admin (with session).
+ * Set SHOPIFY_APP_HANDLE in .env to your app's handle (see Admin URL when opening the app: .../apps/{handle}).
+ */
+function getSubscriptionReturnUrls(shop: string, fallbackOrigin: string): { successUrl: string; cancelUrl: string } {
+  const appHandle = process.env.SHOPIFY_APP_HANDLE?.trim();
+  if (appHandle) {
+    const storeHandle = shop.replace(/\.myshopify\.com$/i, "");
+    const base = `https://admin.shopify.com/store/${encodeURIComponent(storeHandle)}/apps/${encodeURIComponent(appHandle)}`;
+    return {
+      successUrl: `${base}/app/subscription?approved=1`,
+      cancelUrl: `${base}/app/subscription`,
+    };
+  }
+  const appUrl = process.env.SHOPIFY_APP_URL?.trim() ?? "";
+  const origin = fallbackOrigin || (appUrl ? (appUrl.startsWith("http") ? appUrl : `https://${appUrl}`).replace(/\/$/, "") : "");
+  if (origin) {
+    return {
+      successUrl: `${origin}/app/subscription?approved=1`,
+      cancelUrl: `${origin}/app/subscription`,
+    };
+  }
+  return { successUrl: "", cancelUrl: "" };
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const shop = (session as { shop?: string }).shop ?? "";
@@ -42,9 +67,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   const formData = await request.formData();
   const intent = formData.get("intent") as string | null;
-  const baseUrl = new URL(request.url).origin;
-  const successUrl = `${baseUrl}/app/subscription?approved=1`;
-  const cancelUrl = `${baseUrl}/app/subscription`;
+  const { successUrl, cancelUrl } = getSubscriptionReturnUrls(shop, new URL(request.url).origin);
 
   // Return redirectUrl for client-side top-level redirect (embedded app iframe cannot load Stripe).
   if (intent === "portal") {
