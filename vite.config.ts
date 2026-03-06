@@ -67,6 +67,9 @@ export default defineConfig({
   ],
   build: {
     assetsInlineLimit: 0,
+    rollupOptions: {
+      external: ["stripe", "sharp"],
+    },
   },
   ssr: {
     // sharp is a native addon; stripe is Node-only — load at runtime, do not bundle
