@@ -208,6 +208,42 @@ export async function clearSubscriptionState(shop: string): Promise<void> {
 }
 
 /**
+ * Get current subscription and credits summary for display on the subscription page.
+ */
+export async function getSubscriptionDetails(shop: string): Promise<{
+  planId: string | null;
+  subscriptionCreditsPerPeriod: number;
+  addonCreditsBalance: number;
+  periodEnd: Date | null;
+  premiumMusic: boolean;
+  premiumVoices: boolean;
+  hasActiveSubscription: boolean;
+} | null> {
+  const state = await getBillingState().findUnique({
+    where: { shop },
+    select: {
+      planId: true,
+      subscriptionCreditsPerPeriod: true,
+      addonCreditsBalance: true,
+      periodEnd: true,
+      premiumMusic: true,
+      premiumVoices: true,
+      stripeSubscriptionId: true,
+    },
+  });
+  if (!state) return null;
+  return {
+    planId: state.planId,
+    subscriptionCreditsPerPeriod: state.subscriptionCreditsPerPeriod,
+    addonCreditsBalance: state.addonCreditsBalance,
+    periodEnd: state.periodEnd,
+    premiumMusic: state.premiumMusic,
+    premiumVoices: state.premiumVoices,
+    hasActiveSubscription: !!(state.stripeSubscriptionId && state.planId),
+  };
+}
+
+/**
  * Add one-time credits to addonCreditsBalance (for addon_10, addon_25, addon_50).
  */
 export async function addAddonCredits(shop: string, priceId: string, amount: number): Promise<void> {

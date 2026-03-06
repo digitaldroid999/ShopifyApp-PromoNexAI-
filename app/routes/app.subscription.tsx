@@ -3,7 +3,7 @@ import { Form, useActionData, useLoaderData } from "react-router";
 import { useEffect, useRef } from "react";
 import { authenticate } from "../shopify.server";
 import { getCredits } from "../lib/credits.server";
-import { createCheckoutSession, createPortalSession, STRIPE_PRICES } from "../lib/stripe-billing.server";
+import { createCheckoutSession, createPortalSession, getSubscriptionDetails, STRIPE_PRICES } from "../lib/stripe-billing.server";
 import prisma from "../db.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 
@@ -19,7 +19,9 @@ const PLAN_LABELS: Record<string, string> = {
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const shop = (session as { shop?: string }).shop ?? "";
-  const credits = shop ? await getCredits(shop) : null;
+  const [credits, subscriptionDetails] = shop
+    ? await Promise.all([getCredits(shop), getSubscriptionDetails(shop)])
+    : [null, null];
   const hasStripeCustomer = shop
     ? !!(await prisma.stripeCustomer.findUnique({ where: { shop }, select: { id: true } }))
     : false;
@@ -28,6 +30,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   return {
     shop,
     credits,
+    subscriptionDetails,
     hasStripeCustomer,
     approved,
   };
@@ -104,7 +107,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function SubscriptionPage() {
-  const { shop, credits, hasStripeCustomer, approved } = useLoaderData<typeof loader>();
+  const { shop, credits, subscriptionDetails, hasStripeCustomer, approved } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const error = actionData?.error;
   const redirectUrl = actionData && "redirectUrl" in actionData ? actionData.redirectUrl : undefined;
@@ -154,31 +157,122 @@ export default function SubscriptionPage() {
         </div>
       )}
 
-      {credits && (
-        <s-section heading="Credits">
+      {(credits || subscriptionDetails) && (
+        <s-section heading="Current subscription & credits">
           <div
             style={{
-              padding: "16px",
+              padding: "20px",
               background: "var(--p-color-bg-surface-secondary, #f6f6f7)",
-              borderRadius: "8px",
+              borderRadius: "12px",
               border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
               marginBottom: "24px",
             }}
           >
-            <s-text type="strong">Videos this period: {credits.used} / {credits.allowed}</s-text>
-            {credits.remaining <= 0 && (
-              <div style={{ marginTop: "8px" }}>
-                <s-text color="critical">No credits left. Upgrade or buy addon credits to create more videos.</s-text>
+            {/* Plan & period */}
+            <div style={{ marginBottom: "16px" }}>
+              <s-text type="strong">
+                {subscriptionDetails?.hasActiveSubscription && subscriptionDetails.planId
+                  ? PLAN_LABELS[subscriptionDetails.planId] ?? subscriptionDetails.planId
+                  : "No subscription plan"}
+              </s-text>
+              {subscriptionDetails?.periodEnd && (
+                <div style={{ marginTop: "4px" }}>
+                  <s-text color="subdued">
+                    {subscriptionDetails.hasActiveSubscription ? "Current period ends: " : "Add-on credits period: "}
+                    {new Date(subscriptionDetails.periodEnd).toLocaleDateString(undefined, {
+                      dateStyle: "medium",
+                    })}
+                  </s-text>
+                </div>
+              )}
+            </div>
+
+            {/* Credits breakdown */}
+            {subscriptionDetails && (
+              <div
+                style={{
+                  padding: "12px 0",
+                  borderTop: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                  borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                }}
+              >
+                <div style={{ marginBottom: "8px" }}>
+                  <s-text type="strong">Credits</s-text>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  {subscriptionDetails.subscriptionCreditsPerPeriod > 0 && (
+                    <s-text color="subdued">
+                      From plan this period: {subscriptionDetails.subscriptionCreditsPerPeriod} videos
+                    </s-text>
+                  )}
+                  <s-text color="subdued">
+                    Add-on balance: {subscriptionDetails.addonCreditsBalance} videos (do not expire)
+                  </s-text>
+                  {credits && (
+                    <div style={{ marginTop: "4px" }}>
+                      <s-text color="subdued">Total available: {credits.allowed} videos</s-text>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
-            {credits.planId && (
-              <div style={{ marginTop: "8px" }}>
-                <s-text color="subdued">Plan: {PLAN_LABELS[credits.planId] ?? credits.planId}</s-text>
+
+            {/* Used / remaining */}
+            {credits && (
+              <div style={{ marginTop: "16px" }}>
+                {!subscriptionDetails && (
+                  <div style={{ marginBottom: "4px" }}>
+                    <s-text color="subdued">Total available: {credits.allowed} videos</s-text>
+                  </div>
+                )}
+                <s-text type="strong">
+                  Used this period: {credits.used} / {credits.allowed} videos
+                </s-text>
+                <div style={{ marginTop: "2px" }}>
+                  <s-text color="subdued">{credits.remaining} remaining</s-text>
+                </div>
+                {credits.remaining <= 0 && (
+                  <div style={{ marginTop: "8px" }}>
+                    <s-text color="critical">
+                      No credits left. Upgrade or buy add-on credits to create more videos.
+                    </s-text>
+                  </div>
+                )}
               </div>
             )}
-            {credits.periodEnd && (
-              <div style={{ marginTop: "4px" }}>
-                <s-text color="subdued">Period ends: {new Date(credits.periodEnd).toLocaleDateString()}</s-text>
+
+            {/* Premium add-ons */}
+            {(subscriptionDetails?.premiumMusic || subscriptionDetails?.premiumVoices) && (
+              <div style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid var(--p-color-border-secondary, #e1e3e5)" }}>
+                <div style={{ marginBottom: "6px" }}>
+                  <s-text type="strong">Premium add-ons</s-text>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                  {subscriptionDetails.premiumMusic && (
+                    <span
+                      style={{
+                        padding: "4px 10px",
+                        background: "var(--p-color-bg-fill-success-secondary, #d3f0d9)",
+                        borderRadius: "6px",
+                        fontSize: "13px",
+                      }}
+                    >
+                      Premium Music
+                    </span>
+                  )}
+                  {subscriptionDetails.premiumVoices && (
+                    <span
+                      style={{
+                        padding: "4px 10px",
+                        background: "var(--p-color-bg-fill-success-secondary, #d3f0d9)",
+                        borderRadius: "6px",
+                        fontSize: "13px",
+                      }}
+                    >
+                      Premium Voices
+                    </span>
+                  )}
+                </div>
               </div>
             )}
           </div>
