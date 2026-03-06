@@ -6,7 +6,25 @@
 import { getStripe, getOrCreateStripeCustomer } from "./stripe.server";
 import prisma from "../db.server";
 
-// Map Stripe Price ID to plan/addon behavior. Use env vars so you can set real IDs.
+// Delegate access; Prisma client must be generated with BillingState model
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const prismaAny = prisma as any;
+function getBillingState() {
+  const delegate = prismaAny.billingState;
+  if (!delegate) {
+    throw new Error("Prisma client missing billingState. Run: npx prisma generate && npx prisma migrate deploy");
+  }
+  return delegate;
+}
+
+// Placeholder IDs used when env is not set; Stripe will reject these. Real IDs look like price_1ABC123...
+const PLACEHOLDER_IDS = new Set([
+  "price_starter_monthly", "price_starter_yearly", "price_pro_monthly", "price_pro_yearly",
+  "price_business_monthly", "price_business_yearly", "price_addon_10", "price_addon_25", "price_addon_50",
+  "price_premium_music", "price_premium_voices",
+]);
+
+// Map Stripe Price ID to plan/addon behavior. Set real Stripe Price IDs in .env (see README or .env.example).
 export const STRIPE_PRICES: Record<string, string> = {
   starter_monthly: process.env.STRIPE_PRICE_STARTER_MONTHLY ?? "price_starter_monthly",
   starter_yearly: process.env.STRIPE_PRICE_STARTER_YEARLY ?? "price_starter_yearly",
@@ -63,6 +81,14 @@ export async function createCheckoutSession(params: {
 }): Promise<{ url: string } | { error: string }> {
   const { shop, mode, priceIds, successUrl, cancelUrl } = params;
   if (priceIds.length === 0) return { error: "At least one price required" };
+
+  const placeholderUsed = priceIds.some((id) => PLACEHOLDER_IDS.has(id));
+  if (placeholderUsed) {
+    return {
+      error:
+        "Stripe Price IDs are not configured. Create products and prices in the Stripe Dashboard, then set STRIPE_PRICE_PRO_MONTHLY, STRIPE_PRICE_STARTER_MONTHLY, etc. in your .env file. See the subscription plan docs for the full list.",
+    };
+  }
 
   try {
     const stripeCustomerId = await getOrCreateStripeCustomer(shop);
@@ -142,7 +168,7 @@ export async function syncBillingStateFromSubscription(shop: string, subscriptio
     else if (key === "premium_voices") premiumVoices = true;
   }
 
-  await prisma.billingState.upsert({
+  await getBillingState().upsert({
     where: { shop },
     create: {
       shop,
@@ -168,7 +194,7 @@ export async function syncBillingStateFromSubscription(shop: string, subscriptio
  * Clear subscription fields when subscription is cancelled/deleted.
  */
 export async function clearSubscriptionState(shop: string): Promise<void> {
-  await prisma.billingState.updateMany({
+  await getBillingState().updateMany({
     where: { shop },
     data: {
       stripeSubscriptionId: null,
@@ -189,7 +215,7 @@ export async function addAddonCredits(shop: string, priceId: string, amount: num
   const credits = key ? ADDON_CREDITS[key] ?? amount : amount;
   if (credits <= 0) return;
 
-  await prisma.billingState.upsert({
+  await getBillingState().upsert({
     where: { shop },
     create: {
       shop,
