@@ -8,6 +8,24 @@ import prisma from "../db.server";
 const FREE_CREDITS_INITIAL = 3;
 const ADDON_ONLY_PERIOD_END = new Date("2099-12-31T23:59:59Z");
 
+// Delegate access; Prisma client must be generated with BillingState and CreditUsage models
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const prismaAny = prisma as any;
+function getBillingState() {
+  const delegate = prismaAny.billingState;
+  if (!delegate) {
+    throw new Error("Prisma client missing billingState. Run: npx prisma generate && npx prisma migrate deploy");
+  }
+  return delegate;
+}
+function getCreditUsage() {
+  const delegate = prismaAny.creditUsage;
+  if (!delegate) {
+    throw new Error("Prisma client missing creditUsage. Run: npx prisma generate && npx prisma migrate deploy");
+  }
+  return delegate;
+}
+
 export type CreditsResult = {
   allowed: number;
   used: number;
@@ -23,12 +41,13 @@ export type CreditsResult = {
  * Then return allowed, used, remaining, and premium flags.
  */
 export async function getCredits(shop: string): Promise<CreditsResult> {
-  let state = await prisma.billingState.findUnique({
+  const billingState = getBillingState();
+  let state = await billingState.findUnique({
     where: { shop },
   });
 
   if (!state) {
-    state = await prisma.billingState.create({
+    state = await billingState.create({
       data: {
         shop,
         addonCreditsBalance: FREE_CREDITS_INITIAL,
@@ -36,7 +55,7 @@ export async function getCredits(shop: string): Promise<CreditsResult> {
       },
     });
   } else if (!state.freeCreditsGranted) {
-    state = await prisma.billingState.update({
+    state = await billingState.update({
       where: { shop },
       data: {
         freeCreditsGranted: true,
@@ -48,13 +67,14 @@ export async function getCredits(shop: string): Promise<CreditsResult> {
   const periodEnd = state.periodEnd ?? ADDON_ONLY_PERIOD_END;
   const allowed = state.subscriptionCreditsPerPeriod + state.addonCreditsBalance;
 
-  let usage = await prisma.creditUsage.findUnique({
+  const creditUsage = getCreditUsage();
+  let usage = await creditUsage.findUnique({
     where: {
       shop_periodEnd: { shop, periodEnd },
     },
   });
   if (!usage) {
-    usage = await prisma.creditUsage.create({
+    usage = await creditUsage.create({
       data: { shop, periodEnd, creditsUsed: 0 },
     });
   }
@@ -77,7 +97,9 @@ export async function getCredits(shop: string): Promise<CreditsResult> {
  * Consume 1 credit: use addon balance first, then subscription period usage.
  */
 export async function consumeCredit(shop: string): Promise<{ ok: true } | { ok: false; error: string }> {
-  const state = await prisma.billingState.findUnique({
+  const billingState = getBillingState();
+  const creditUsage = getCreditUsage();
+  const state = await billingState.findUnique({
     where: { shop },
   });
   if (!state) {
@@ -87,14 +109,14 @@ export async function consumeCredit(shop: string): Promise<{ ok: true } | { ok: 
   const periodEnd = state.periodEnd ?? ADDON_ONLY_PERIOD_END;
 
   if (state.addonCreditsBalance > 0) {
-    await prisma.billingState.update({
+    await billingState.update({
       where: { shop },
       data: { addonCreditsBalance: { decrement: 1 } },
     });
     return { ok: true };
   }
 
-  const usage = await prisma.creditUsage.upsert({
+  const usage = await creditUsage.upsert({
     where: { shop_periodEnd: { shop, periodEnd } },
     create: { shop, periodEnd, creditsUsed: 1 },
     update: { creditsUsed: { increment: 1 } },
@@ -102,7 +124,7 @@ export async function consumeCredit(shop: string): Promise<{ ok: true } | { ok: 
 
   const allowedForPeriod = state.subscriptionCreditsPerPeriod;
   if (usage.creditsUsed > allowedForPeriod) {
-    await prisma.creditUsage.update({
+    await creditUsage.update({
       where: { shop_periodEnd: { shop, periodEnd } },
       data: { creditsUsed: { decrement: 1 } },
     });
