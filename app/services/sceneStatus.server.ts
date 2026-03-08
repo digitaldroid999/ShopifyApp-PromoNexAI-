@@ -109,6 +109,7 @@ export function getScene2ClearFieldsWhenGoingPrevious(current: string): { imageU
     case "video_generated":
       return { generatedVideoUrl: true };
     case "bg_video_fetched":
+    case "step2":
       return { imageUrl: true, fetchedMedia: true };
     case "bg_removed":
       return { imageUrl: true };

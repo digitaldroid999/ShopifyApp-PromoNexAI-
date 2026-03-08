@@ -1986,18 +1986,21 @@ export function WorkflowModal({
       sceneId,
     });
   }, []);
-  const handleConfirmGoPrevious = useCallback(() => {
+  const handleConfirmGoPrevious = useCallback(async () => {
     const pending = confirmGoPrevious;
     setConfirmGoPrevious(null);
     if (!pending) return;
-    fetch(SHORTS_SCENES_API, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ sceneId: pending.sceneId, goPrevious: true }),
-    }).then((res) => {
+    try {
+      const res = await fetch(SHORTS_SCENES_API, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ sceneId: pending.sceneId, goPrevious: true }),
+      });
       if (res.ok) refetchShort();
-    });
+    } catch {
+      refetchShort();
+    }
   }, [confirmGoPrevious, refetchShort]);
 
   // Reset ensure-short ref when productId changes (e.g. open modal for different product)
@@ -4448,8 +4451,9 @@ function Scene2Content({
             title="Select stock video & generate scene"
             description="Search and pick a stock video from Pexels, Pixabay, or Coverr as the background. Then click Generate video to composite your subject onto it and create the scene (~8s)."
           />
-          <div style={{ display: "flex", flexDirection: "row", gap: "24px", alignItems: "flex-start", flexWrap: "wrap" }}>
-            <div style={{ flex: "1 1 260px", minWidth: "240px", display: "flex", flexDirection: "row", gap: "16px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            {/* Row 1: BG removed image card | Select stock video card */}
+            <div style={{ display: "flex", flexDirection: "row", gap: "16px", alignItems: "stretch", flexWrap: "wrap" }}>
               {effectiveOverlayUrl ? (
                 <div style={{ ...boxStyle, padding: "12px", display: "flex", flexDirection: "column", gap: "8px", flex: "1 1 200px", minWidth: "180px" }}>
                   <p style={{ margin: 0, fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>Subject (BG removed)</p>
@@ -4522,9 +4526,10 @@ function Scene2Content({
                 </button>
               )}
             </div>
-            <div style={{ flex: "1 1 260px", minWidth: "240px", display: "flex", flexDirection: "column", gap: "8px" }}>
+            {/* Row 2: Generate video button (and loading / error) */}
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "8px" }}>
               {sceneLoading ? (
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", minWidth: "200px" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px", width: "100%" }}>
                   <div style={{ width: "100%", maxWidth: "280px", height: "8px", borderRadius: "4px", background: "var(--p-color-border-secondary, #e1e3e5)", overflow: "hidden" }}>
                     <div
                       style={{
@@ -4543,46 +4548,6 @@ function Scene2Content({
                     <span style={{ fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)" }}>{sceneProgress}%</span>
                   )}
                 </div>
-              ) : (dbSceneVideoUrl ?? sceneVideo) ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                  <video key={dbSceneVideoUrl ?? sceneVideo ?? ""} src={normalizeSceneVideoUrl(dbSceneVideoUrl ?? sceneVideo)} controls style={{ maxWidth: "100%", maxHeight: "240px", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                    <button
-                      type="button"
-                      onClick={handleGenerateVideo}
-                      disabled={!selectedStockVideoUrl || !effectiveOverlayUrl || !scene2Id || !shortUserId || sceneLoading}
-                      style={{
-                        padding: "8px 16px",
-                        borderRadius: "8px",
-                        border: "none",
-                        background: selectedStockVideoUrl && effectiveOverlayUrl && scene2Id && shortUserId && !sceneLoading ? "var(--p-color-bg-fill-info, #2c6ecb)" : "#9ca3af",
-                        color: "#fff",
-                        cursor: selectedStockVideoUrl && effectiveOverlayUrl && scene2Id && shortUserId && !sceneLoading ? "pointer" : "not-allowed",
-                        fontSize: "14px",
-                        fontWeight: 600,
-                      }}
-                    >
-                      {sceneLoading ? "Generating…" : "Generate video again"}
-                    </button>
-                    {onRegenerate && (
-                      <button
-                        type="button"
-                        onClick={onRegenerate}
-                        style={{
-                          padding: "8px 16px",
-                          borderRadius: "8px",
-                          border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                          background: "transparent",
-                          cursor: "pointer",
-                          fontSize: "14px",
-                          fontWeight: 600,
-                        }}
-                      >
-                        Start from scratch
-                      </button>
-                    )}
-                  </div>
-                </div>
               ) : (
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                   <button
@@ -4593,20 +4558,51 @@ function Scene2Content({
                       padding: "10px 20px",
                       borderRadius: "8px",
                       border: "none",
-                      background: !selectedStockVideoUrl || !effectiveOverlayUrl || !scene2Id ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
+                      background: !selectedStockVideoUrl || !effectiveOverlayUrl || !scene2Id || !shortUserId ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
                       color: "#fff",
                       fontWeight: 600,
                       cursor: !selectedStockVideoUrl || !effectiveOverlayUrl || !scene2Id ? "not-allowed" : "pointer",
                     }}
                   >
-                    Generate video
+                    {(dbSceneVideoUrl ?? sceneVideo) ? "Generate video again" : "Generate video"}
                   </button>
+                  {(dbSceneVideoUrl ?? sceneVideo) && onRegenerate && (
+                    <button
+                      type="button"
+                      onClick={onRegenerate}
+                      style={{
+                        padding: "10px 20px",
+                        borderRadius: "8px",
+                        border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                        background: "transparent",
+                        cursor: "pointer",
+                        fontSize: "14px",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Start from scratch
+                    </button>
+                  )}
                 </div>
               )}
               {sceneError && (
                 <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{sceneError}</span>
               )}
             </div>
+            {/* Row 3: Generated video at center */}
+            {(dbSceneVideoUrl ?? sceneVideo) && !sceneLoading && (
+              <div style={{ display: "flex", justifyContent: "center", width: "100%" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", maxWidth: "100%" }}>
+                  <p style={{ margin: 0, fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>Generated scene video</p>
+                  <video
+                    key={dbSceneVideoUrl ?? sceneVideo ?? ""}
+                    src={normalizeSceneVideoUrl(dbSceneVideoUrl ?? sceneVideo)}
+                    controls
+                    style={{ maxWidth: "100%", maxHeight: "280px", borderRadius: "8px", border: "1px solid #e1e3e5" }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
           <FetchVideoModal
             open={videoModalOpen}
