@@ -1851,6 +1851,7 @@ export function WorkflowModal({
   const [audioGenerateLoading, setAudioGenerateLoading] = useState(false);
   const [audioSaveLoading, setAudioSaveLoading] = useState(false);
   const [testAudioLoading, setTestAudioLoading] = useState(false);
+  const [showSubtitles, setShowSubtitles] = useState(true);
   const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(null);
   const [lastSubtitleTiming, setLastSubtitleTiming] = useState<Array<{ text: string; start_time: number; end_time: number; duration: number }> | null>(null);
   const [scriptSavedFeedback, setScriptSavedFeedback] = useState(false);
@@ -2122,11 +2123,13 @@ export function WorkflowModal({
         activeTab: state.activeTab,
         showingFinal: Boolean(state.showingFinal),
         activePhase: (state.activePhase === "audio" || state.activePhase === "finalize" ? state.activePhase : "scenes"),
+        includeSubtitles: typeof state.includeSubtitles === "boolean" ? state.includeSubtitles : true,
       };
       setLoadedState(slim);
       setActiveTab(slim.activeTab);
       setShowingFinal(slim.showingFinal);
       setActivePhase(slim.activePhase);
+      setShowSubtitles(slim.includeSubtitles !== false);
     } else {
       setLoadedState(null);
     }
@@ -2137,12 +2140,12 @@ export function WorkflowModal({
     if (!productId?.trim() || loadedState === "pending") return;
     const timer = setTimeout(() => {
       saveTempFetcher.submit(
-        { productId: productId.trim(), state: { activeTab, showingFinal, activePhase } },
+        { productId: productId.trim(), state: { activeTab, showingFinal, activePhase, includeSubtitles: showSubtitles } },
         { method: "post", action: WORKFLOW_TEMP_API, encType: "application/json" }
       );
     }, 2000);
     return () => clearTimeout(timer);
-  }, [productId, loadedState, activeTab, showingFinal, activePhase]);
+  }, [productId, loadedState, activeTab, showingFinal, activePhase, showSubtitles]);
 
   // Fetch final video with no-cache and show via blob URL so re-finalize (same URL, new file) always displays new content
   useEffect(() => {
@@ -2187,7 +2190,7 @@ export function WorkflowModal({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ short_id: shortId }),
+        body: JSON.stringify({ short_id: shortId, include_subtitles: showSubtitles }),
       });
       const startData = await startRes.json().catch(() => ({}));
       const taskId = startData.task_id;
@@ -2763,6 +2766,19 @@ export function WorkflowModal({
                             </button>
                           </div>
                         </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
+                          <input
+                            type="checkbox"
+                            id="workflow-show-subtitles"
+                            checked={showSubtitles}
+                            onChange={(e) => setShowSubtitles(e.target.checked)}
+                            style={{ width: "18px", height: "18px", cursor: "pointer" }}
+                            aria-describedby="workflow-show-subtitles-desc"
+                          />
+                          <label htmlFor="workflow-show-subtitles" id="workflow-show-subtitles-desc" style={{ margin: 0, fontSize: "14px", color: "var(--p-color-text-primary, #202223)", cursor: "pointer" }}>
+                            Show subtitles in final video
+                          </label>
+                        </div>
                         {!scriptGenerated && (
                           <button
                             type="button"
@@ -3077,7 +3093,16 @@ export function WorkflowModal({
                       <p style={{ margin: 0, fontSize: "13px", color: "var(--p-color-text-subdued, #6d7175)" }}>Select background music from Storyblocks. Open the picker to search and choose a track; your selection is shown here.</p>
                       {selectedBgMusic && (selectedBgMusic.previewUrl || selectedBgMusic.name) ? (
                         <div style={{ padding: "16px", borderRadius: "10px", background: "#fff", border: "1px solid var(--p-color-border-secondary, #e1e3e5)" }}>
-                          <p style={{ margin: "0 0 8px", fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>Selected track</p>
+                          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", marginBottom: "8px" }}>
+                            <p style={{ margin: 0, fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>Selected track</p>
+                            <button
+                              type="button"
+                              onClick={() => setActivePhase("finalize")}
+                              style={{ padding: "8px 16px", borderRadius: "8px", border: "none", background: "var(--p-color-bg-fill-info, #2c6ecb)", color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: "13px", flexShrink: 0 }}
+                            >
+                              Next step →
+                            </button>
+                          </div>
                           <p style={{ margin: 0, fontSize: "14px", fontWeight: 600, color: "var(--p-color-text-primary, #202223)" }}>{selectedBgMusic.name || "Untitled"}</p>
                           {(selectedBgMusic.genre || selectedBgMusic.duration != null) && (
                             <p style={{ margin: "4px 0 0", fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)" }}>
@@ -3392,11 +3417,12 @@ async function parseCompositeApiResponse(
   return { ok: false, error: errorMessage };
 }
 
-/** Slim state persisted to temp API (server stores activeTab, showingFinal, activePhase) */
+/** Slim state persisted to temp API (server stores activeTab, showingFinal, activePhase, includeSubtitles) */
 export type WorkflowTempStateSlim = {
   activeTab: "scene1" | "scene2" | "scene3";
   showingFinal: boolean;
   activePhase: "scenes" | "audio" | "finalize";
+  includeSubtitles?: boolean;
 };
 
 /** Full workflow state shape (scene snapshots used in-memory only; temp API uses WorkflowTempStateSlim) */

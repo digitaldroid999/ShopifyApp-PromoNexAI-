@@ -12,7 +12,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (request.method !== "POST") {
     return Response.json({ error: "Method not allowed" }, { status: 405 });
   }
-  let body: { short_id?: string };
+  let body: { short_id?: string; include_subtitles?: boolean };
   try {
     body = await request.json();
   } catch {
@@ -20,7 +20,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return Response.json({ error: "Invalid JSON" }, { status: 400 });
   }
   const shortId = typeof body.short_id === "string" ? body.short_id.trim() : "";
-  console.log(`${LOG} Request body short_id=${shortId || "(missing)"}`);
+  const includeSubtitles = typeof body.include_subtitles === "boolean" ? body.include_subtitles : true;
+  console.log(`${LOG} Request body short_id=${shortId || "(missing)"} include_subtitles=${includeSubtitles}`);
   if (!shortId) {
     return Response.json({ error: "short_id is required" }, { status: 400 });
   }
@@ -57,7 +58,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     console.log(`${LOG} Failed to set status=finalizing:`, e);
   }
 
-  const result = await finalizeShortStart(userId, short.id);
+  const result = await finalizeShortStart(userId, short.id, includeSubtitles);
   if (!result.ok) {
     console.log(`${LOG} Backend error short_id=${shortId}:`, result.error);
     try {

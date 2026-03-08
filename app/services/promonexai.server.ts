@@ -888,21 +888,21 @@ export type FinalizeShortStartResult =
 /**
  * Start finalize (merge) for a short.
  * POST {BACKEND_URL}/merge/finalize
- * Body: { user_id, short_id }
+ * Body: { user_id, short_id, include_subtitles? }
  * Response: { task_id, status, short_id, user_id, message?, ... }
  * Backend must return message as a string (e.g. "Started"); if it returns a number (e.g. progress 0.1)
  * you get FinalizeShortResponse validation error.
  */
 const LOG_FINALIZE = "[finalize/start]";
 
-export async function finalizeShortStart(userId: string, shortId: string): Promise<FinalizeShortStartResult> {
+export async function finalizeShortStart(userId: string, shortId: string, includeSubtitles: boolean = true): Promise<FinalizeShortStartResult> {
   const base = process.env.BACKEND_URL;
   if (!base?.trim()) {
     console.log(`${LOG_FINALIZE} BACKEND_URL not set`);
     return { ok: false, error: "BACKEND_URL is not set in .env" };
   }
   const endpoint = `${base.replace(/\/$/, "")}/merge/finalize`;
-  const body = { user_id: userId, short_id: shortId };
+  const body = { user_id: userId, short_id: shortId, include_subtitles: includeSubtitles };
   console.log(`${LOG_FINALIZE} POST ${endpoint} body=${JSON.stringify(body)}`);
   try {
     const response = await fetch(endpoint, {
