@@ -1880,6 +1880,7 @@ export function WorkflowModal({
   const [finalizeLoading, setFinalizeLoading] = useState(false);
   const [finalizeError, setFinalizeError] = useState<string | null>(null);
   const [finalizeProgress, setFinalizeProgress] = useState<number | null>(null);
+  const [finalizeStatus, setFinalizeStatus] = useState<string | null>(null);
   /** Final video URL from merge (set after finalize completes; used when showing final view) */
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
   /** Cache-bust key for final video so re-finalize (same URL, new file) forces browser to reload */
@@ -2183,6 +2184,7 @@ export function WorkflowModal({
     setFinalizeError(null);
     setFinalizeLoading(true);
     setFinalizeProgress(0);
+    setFinalizeStatus("Starting…");
     const shortId = shortInfo.shortId;
     console.log("[Finalize] Starting short_id=", shortId);
     try {
@@ -2211,6 +2213,14 @@ export function WorkflowModal({
         const statusData = await pollRes.json().catch(() => ({}));
         const progress = typeof statusData.progress === "number" ? statusData.progress : null;
         setFinalizeProgress(progress);
+        const stepText = typeof statusData.current_step === "string" && statusData.current_step.trim()
+          ? statusData.current_step.trim()
+          : typeof statusData.message === "string" && statusData.message.trim()
+            ? statusData.message.trim()
+            : progress != null
+              ? "Merging videos…"
+              : "Starting…";
+        setFinalizeStatus(stepText);
         if (i % 6 === 0 || statusData.status === "completed" || statusData.status === "failed") {
           console.log("[Finalize] poll attempt=", i + 1, "task_id=", taskId, "status=", statusData.status, "progress=", progress);
         }
@@ -2253,6 +2263,7 @@ export function WorkflowModal({
     } finally {
       setFinalizeLoading(false);
       setFinalizeProgress(null);
+      setFinalizeStatus(null);
     }
   };
 
@@ -3204,7 +3215,7 @@ export function WorkflowModal({
                     ? "Merge again to create a new final video from the current scenes and audio."
                     : "All scenes and audio are ready. Click below to merge into the final video."}
                 </p>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "8px" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "stretch", gap: "12px", width: "100%", maxWidth: "480px" }}>
                   <button
                     type="button"
                     onClick={handleFinalize}
@@ -3218,12 +3229,46 @@ export function WorkflowModal({
                       fontWeight: 600,
                       cursor: finalizeLoading || !shortInfo?.shortId ? "not-allowed" : "pointer",
                       fontSize: "14px",
+                      alignSelf: "flex-start",
                     }}
                   >
                     {finalizeLoading ? "Merging…" : displayedFinalVideoUrl ? "Re-finalize" : "Finalize"}
                   </button>
-                  {finalizeProgress != null && (
-                    <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>{finalizeProgress}%</span>
+                  {finalizeLoading && (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      {finalizeStatus && (
+                        <p style={{ margin: 0, fontSize: "14px", color: "var(--p-color-text-primary, #202223)", fontWeight: 500 }}>
+                          {finalizeStatus}
+                        </p>
+                      )}
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "10px",
+                          borderRadius: "5px",
+                          background: "var(--p-color-bg-fill-secondary, #e1e3e5)",
+                          overflow: "hidden",
+                        }}
+                        role="progressbar"
+                        aria-valuenow={finalizeProgress ?? 0}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-label="Merge progress"
+                      >
+                        <div
+                          style={{
+                            width: `${Math.min(100, Math.max(0, finalizeProgress ?? 0))}%`,
+                            height: "100%",
+                            borderRadius: "5px",
+                            background: "var(--p-color-bg-fill-success, #008060)",
+                            transition: "width 0.3s ease",
+                          }}
+                        />
+                      </div>
+                      {finalizeProgress != null && (
+                        <span style={{ fontSize: "13px", color: "var(--p-color-text-subdued, #6d7175)" }}>{finalizeProgress}%</span>
+                      )}
+                    </div>
                   )}
                   {finalizeError && (
                     <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{finalizeError}</span>
