@@ -243,6 +243,8 @@ export async function testTestAudio(
       console.warn(`${LOG_PREFIX} [test-audio] failed status=${res.status} error=${data?.error ?? "unknown"}`);
       return { ok: false, error: data?.error ?? `HTTP ${res.status}` };
     }
+    const audioUrl = typeof data.audio_url === "string" ? data.audio_url : "";
+    console.log(`${LOG_PREFIX} [test-audio] success voice_id=${data.voice_id ?? voiceId} language=${data.language ?? language} audio_url=${audioUrl || "(empty)"} message=${data.message ?? ""}`);
     return {
       voice_id: typeof data.voice_id === "string" ? data.voice_id : voiceId,
       language: typeof data.language === "string" ? data.language : language,

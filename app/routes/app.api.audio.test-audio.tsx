@@ -25,7 +25,9 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   }
   const result = await testTestAudio(voice_id, language, user_id);
   if ("ok" in result && result.ok === false) {
+    console.warn("[app.api.audio.test-audio] error", result.error);
     return Response.json({ error: result.error }, { status: 500 });
   }
+  console.log("[app.api.audio.test-audio] success", { voice_id: result.voice_id, audio_url: result.audio_url || "(empty)" });
   return Response.json(result);
 };

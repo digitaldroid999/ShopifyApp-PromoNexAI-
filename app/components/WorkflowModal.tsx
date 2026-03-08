@@ -2692,17 +2692,16 @@ export function WorkflowModal({
                               onClick={async () => {
                                 if (!selectedVoiceId || !shortInfo?.userId) return;
                                 setTestAudioLoading(true);
+                                const requestPayload = { voice_id: selectedVoiceId, language: "en-US", user_id: shortInfo.userId };
+                                console.log("[test-audio] request", requestPayload);
                                 try {
                                   const res = await fetch(AUDIO_TEST_AUDIO_API, {
                                     method: "POST",
                                     headers: { "Content-Type": "application/json" },
-                                    body: JSON.stringify({
-                                      voice_id: selectedVoiceId,
-                                      language: "en-US",
-                                      user_id: shortInfo.userId,
-                                    }),
+                                    body: JSON.stringify(requestPayload),
                                   });
                                   const data = await res.json();
+                                  console.log("[test-audio] response", { ok: res.ok, status: res.status, data });
                                   if (!res.ok) {
                                     setPlatformAlert(data?.error ?? "Test audio failed");
                                     return;
@@ -2711,12 +2710,21 @@ export function WorkflowModal({
                                   if (audioUrl) {
                                     const base = backendUrl || audioConfigFetcher.data?.backendUrl || "";
                                     const fullUrl = base ? (base.replace(/\/$/, "") + (audioUrl.startsWith("/") ? audioUrl : `/${audioUrl}`)) : audioUrl;
+                                    console.log("[test-audio] playing", { base, audioUrl, fullUrl });
                                     const audio = new Audio(fullUrl);
+                                    audio.addEventListener("error", (e) => {
+                                      const el = e.target as HTMLAudioElement;
+                                      const msg = el?.error?.message ?? "Unknown media error";
+                                      const code = el?.error?.code;
+                                      console.error("[test-audio] media error", { code, message: msg, fullUrl });
+                                    });
                                     await audio.play();
                                   } else {
+                                    console.log("[test-audio] no audio_url", data?.message);
                                     setPlatformAlert(data?.message ?? "Unsupported language or no test audio.");
                                   }
                                 } catch (e) {
+                                  console.error("[test-audio] exception", e);
                                   setPlatformAlert(e instanceof Error ? e.message : "Test audio failed");
                                 } finally {
                                   setTestAudioLoading(false);
