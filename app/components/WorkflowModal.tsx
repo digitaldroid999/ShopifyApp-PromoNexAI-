@@ -364,7 +364,7 @@ function AIBackgroundModal({
           <h3 style={{ margin: 0, fontSize: "14px", fontWeight: 600 }}>Generate background with AI</h3>
           <button type="button" onClick={onClose} style={{ padding: "4px", border: "none", background: "transparent", cursor: "pointer", fontSize: "18px", lineHeight: 1, color: "#5c5f62" }} aria-label="Close">×</button>
         </div>
-        {/* Section 1: Manual input — user types the prompt */}
+        {/* Section 1: Manual input — user types the prompt (also filled when Generate Prompt is used in AI-written) */}
         <div
           style={{
             padding: "10px 12px",
@@ -383,12 +383,13 @@ function AIBackgroundModal({
             />
             <span>Manual input</span>
           </label>
-          <div style={{ pointerEvents: generationMode === "manual" ? "auto" : "none" }}>
+          <div>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe the background in your own words"
+              placeholder="Describe the background in your own words (or use AI-written prompt: Generate Prompt fills this too)"
               rows={2}
+              disabled={generationMode !== "manual"}
               style={{
                 width: "100%",
                 boxSizing: "border-box",
@@ -398,11 +399,12 @@ function AIBackgroundModal({
                 fontSize: "12px",
                 resize: "vertical",
                 fontFamily: "inherit",
+                ...(generationMode !== "manual" ? { background: "var(--p-color-bg-surface-secondary, #f6f6f7)", cursor: "not-allowed" } : {}),
               }}
             />
           </div>
         </div>
-        {/* Section 2: AI-written prompt — generate prompt from product + mood/style/env, then send as manual_prompt */}
+        {/* Section 2: AI-written prompt — generate prompt from product + mood/style/env (fills same prompt used by manual); then send as manual_prompt */}
         <div
           style={{
             padding: "10px 12px",
@@ -421,19 +423,13 @@ function AIBackgroundModal({
             />
             <span>AI-written prompt</span>
           </label>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: "8px",
-              pointerEvents: generationMode === "aiPrompt" ? "auto" : "none",
-            }}
-          >
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "8px" }}>
             <textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Select mood, style & environment below and click Generate Prompt, or edit the result here"
+              placeholder="Select mood, style & environment below and click Generate Prompt (also fills Manual input above)"
               rows={2}
+              disabled={generationMode !== "aiPrompt"}
               style={{
                 flex: 1,
                 minWidth: 0,
@@ -443,20 +439,21 @@ function AIBackgroundModal({
                 fontSize: "12px",
                 resize: "vertical",
                 fontFamily: "inherit",
+                ...(generationMode !== "aiPrompt" ? { background: "var(--p-color-bg-surface-secondary, #f6f6f7)", cursor: "not-allowed" } : {}),
               }}
             />
             <button
               type="button"
               onClick={handleExtractPrompt}
-              disabled={extractPromptLoading}
+              disabled={extractPromptLoading || generationMode !== "aiPrompt"}
               style={{
                 padding: "8px 14px",
                 borderRadius: "8px",
                 border: "none",
-                background: extractPromptLoading ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
+                background: extractPromptLoading || generationMode !== "aiPrompt" ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
                 color: "#fff",
                 fontWeight: 600,
-                cursor: extractPromptLoading ? "wait" : "pointer",
+                cursor: extractPromptLoading || generationMode !== "aiPrompt" ? "not-allowed" : "pointer",
                 fontSize: "12px",
                 flexShrink: 0,
               }}
@@ -3216,6 +3213,7 @@ export function WorkflowModal({
                   goPreviousWithConfirm={goPreviousWithConfirm}
                   getNextStatus={getNextStatusScene13}
                   onGoToAudio={() => setActivePhase("audio")}
+                  allScenesVideosGenerated={scene1Complete && scene2Complete && scene3Complete}
                 />
               </div>
             </div>
@@ -3767,7 +3765,15 @@ function Scene1Content({
             </button>
           )}
           {step === 3 && onGoToScene2 && (
-            <button type="button" onClick={onGoToScene2} style={navBtnPrimaryStyle}>
+            <button
+              type="button"
+              onClick={onGoToScene2}
+              disabled={!(dbSceneVideoUrl ?? sceneVideo)}
+              style={{
+                ...navBtnPrimaryStyle,
+                ...(!(dbSceneVideoUrl ?? sceneVideo) ? { background: "#9ca3af", cursor: "not-allowed" } : {}),
+              }}
+            >
               Next step →
             </button>
           )}
@@ -3800,84 +3806,54 @@ function Scene1Content({
               </button>
             ))}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "24px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {(() => {
                 const selectedImg = productImagesProp.find((i) => i.id === selectedImage);
                 return selectedImg ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <>
                     <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>Original</span>
                     <img src={selectedImg.src} alt="Selected" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
-                  </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveBg}
+                      disabled={bgRemovedLoading}
+                      style={{
+                        padding: "10px 20px",
+                        borderRadius: "8px",
+                        border: "none",
+                        background: "var(--p-color-bg-fill-info, #2c6ecb)",
+                        color: "#fff",
+                        fontWeight: 600,
+                        cursor: bgRemovedLoading ? "wait" : "pointer",
+                        alignSelf: "flex-start",
+                      }}
+                    >
+                      {bgRemovedLoading ? "Removing…" : "Remove BG"}
+                    </button>
+                    {bgRemovedError && (
+                      <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{bgRemovedError}</span>
+                    )}
+                  </>
                 ) : null;
               })()}
-              {(bgRemoved || skipRemoveBg) && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "flex-start" }}>
-                  <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>BG removed</span>
-                  {bgRemoved ? (
-                    <img key={bgRemoved} src={normalizeMediaUrl(bgRemoved)} alt="BG removed" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
-                  ) : skipRemoveBg ? (
-                    <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Using image as-is</span>
-                  ) : null}
-                  <button
-                    type="button"
-                    disabled={!bgRemoved && !skipRemoveBg}
-                    onClick={() => {
-                      const next = getNextStatus?.(sceneStatus ?? "step1");
-                      if (videoSceneId && next && updateSceneStatus) updateSceneStatus(videoSceneId, next);
-                    }}
-                    style={{
-                      ...navBtnPrimaryStyle,
-                      marginTop: "8px",
-                      ...(!(bgRemoved || skipRemoveBg) ? { background: "#9ca3af", cursor: "not-allowed" } : {}),
-                    }}
-                  >
-                    Next step →
-                  </button>
-                </div>
-              )}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-              <button
-                type="button"
-                onClick={handleRemoveBg}
-                disabled={bgRemovedLoading}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "8px",
-                  border: "none",
-                  background: "var(--p-color-bg-fill-info, #2c6ecb)",
-                  color: "#fff",
-                  fontWeight: 600,
-                  cursor: bgRemovedLoading ? "wait" : "pointer",
-                }}
-              >
-                {bgRemovedLoading ? "Removing…" : "Remove BG"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSkipRemoveBg(true);
-                  onSkipRemoveBgWarning?.();
-                  if (videoSceneId && updateSceneStatus) updateSceneStatus(videoSceneId, "step2");
-                }}
-                disabled={bgRemovedLoading}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "8px",
-                  border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                  background: "transparent",
-                  color: "var(--p-color-text-primary, #202223)",
-                  fontWeight: 600,
-                  cursor: bgRemovedLoading ? "wait" : "pointer",
-                }}
-              >
-                Skip
-              </button>
-              {bgRemovedError && (
-                <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{bgRemovedError}</span>
-              )}
-            </div>
+            {bgRemoved && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "flex-start" }}>
+                <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>BG removed</span>
+                <img key={bgRemoved} src={normalizeMediaUrl(bgRemoved)} alt="BG removed" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = getNextStatus?.(sceneStatus ?? "step1");
+                    if (videoSceneId && next && updateSceneStatus) updateSceneStatus(videoSceneId, next);
+                  }}
+                  style={{ ...navBtnPrimaryStyle, marginTop: "8px" }}
+                >
+                  Next step →
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -4412,84 +4388,54 @@ function Scene2Content({
               </button>
             ))}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "24px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {(() => {
                 const selectedImg = productImagesProp.find((i) => i.id === selectedImage);
                 return selectedImg ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <>
                     <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>Original</span>
                     <img src={selectedImg.src} alt="Selected" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
-                  </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveBg}
+                      disabled={bgRemovedLoading}
+                      style={{
+                        padding: "10px 20px",
+                        borderRadius: "8px",
+                        border: "none",
+                        background: "var(--p-color-bg-fill-info, #2c6ecb)",
+                        color: "#fff",
+                        fontWeight: 600,
+                        cursor: bgRemovedLoading ? "wait" : "pointer",
+                        alignSelf: "flex-start",
+                      }}
+                    >
+                      {bgRemovedLoading ? "Removing…" : "Remove BG"}
+                    </button>
+                    {bgRemovedError && (
+                      <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{bgRemovedError}</span>
+                    )}
+                  </>
                 ) : null;
               })()}
-              {(bgRemoved || skipRemoveBg) && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "flex-start" }}>
-                  <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>BG removed</span>
-                  {bgRemoved ? (
-                    <img key={bgRemoved} src={normalizeMediaUrl(bgRemoved)} alt="BG removed" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
-                  ) : skipRemoveBg ? (
-                    <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Using image as-is</span>
-                  ) : null}
-                  <button
-                    type="button"
-                    disabled={!bgRemoved && !skipRemoveBg}
-                    onClick={() => {
-                      const next = getNextStatus?.(sceneStatus ?? "step1");
-                      if (scene2Id && next && updateSceneStatus) updateSceneStatus(scene2Id, next);
-                    }}
-                    style={{
-                      ...navBtnPrimaryStyle,
-                      marginTop: "8px",
-                      ...(!(bgRemoved || skipRemoveBg) ? { background: "#9ca3af", cursor: "not-allowed" } : {}),
-                    }}
-                  >
-                    Next step →
-                  </button>
-                </div>
-              )}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-              <button
-                type="button"
-                onClick={handleRemoveBg}
-                disabled={bgRemovedLoading}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "8px",
-                  border: "none",
-                  background: "var(--p-color-bg-fill-info, #2c6ecb)",
-                  color: "#fff",
-                  fontWeight: 600,
-                  cursor: bgRemovedLoading ? "wait" : "pointer",
-                }}
-              >
-                {bgRemovedLoading ? "Removing…" : "Remove BG"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSkipRemoveBg(true);
-                  onSkipRemoveBgWarning?.();
-                  if (scene2Id && updateSceneStatus) updateSceneStatus(scene2Id, "step2");
-                }}
-                disabled={bgRemovedLoading}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "8px",
-                  border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                  background: "transparent",
-                  color: "var(--p-color-text-primary, #202223)",
-                  fontWeight: 600,
-                  cursor: bgRemovedLoading ? "wait" : "pointer",
-                }}
-              >
-                Skip
-              </button>
-              {bgRemovedError && (
-                <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{bgRemovedError}</span>
-              )}
-            </div>
+            {bgRemoved && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "flex-start" }}>
+                <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>BG removed</span>
+                <img key={bgRemoved} src={normalizeMediaUrl(bgRemoved)} alt="BG removed" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = getNextStatus?.(sceneStatus ?? "step1");
+                    if (scene2Id && next && updateSceneStatus) updateSceneStatus(scene2Id, next);
+                  }}
+                  style={{ ...navBtnPrimaryStyle, marginTop: "8px" }}
+                >
+                  Next step →
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -4714,6 +4660,7 @@ function Scene3Content({
   goPreviousWithConfirm,
   getNextStatus,
   onGoToAudio,
+  allScenesVideosGenerated,
 }: {
   productImages: ProductImageItem[];
   productId?: string | null;
@@ -4738,6 +4685,8 @@ function Scene3Content({
   goPreviousWithConfirm?: (sceneId: string) => void | Promise<void>;
   getNextStatus?: (current: string) => string | null;
   onGoToAudio?: () => void;
+  /** When true, the step 3 "Next step" to audio is enabled (all scene 1/2/3 videos generated). */
+  allScenesVideosGenerated?: boolean;
 }) {
   const firstId = productImagesProp[0]?.id ?? "s1";
   const stepFromStatus = scene13StatusToStep(sceneStatus);
@@ -5061,7 +5010,15 @@ function Scene3Content({
             </button>
           )}
           {step === 3 && onGoToAudio && (
-            <button type="button" onClick={onGoToAudio} style={navBtnPrimaryStyle}>
+            <button
+              type="button"
+              onClick={onGoToAudio}
+              disabled={!allScenesVideosGenerated}
+              style={{
+                ...navBtnPrimaryStyle,
+                ...(!allScenesVideosGenerated ? { background: "#9ca3af", cursor: "not-allowed" } : {}),
+              }}
+            >
               Next step →
             </button>
           )}
@@ -5094,84 +5051,54 @@ function Scene3Content({
               </button>
             ))}
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "16px", flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "flex-start", gap: "24px", flexWrap: "wrap" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
               {(() => {
                 const selectedImg = productImagesProp.find((i) => i.id === selectedImage);
                 return selectedImg ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                  <>
                     <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>Original</span>
                     <img src={selectedImg.src} alt="Selected" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
-                  </div>
+                    <button
+                      type="button"
+                      onClick={handleRemoveBg}
+                      disabled={bgRemovedLoading}
+                      style={{
+                        padding: "10px 20px",
+                        borderRadius: "8px",
+                        border: "none",
+                        background: "var(--p-color-bg-fill-info, #2c6ecb)",
+                        color: "#fff",
+                        fontWeight: 600,
+                        cursor: bgRemovedLoading ? "wait" : "pointer",
+                        alignSelf: "flex-start",
+                      }}
+                    >
+                      {bgRemovedLoading ? "Removing…" : "Remove BG"}
+                    </button>
+                    {bgRemovedError && (
+                      <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{bgRemovedError}</span>
+                    )}
+                  </>
                 ) : null;
               })()}
-              {(bgRemoved || skipRemoveBg) && (
-                <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "flex-start" }}>
-                  <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>BG removed</span>
-                  {bgRemoved ? (
-                    <img key={bgRemoved} src={normalizeMediaUrl(bgRemoved)} alt="BG removed" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
-                  ) : skipRemoveBg ? (
-                    <span style={{ fontSize: "14px", color: "var(--p-color-text-subdued, #6d7175)" }}>Using image as-is</span>
-                  ) : null}
-                  <button
-                    type="button"
-                    disabled={!bgRemoved && !skipRemoveBg}
-                    onClick={() => {
-                      const next = getNextStatus?.(sceneStatus ?? "step1");
-                      if (videoSceneId && next && updateSceneStatus) updateSceneStatus(videoSceneId, next);
-                    }}
-                    style={{
-                      ...navBtnPrimaryStyle,
-                      marginTop: "8px",
-                      ...(!(bgRemoved || skipRemoveBg) ? { background: "#9ca3af", cursor: "not-allowed" } : {}),
-                    }}
-                  >
-                    Next step →
-                  </button>
-                </div>
-              )}
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-              <button
-                type="button"
-                onClick={handleRemoveBg}
-                disabled={bgRemovedLoading}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "8px",
-                  border: "none",
-                  background: "var(--p-color-bg-fill-info, #2c6ecb)",
-                  color: "#fff",
-                  fontWeight: 600,
-                  cursor: bgRemovedLoading ? "wait" : "pointer",
-                }}
-              >
-                {bgRemovedLoading ? "Removing…" : "Remove BG"}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSkipRemoveBg(true);
-                  onSkipRemoveBgWarning?.();
-                  if (videoSceneId && updateSceneStatus) updateSceneStatus(videoSceneId, "step2");
-                }}
-                disabled={bgRemovedLoading}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: "8px",
-                  border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                  background: "transparent",
-                  color: "var(--p-color-text-primary, #202223)",
-                  fontWeight: 600,
-                  cursor: bgRemovedLoading ? "wait" : "pointer",
-                }}
-              >
-                Skip
-              </button>
-              {bgRemovedError && (
-                <span style={{ fontSize: "14px", color: "var(--p-color-text-critical, #d72c0d)" }}>{bgRemovedError}</span>
-              )}
-            </div>
+            {bgRemoved && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "flex-start" }}>
+                <span style={{ fontSize: "12px", fontWeight: 600, color: "var(--p-color-text-subdued, #6d7175)" }}>BG removed</span>
+                <img key={bgRemoved} src={normalizeMediaUrl(bgRemoved)} alt="BG removed" style={{ width: "160px", height: "auto", borderRadius: "8px", border: "1px solid #e1e3e5" }} />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = getNextStatus?.(sceneStatus ?? "step1");
+                    if (videoSceneId && next && updateSceneStatus) updateSceneStatus(videoSceneId, next);
+                  }}
+                  style={{ ...navBtnPrimaryStyle, marginTop: "8px" }}
+                >
+                  Next step →
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}
