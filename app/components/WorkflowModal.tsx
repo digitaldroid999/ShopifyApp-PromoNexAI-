@@ -1850,6 +1850,7 @@ export function WorkflowModal({
   const [scriptSaveLoading, setScriptSaveLoading] = useState(false);
   const [audioGenerateLoading, setAudioGenerateLoading] = useState(false);
   const [audioSaveLoading, setAudioSaveLoading] = useState(false);
+  const [testAudioLoading, setTestAudioLoading] = useState(false);
   const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(null);
   const [lastSubtitleTiming, setLastSubtitleTiming] = useState<Array<{ text: string; start_time: number; end_time: number; duration: number }> | null>(null);
   const [scriptSavedFeedback, setScriptSavedFeedback] = useState(false);
@@ -1987,11 +1988,15 @@ export function WorkflowModal({
         credentials: "include",
         body: JSON.stringify({ sceneId: pending.sceneId, goPrevious: true }),
       });
-      if (res.ok) refetchShort();
+      if (res.ok && productId?.trim()) {
+        loadShortFetcher.load(`${SHORTS_API}?productId=${encodeURIComponent(productId.trim())}&_=${Date.now()}`);
+      } else if (res.ok) {
+        refetchShort();
+      }
     } catch {
       refetchShort();
     }
-  }, [confirmGoPrevious, refetchShort]);
+  }, [confirmGoPrevious, refetchShort, productId, loadShortFetcher]);
 
   // Reset ensure-short ref when productId changes (e.g. open modal for different product)
   useEffect(() => {
@@ -2658,26 +2663,94 @@ export function WorkflowModal({
                       <div style={{ display: "flex", alignItems: "flex-end", gap: "16px", flexWrap: "wrap", width: "100%" }}>
                         <div style={{ flex: "1 1 200px", minWidth: 0 }}>
                           <label style={{ display: "block", marginBottom: "4px", fontSize: "12px", color: "var(--p-color-text-subdued, #6d7175)", fontWeight: 600 }}>Voice</label>
-                          <select
-                            value={selectedVoiceId}
-                            onChange={(e) => setSelectedVoiceId(e.target.value)}
-                            disabled={!voicesFetcher.data?.success}
-                            style={{
-                              width: "100%",
-                              padding: "10px 12px",
-                              borderRadius: "8px",
-                              border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                              fontSize: "14px",
-                              background: "#fff",
-                              boxSizing: "border-box",
-                            }}
-                          >
-                            {voicesFetcher.state === "loading" && <option value="">Loading voices…</option>}
-                            {voicesFetcher.data?.success && voicesFetcher.data.voices.length === 0 && <option value="">No voices (check ELEVENLABS_API_KEY)</option>}
-                            {voicesFetcher.data?.success && voicesFetcher.data.voices.map((v) => (
-                              <option key={v.voice_id} value={v.voice_id}>{v.name}</option>
-                            ))}
-                          </select>
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <select
+                              value={selectedVoiceId}
+                              onChange={(e) => setSelectedVoiceId(e.target.value)}
+                              disabled={!voicesFetcher.data?.success}
+                              style={{
+                                flex: 1,
+                                minWidth: 0,
+                                padding: "10px 12px",
+                                borderRadius: "8px",
+                                border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                                fontSize: "14px",
+                                background: "#fff",
+                                boxSizing: "border-box",
+                              }}
+                            >
+                              {voicesFetcher.state === "loading" && <option value="">Loading voices…</option>}
+                              {voicesFetcher.data?.success && voicesFetcher.data.voices.length === 0 && <option value="">No voices (check ELEVENLABS_API_KEY)</option>}
+                              {voicesFetcher.data?.success && voicesFetcher.data.voices.map((v) => (
+                                <option key={v.voice_id} value={v.voice_id}>{v.name}</option>
+                              ))}
+                            </select>
+                            <button
+                              type="button"
+                              title="Test voice"
+                              disabled={!selectedVoiceId || !shortInfo?.userId || testAudioLoading}
+                              onClick={async () => {
+                                if (!selectedVoiceId || !shortInfo?.userId) return;
+                                setTestAudioLoading(true);
+                                try {
+                                  const res = await fetch(AUDIO_TEST_AUDIO_API, {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({
+                                      voice_id: selectedVoiceId,
+                                      language: "en-US",
+                                      user_id: shortInfo.userId,
+                                    }),
+                                  });
+                                  const data = await res.json();
+                                  if (!res.ok) {
+                                    setPlatformAlert(data?.error ?? "Test audio failed");
+                                    return;
+                                  }
+                                  const audioUrl = typeof data.audio_url === "string" ? data.audio_url.trim() : "";
+                                  if (audioUrl) {
+                                    const base = backendUrl || audioConfigFetcher.data?.backendUrl || "";
+                                    const fullUrl = base ? (base.replace(/\/$/, "") + (audioUrl.startsWith("/") ? audioUrl : `/${audioUrl}`)) : audioUrl;
+                                    const audio = new Audio(fullUrl);
+                                    await audio.play();
+                                  } else {
+                                    setPlatformAlert(data?.message ?? "Unsupported language or no test audio.");
+                                  }
+                                } catch (e) {
+                                  setPlatformAlert(e instanceof Error ? e.message : "Test audio failed");
+                                } finally {
+                                  setTestAudioLoading(false);
+                                }
+                              }}
+                              style={{
+                                padding: "8px",
+                                borderRadius: "8px",
+                                border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                                background: testAudioLoading || !selectedVoiceId ? "#f1f2f4" : "#fff",
+                                color: "var(--p-color-text-primary, #202223)",
+                                cursor: testAudioLoading || !selectedVoiceId ? "not-allowed" : "pointer",
+                                display: "flex",
+                                alignItems: "center",
+                                justifyContent: "center",
+                              }}
+                              aria-label="Test voice"
+                            >
+                              {testAudioLoading ? (
+                                <>
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ animation: "spin 0.8s linear infinite" }}>
+                                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                                  </svg>
+                                  <span style={{ fontSize: "12px", marginLeft: "6px", whiteSpace: "nowrap" }}>Loading…</span>
+                                </>
+                              ) : (
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                  <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                                  <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                                  <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                                </svg>
+                              )}
+                            </button>
+                          </div>
                         </div>
                         {!scriptGenerated && (
                           <button
@@ -2839,51 +2912,7 @@ export function WorkflowModal({
                           </div>
                           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "10px", flex: "1 1 260px", minWidth: "200px" }}>
                             {!audioGenerated ? (
-                              <button
-                                type="button"
-                                disabled={!shortInfo?.shortId || !shortInfo?.userId || !selectedVoiceId || !audioScript.trim() || audioGenerateLoading}
-                                onClick={async () => {
-                                  if (!shortInfo?.shortId || !shortInfo?.userId || !selectedVoiceId || !audioScript.trim()) return;
-                                  setAudioGenerateLoading(true);
-                                  try {
-                                    const res = await fetch(AUDIO_GENERATE_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ voice_id: selectedVoiceId, user_id: shortInfo.userId, short_id: shortInfo.shortId, script: audioScript.trim() }) });
-                                    const data = await res.json();
-                                    if (data.audio_url) {
-                                      setGeneratedAudioUrl(data.audio_url);
-                                      setLastSubtitleTiming(Array.isArray(data.subtitle_timing) ? data.subtitle_timing : null);
-                                      try {
-                                        const saveRes = await fetch(AUDIO_SAVE_API, {
-                                          method: "POST",
-                                          headers: { "Content-Type": "application/json" },
-                                          body: JSON.stringify({
-                                            short_id: shortInfo.shortId,
-                                            generated_audio_url: data.audio_url,
-                                            subtitles: Array.isArray(data.subtitle_timing) ? data.subtitle_timing : undefined,
-                                            voice_id: selectedVoiceId || undefined,
-                                            voice_name: voicesFetcher.data?.success ? voicesFetcher.data.voices.find((v) => v.voice_id === selectedVoiceId)?.name : undefined,
-                                          }),
-                                        });
-                                        const saveData = await saveRes.json();
-                                        if (saveData.success) { setAudioSavedFeedback(true); setTimeout(() => setAudioSavedFeedback(false), 2000); refetchShort(); }
-                                      } catch {
-                                        // non-blocking
-                                      }
-                                    } else {
-                                      setPlatformAlert(data.error || "Failed to generate audio");
-                                    }
-                                  } finally { setAudioGenerateLoading(false); }
-                                }}
-                                style={{ padding: "12px 24px", borderRadius: "8px", border: "none", background: audioGenerateLoading || !audioScript.trim() ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)", color: "#fff", fontWeight: 600, cursor: audioGenerateLoading || !audioScript.trim() ? "not-allowed" : "pointer", fontSize: "14px" }}
-                              >
-                                {audioGenerateLoading ? "Generating audio…" : "Generate audio"}
-                              </button>
-                            ) : (
-                              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "12px" }}>
-                                <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-                                  <audio src={(shortInfo?.audioInfo?.generatedAudioUrl ?? generatedAudioUrl) || undefined} controls style={{ maxWidth: "100%", minWidth: "200px" }} />
-                                  <span style={{ fontSize: "14px", color: "var(--p-color-text-success, #008060)", fontWeight: 600 }}>✓ Audio ready</span>
-                                  {audioSavedFeedback && <span style={{ fontSize: "13px", color: "var(--p-color-text-success, #008060)" }}>Saved</span>}
-                                </div>
+                              <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
                                 <button
                                   type="button"
                                   disabled={!shortInfo?.shortId || !shortInfo?.userId || !selectedVoiceId || !audioScript.trim() || audioGenerateLoading}
@@ -2914,37 +2943,81 @@ export function WorkflowModal({
                                           // non-blocking
                                         }
                                       } else {
-                                        setPlatformAlert(data.error || "Failed to regenerate audio");
+                                        setPlatformAlert(data.error || "Failed to generate audio");
                                       }
                                     } finally { setAudioGenerateLoading(false); }
                                   }}
-                                  style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid var(--p-color-border-secondary, #e1e3e5)", background: "#fff", color: "var(--p-color-text-primary, #202223)", fontWeight: 600, cursor: audioGenerateLoading || !audioScript.trim() ? "not-allowed" : "pointer", fontSize: "13px" }}
+                                  style={{ padding: "12px 24px", borderRadius: "8px", border: "none", background: audioGenerateLoading || !audioScript.trim() ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)", color: "#fff", fontWeight: 600, cursor: audioGenerateLoading || !audioScript.trim() ? "not-allowed" : "pointer", fontSize: "14px" }}
                                 >
-                                  {audioGenerateLoading ? "Regenerating audio…" : "Regenerate audio"}
+                                  {audioGenerateLoading ? "Generating audio…" : "Generate audio"}
                                 </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setAudioStepTab("bgMusic")}
+                                  style={{ padding: "10px 20px", borderRadius: "8px", border: "none", background: "var(--p-color-bg-fill-info, #2c6ecb)", color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: "14px" }}
+                                >
+                                  Next step →
+                                </button>
+                              </div>
+                            ) : (
+                              <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: "12px" }}>
+                                <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                                  <audio src={(shortInfo?.audioInfo?.generatedAudioUrl ?? generatedAudioUrl) || undefined} controls style={{ maxWidth: "100%", minWidth: "200px" }} />
+                                  <span style={{ fontSize: "14px", color: "var(--p-color-text-success, #008060)", fontWeight: 600 }}>✓ Audio ready</span>
+                                  {audioSavedFeedback && <span style={{ fontSize: "13px", color: "var(--p-color-text-success, #008060)" }}>Saved</span>}
+                                </div>
+                                <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                                  <button
+                                    type="button"
+                                    disabled={!shortInfo?.shortId || !shortInfo?.userId || !selectedVoiceId || !audioScript.trim() || audioGenerateLoading}
+                                    onClick={async () => {
+                                      if (!shortInfo?.shortId || !shortInfo?.userId || !selectedVoiceId || !audioScript.trim()) return;
+                                      setAudioGenerateLoading(true);
+                                      try {
+                                        const res = await fetch(AUDIO_GENERATE_API, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ voice_id: selectedVoiceId, user_id: shortInfo.userId, short_id: shortInfo.shortId, script: audioScript.trim() }) });
+                                        const data = await res.json();
+                                        if (data.audio_url) {
+                                          setGeneratedAudioUrl(data.audio_url);
+                                          setLastSubtitleTiming(Array.isArray(data.subtitle_timing) ? data.subtitle_timing : null);
+                                          try {
+                                            const saveRes = await fetch(AUDIO_SAVE_API, {
+                                              method: "POST",
+                                              headers: { "Content-Type": "application/json" },
+                                              body: JSON.stringify({
+                                                short_id: shortInfo.shortId,
+                                                generated_audio_url: data.audio_url,
+                                                subtitles: Array.isArray(data.subtitle_timing) ? data.subtitle_timing : undefined,
+                                                voice_id: selectedVoiceId || undefined,
+                                                voice_name: voicesFetcher.data?.success ? voicesFetcher.data.voices.find((v) => v.voice_id === selectedVoiceId)?.name : undefined,
+                                              }),
+                                            });
+                                            const saveData = await saveRes.json();
+                                            if (saveData.success) { setAudioSavedFeedback(true); setTimeout(() => setAudioSavedFeedback(false), 2000); refetchShort(); }
+                                          } catch {
+                                            // non-blocking
+                                          }
+                                        } else {
+                                          setPlatformAlert(data.error || "Failed to regenerate audio");
+                                        }
+                                      } finally { setAudioGenerateLoading(false); }
+                                    }}
+                                    style={{ padding: "8px 16px", borderRadius: "8px", border: "1px solid var(--p-color-border-secondary, #e1e3e5)", background: "#fff", color: "var(--p-color-text-primary, #202223)", fontWeight: 600, cursor: audioGenerateLoading || !audioScript.trim() ? "not-allowed" : "pointer", fontSize: "13px" }}
+                                  >
+                                    {audioGenerateLoading ? "Regenerating audio…" : "Regenerate audio"}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setAudioStepTab("bgMusic")}
+                                    style={{ padding: "10px 20px", borderRadius: "8px", border: "none", background: "var(--p-color-bg-fill-info, #2c6ecb)", color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: "14px" }}
+                                  >
+                                    Next step →
+                                  </button>
+                                </div>
                               </div>
                             )}
                           </div>
                         </div>
                       )}
-                      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "8px" }}>
-                        <button
-                          type="button"
-                          onClick={() => setAudioStepTab("bgMusic")}
-                          style={{
-                            padding: "10px 20px",
-                            borderRadius: "8px",
-                            border: "none",
-                            background: "var(--p-color-bg-fill-info, #2c6ecb)",
-                            color: "#fff",
-                            fontWeight: 600,
-                            cursor: "pointer",
-                            fontSize: "14px",
-                          }}
-                        >
-                          Next step →
-                        </button>
-                      </div>
                     </div>
                   )}
                   {audioStepTab === "bgMusic" && (
@@ -3250,6 +3323,7 @@ const AUDIO_SAVE_SCRIPT_API = "/app/api/audio/save-script";
 const AUDIO_SAVE_API = "/app/api/audio/save";
 const AUDIO_CLEAR_GENERATED_API = "/app/api/audio/clear-generated";
 const AUDIO_CONFIG_API = "/app/api/audio/config";
+const AUDIO_TEST_AUDIO_API = "/app/api/audio/test-audio";
 const STORYBLOCKS_MUSIC_API = "/app/api/storyblocks/music";
 const LOCAL_MUSIC_API = "/app/api/music/local";
 const SHORTS_SAVE_BG_MUSIC_API = "/app/api/shorts/save-bg-music";
@@ -4150,11 +4224,7 @@ function Scene2Content({
   onGoToScene3?: () => void;
 }) {
   const firstId = productImagesProp[0]?.id ?? "s1";
-  const stepFromStatus = scene2StatusToStep(sceneStatus);
-  const [step, setStep] = useState(stepFromStatus);
-  useEffect(() => {
-    setStep(scene2StatusToStep(sceneStatus));
-  }, [sceneStatus]);
+  const step = scene2StatusToStep(sceneStatus);
   const [selectedImage, setSelectedImage] = useState<string | null>(initialScene2?.selectedImage ?? firstId);
   const [bgRemoved, setBgRemoved] = useState<string | null>(initialScene2?.bgRemoved ?? null);
   const [skipRemoveBg, setSkipRemoveBg] = useState(initialScene2?.skipRemoveBg ?? false);
@@ -4174,9 +4244,6 @@ function Scene2Content({
   useEffect(() => {
     setSelectedStockVideoDownloadUrl(videoDownloadUrlFromDb ?? null);
   }, [videoDownloadUrlFromDb]);
-  useEffect(() => {
-    if (videoUrlFromDb && stepFromStatus === 1) setStep(2);
-  }, [videoUrlFromDb, stepFromStatus]);
   const [sceneVideo, setSceneVideo] = useState<string | null>(initialScene2?.sceneVideo ?? null);
   const [sceneLoading, setSceneLoading] = useState(false);
   const [sceneError, setSceneError] = useState<string | null>(null);

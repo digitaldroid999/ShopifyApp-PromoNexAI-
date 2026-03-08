@@ -198,3 +198,64 @@ export async function generateAudio(
     return { ok: false, error: message };
   }
 }
+
+/** Backend: test audio for a voice. POST {BACKEND_URL}/audio/test-audio. Returns 200 with audio_url (or empty if language unsupported). */
+export async function testTestAudio(
+  voiceId: string,
+  language: string,
+  userId: string
+): Promise<{
+  voice_id: string;
+  language: string;
+  audio_url: string;
+  user_id: string;
+  created_at?: string;
+  is_cached?: boolean;
+  message?: string;
+  test_text?: string;
+} | { ok: false; error: string }> {
+  const base = getBackendBase();
+  const endpoint = `${base}/audio/test-audio`;
+  console.log(`${LOG_PREFIX} [test-audio] request voice_id=${voiceId} language=${language} user_id=${userId} -> ${endpoint}`);
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        voice_id: voiceId,
+        language: language,
+        user_id: userId,
+      }),
+      signal: AbortSignal.timeout(30000),
+    });
+    const data = (await res.json()) as {
+      voice_id?: string;
+      language?: string;
+      audio_url?: string;
+      user_id?: string;
+      created_at?: string;
+      is_cached?: boolean;
+      message?: string;
+      test_text?: string;
+      error?: string;
+    };
+    if (!res.ok) {
+      console.warn(`${LOG_PREFIX} [test-audio] failed status=${res.status} error=${data?.error ?? "unknown"}`);
+      return { ok: false, error: data?.error ?? `HTTP ${res.status}` };
+    }
+    return {
+      voice_id: typeof data.voice_id === "string" ? data.voice_id : voiceId,
+      language: typeof data.language === "string" ? data.language : language,
+      audio_url: typeof data.audio_url === "string" ? data.audio_url : "",
+      user_id: typeof data.user_id === "string" ? data.user_id : userId,
+      created_at: data.created_at,
+      is_cached: data.is_cached,
+      message: data.message,
+      test_text: data.test_text,
+    };
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    console.error(`${LOG_PREFIX} [test-audio] error:`, message);
+    return { ok: false, error: message };
+  }
+}
