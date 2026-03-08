@@ -1205,9 +1205,6 @@ function StoryblocksMusicModal({
                       transition: "border-color 0.15s, background 0.15s",
                     }}
                   >
-                    <div style={{ width: "100%", aspectRatio: "1", borderRadius: "8px", background: "var(--p-color-bg-surface-secondary, #e1e3e5)", marginBottom: "8px", overflow: "hidden" }}>
-                      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#6d7175", fontSize: "24px" }}>♪</div>
-                    </div>
                     <p style={{ margin: 0, fontSize: "13px", fontWeight: 600, color: "var(--p-color-text-primary, #202223)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={track.title}>
                       {track.title}
                     </p>
@@ -1254,13 +1251,6 @@ function StoryblocksMusicModal({
                       transition: "border-color 0.15s, background 0.15s",
                     }}
                   >
-                    <div style={{ width: "100%", aspectRatio: "1", borderRadius: "8px", background: "var(--p-color-bg-surface-secondary, #e1e3e5)", marginBottom: "8px", overflow: "hidden" }}>
-                      {track.thumbnail_url ? (
-                        <img src={track.thumbnail_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      ) : (
-                        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#6d7175", fontSize: "24px" }}>♪</div>
-                      )}
-                    </div>
                     <p style={{ margin: 0, fontSize: "13px", fontWeight: 600, color: "var(--p-color-text-primary, #202223)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={track.title}>
                       {track.title}
                     </p>
@@ -3186,6 +3176,7 @@ export function WorkflowModal({
                   updateSceneFetchedMedia={updateSceneFetchedMedia}
                   goPreviousWithConfirm={goPreviousWithConfirm}
                   getNextStatus={getNextStatusScene2}
+                  onGoToScene3={() => setActiveTab("scene3")}
                 />
               </div>
               <div style={{ display: activeTab === "scene3" ? "block" : "none" }} key={`scene3-${scene3ResetKey}`}>
@@ -4138,6 +4129,7 @@ function Scene2Content({
   updateSceneFetchedMedia,
   goPreviousWithConfirm,
   getNextStatus,
+  onGoToScene3,
 }: {
   productImages: ProductImageItem[];
   sceneId?: string | null;
@@ -4155,6 +4147,7 @@ function Scene2Content({
   updateSceneFetchedMedia?: (sceneId: string, media: FetchedMediaSnapshot) => void | Promise<void>;
   goPreviousWithConfirm?: (sceneId: string) => void | Promise<void>;
   getNextStatus?: (current: string) => string | null;
+  onGoToScene3?: () => void;
 }) {
   const firstId = productImagesProp[0]?.id ?? "s1";
   const stepFromStatus = scene2StatusToStep(sceneStatus);
@@ -4549,38 +4542,58 @@ function Scene2Content({
                   )}
                 </div>
               ) : (
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                  <button
-                    type="button"
-                    onClick={handleGenerateVideo}
-                    disabled={!selectedStockVideoUrl || !effectiveOverlayUrl || !scene2Id || !shortUserId || sceneLoading}
-                    style={{
-                      padding: "10px 20px",
-                      borderRadius: "8px",
-                      border: "none",
-                      background: !selectedStockVideoUrl || !effectiveOverlayUrl || !scene2Id || !shortUserId ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
-                      color: "#fff",
-                      fontWeight: 600,
-                      cursor: !selectedStockVideoUrl || !effectiveOverlayUrl || !scene2Id ? "not-allowed" : "pointer",
-                    }}
-                  >
-                    {(dbSceneVideoUrl ?? sceneVideo) ? "Generate video again" : "Generate video"}
-                  </button>
-                  {(dbSceneVideoUrl ?? sceneVideo) && onRegenerate && (
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", flexWrap: "wrap", width: "100%" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                     <button
                       type="button"
-                      onClick={onRegenerate}
+                      onClick={handleGenerateVideo}
+                      disabled={!selectedStockVideoUrl || !effectiveOverlayUrl || !scene2Id || !shortUserId || sceneLoading}
                       style={{
                         padding: "10px 20px",
                         borderRadius: "8px",
-                        border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
-                        background: "transparent",
-                        cursor: "pointer",
-                        fontSize: "14px",
+                        border: "none",
+                        background: !selectedStockVideoUrl || !effectiveOverlayUrl || !scene2Id || !shortUserId ? "#9ca3af" : "var(--p-color-bg-fill-info, #2c6ecb)",
+                        color: "#fff",
                         fontWeight: 600,
+                        cursor: !selectedStockVideoUrl || !effectiveOverlayUrl || !scene2Id ? "not-allowed" : "pointer",
                       }}
                     >
-                      Start from scratch
+                      {(dbSceneVideoUrl ?? sceneVideo) ? "Generate video again" : "Generate video"}
+                    </button>
+                    {(dbSceneVideoUrl ?? sceneVideo) && onRegenerate && (
+                      <button
+                        type="button"
+                        onClick={onRegenerate}
+                        style={{
+                          padding: "10px 20px",
+                          borderRadius: "8px",
+                          border: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+                          background: "transparent",
+                          cursor: "pointer",
+                          fontSize: "14px",
+                          fontWeight: 600,
+                        }}
+                      >
+                        Start from scratch
+                      </button>
+                    )}
+                  </div>
+                  {(dbSceneVideoUrl ?? sceneVideo) && onGoToScene3 && (
+                    <button
+                      type="button"
+                      onClick={onGoToScene3}
+                      style={{
+                        padding: "10px 20px",
+                        borderRadius: "8px",
+                        border: "none",
+                        background: "var(--p-color-bg-fill-info, #2c6ecb)",
+                        color: "#fff",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        fontSize: "14px",
+                      }}
+                    >
+                      Next step →
                     </button>
                   )}
                 </div>
