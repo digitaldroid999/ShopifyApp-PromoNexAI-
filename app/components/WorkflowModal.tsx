@@ -2708,9 +2708,12 @@ export function WorkflowModal({
                                   }
                                   const audioUrl = typeof data.audio_url === "string" ? data.audio_url.trim() : "";
                                   if (audioUrl) {
-                                    const base = backendUrl || audioConfigFetcher.data?.backendUrl || "";
-                                    const fullUrl = base ? (base.replace(/\/$/, "") + (audioUrl.startsWith("/") ? audioUrl : `/${audioUrl}`)) : audioUrl;
-                                    console.log("[test-audio] playing", { base, audioUrl, fullUrl });
+                                    // Paths like /generated_audio/... are served from this app's public folder — use same origin
+                                    const fullUrl = audioUrl.startsWith("/") ? audioUrl : (() => {
+                                      const base = backendUrl || audioConfigFetcher.data?.backendUrl || "";
+                                      return base ? base.replace(/\/$/, "") + (audioUrl.startsWith("/") ? audioUrl : `/${audioUrl}`) : audioUrl;
+                                    })();
+                                    console.log("[test-audio] playing", { audioUrl, fullUrl });
                                     const audio = new Audio(fullUrl);
                                     audio.addEventListener("error", (e) => {
                                       const el = e.target as HTMLAudioElement;
