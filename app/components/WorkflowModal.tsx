@@ -2437,6 +2437,32 @@ export function WorkflowModal({
                 <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", justifyContent: "center" }}>
                   <button
                     type="button"
+                    onClick={() => {
+                      const url = finalVideoBlobUrl ?? (displayedFinalVideoUrl ? `${displayedFinalVideoUrl}${displayedFinalVideoUrl.includes("?") ? "&" : "?"}t=${finalVideoCacheBust}` : null);
+                      if (!url) return;
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = "promo-video.mp4";
+                      a.rel = "noopener noreferrer";
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                    }}
+                    style={{
+                      padding: "10px 20px",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: "var(--p-color-bg-fill-success, #008060)",
+                      cursor: "pointer",
+                      fontSize: "14px",
+                      fontWeight: 600,
+                      color: "#fff",
+                    }}
+                  >
+                    Download
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => { setShowingFinal(false); setActiveTab("scene1"); setActivePhase("scenes"); }}
                     style={{
                       padding: "10px 20px",

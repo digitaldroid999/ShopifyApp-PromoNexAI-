@@ -4,14 +4,14 @@
  */
 
 export type LegalTableSection = {
-  type: "table";
-  headers: string[];
-  rows: string[][];
+  readonly type: "table";
+  readonly headers: readonly string[];
+  readonly rows: readonly (readonly string[])[];
 };
 
 export type LegalTextSection = {
-  type: "text";
-  content: string;
+  readonly type: "text";
+  readonly content: string;
 };
 
 export type LegalSection = LegalTextSection | LegalTableSection;
@@ -19,11 +19,11 @@ export type LegalSection = LegalTextSection | LegalTableSection;
 /** Document with optional plain content or sections (for Privacy Policy with tables) */
 export type LegalDocument =
   | { title: string; content: string }
-  | { title: string; sections: LegalSection[] };
+  | { title: string; sections: readonly LegalSection[] };
 
 export function isDocumentWithSections(
   doc: LegalDocument
-): doc is { title: string; sections: LegalSection[] } {
+): doc is { title: string; sections: readonly LegalSection[] } {
   return "sections" in doc && Array.isArray(doc.sections);
 }
 
@@ -429,4 +429,4 @@ This Data Processing Agreement is incorporated into and forms part of the Terms 
       },
     ],
   },
-} as const;
+} satisfies Record<"terms" | "privacy" | "dataProcessing", LegalDocument>;
