@@ -58,8 +58,8 @@ type GraphQLAdmin = {
 };
 
 const APP_SUBSCRIPTION_CREATE = `#graphql
-mutation AppSubscriptionCreate($name: String!, $lineItems: [AppSubscriptionLineItemInput!]!, $returnUrl: URL!, $test: Boolean) {
-  appSubscriptionCreate(name: $name, returnUrl: $returnUrl, lineItems: $lineItems, test: $test) {
+mutation AppSubscriptionCreate($name: String!, $lineItems: [AppSubscriptionLineItemInput!]!, $returnUrl: URL!, $test: Boolean, $replacementBehavior: AppSubscriptionReplacementBehavior) {
+  appSubscriptionCreate(name: $name, returnUrl: $returnUrl, lineItems: $lineItems, test: $test, replacementBehavior: $replacementBehavior) {
     userErrors { field message }
     confirmationUrl
     appSubscription { id }
@@ -148,11 +148,14 @@ export async function createSubscription(params: {
 
   const name = `PromoNexAI - ${keyToLabel(planKey)}`;
 
+  // APPLY_ON_NEXT_BILLING_CYCLE: existing subscription stays active until the new one is approved and next cycle starts.
+  // If the merchant cancels the approval, they keep their current plan instead of losing it (STANDARD cancels immediately).
   const res = await admin.graphql(APP_SUBSCRIPTION_CREATE, {
     variables: {
       name,
       returnUrl,
       lineItems,
+      replacementBehavior: "APPLY_ON_NEXT_BILLING_CYCLE",
       ...(test ? { test: true } : {}),
     },
   });
