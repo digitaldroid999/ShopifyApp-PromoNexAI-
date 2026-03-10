@@ -8,6 +8,7 @@ import { useFetcher, useLoaderData, useRevalidator, useSearchParams } from "reac
 import { Link } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
+import { getCredits } from "../lib/credits.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import prisma from "../db.server";
 
@@ -95,6 +96,13 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   let recentShorts: { id: string; title: string; productId: string | null; status: string; finalVideoUrl: string | null; updatedAt: Date; thumbnailUrl: string | null }[] = [];
   let productIdToShortStatus: Record<string, string> = {};
 
+  let trialEnded = false;
+  let hasActiveSubscription = false;
+  if (shop) {
+    const credits = await getCredits(shop);
+    trialEnded = credits.trialEnded;
+    hasActiveSubscription = credits.hasActiveSubscription;
+  }
   if (shop) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const shortDelegate = (prisma as any).short;
@@ -160,6 +168,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     stats,
     recentShorts,
     productIdToShortStatus,
+    trialEnded,
+    hasActiveSubscription,
   };
 };
 
@@ -322,7 +332,8 @@ export default function Index() {
   const fetcher = useFetcher<typeof action>();
   const loadMoreFetcher = useFetcher<{ products: ProductNode[]; pageInfo: { hasNextPage: boolean; endCursor: string | null } }>();
   const revalidator = useRevalidator();
-  const { products: loaderProducts, pageInfo: loaderPageInfo, stats, recentShorts, productIdToShortStatus } = useLoaderData<typeof loader>();
+  const { products: loaderProducts, pageInfo: loaderPageInfo, stats, recentShorts, productIdToShortStatus, trialEnded, hasActiveSubscription } = useLoaderData<typeof loader>();
+  const trialEndedNoPlan = trialEnded && !hasActiveSubscription;
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<ProductNode[]>(loaderProducts as ProductNode[]);
   const [pageInfo, setPageInfo] = useState(loaderPageInfo);
@@ -811,9 +822,15 @@ export default function Index() {
                       )}
                       <div style={{ marginTop: "12px" }}>
                         <s-stack direction="inline" gap="base">
-                          <Link to={`/app/products/${productIdSegment}`}>
-                            <s-button variant="primary">Generate video</s-button>
-                          </Link>
+                          {trialEndedNoPlan ? (
+                            <Link to="/app/subscription">
+                              <s-button variant="primary">Subscribe to create videos</s-button>
+                            </Link>
+                          ) : (
+                            <Link to={`/app/products/${productIdSegment}`}>
+                              <s-button variant="primary">Generate video</s-button>
+                            </Link>
+                          )}
                           {product.id !== "sample" && (
                             <s-button
                               variant="tertiary"

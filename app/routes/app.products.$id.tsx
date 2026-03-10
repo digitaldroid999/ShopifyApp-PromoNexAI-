@@ -93,6 +93,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
       isSample: true,
       isPremiumMusic: false,
       isPremiumVoices: false,
+      trialEnded: false,
+      hasActiveSubscription: false,
     };
   }
 
@@ -111,6 +113,8 @@ export const loader = async ({ request, params }: LoaderFunctionArgs) => {
     isSample: false,
     isPremiumMusic: credits?.isPremiumMusic ?? false,
     isPremiumVoices: credits?.isPremiumVoices ?? false,
+    trialEnded: credits?.trialEnded ?? false,
+    hasActiveSubscription: credits?.hasActiveSubscription ?? false,
   };
 };
 
@@ -119,7 +123,8 @@ const SHORTS_API = "/app/api/shorts";
 const SHORTS_RESET_API = "/app/api/shorts/reset";
 
 export default function ProductDetail() {
-  const { product, isSample, isPremiumMusic, isPremiumVoices } = useLoaderData<typeof loader>();
+  const { product, isSample, isPremiumMusic, isPremiumVoices, trialEnded, hasActiveSubscription } = useLoaderData<typeof loader>();
+  const trialEndedNoPlan = trialEnded && !hasActiveSubscription;
   const [workflowOpen, setWorkflowOpen] = useState(false);
   const [productVideoUrl, setProductVideoUrl] = useState<string | null>(null);
   const shortsFetcher = useFetcher<{ shortId?: string | null; finalVideoUrl?: string | null; status?: string | null }>();
@@ -401,6 +406,7 @@ export default function ProductDetail() {
           }}
           isPremiumMusic={isPremiumMusic}
           isPremiumVoices={isPremiumVoices}
+          trialEndedNoPlan={trialEndedNoPlan}
         />
       )}
     </>

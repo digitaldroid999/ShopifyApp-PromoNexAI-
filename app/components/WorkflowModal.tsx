@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useFetcher } from "react-router";
+import { Link, useFetcher } from "react-router";
 import { useAppBridge } from "@shopify/app-bridge-react";
 
 const BASE = "/mockup";
@@ -1781,6 +1781,7 @@ export function WorkflowModal({
   openAsEdit = false,
   isPremiumMusic = false,
   isPremiumVoices = false,
+  trialEndedNoPlan = false,
 }: {
   onClose: () => void;
   /** Called when user clicks Done after viewing the final video; pass the final video URL to add to product */
@@ -1798,6 +1799,8 @@ export function WorkflowModal({
   isPremiumMusic?: boolean;
   /** Whether the shop has Premium Voices add-on (50 voices). */
   isPremiumVoices?: boolean;
+  /** When true, trial ended and no paid plan: show blocker only, no workflow actions. */
+  trialEndedNoPlan?: boolean;
 }) {
   const shopify = useAppBridge();
   const productImages = productImagesProp?.length ? productImagesProp : defaultProductImages;
@@ -2365,6 +2368,84 @@ export function WorkflowModal({
       });
     }
   };
+
+  if (trialEndedNoPlan) {
+    return (
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 1000,
+          background: "rgba(0,0,0,0.5)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "24px",
+        }}
+        onClick={(e) => e.target === e.currentTarget && onClose()}
+      >
+        <div
+          style={{
+            background: "var(--p-color-bg-surface, #fff)",
+            borderRadius: "16px",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
+            maxWidth: "420px",
+            width: "100%",
+            overflow: "hidden",
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            style={{
+              padding: "16px 20px",
+              borderBottom: "1px solid var(--p-color-border-secondary, #e1e3e5)",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
+          >
+            <h2 style={{ margin: 0, fontSize: "18px", fontWeight: 600 }}>Create promo video</h2>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                padding: "8px",
+                border: "none",
+                background: "transparent",
+                cursor: "pointer",
+                fontSize: "20px",
+                lineHeight: 1,
+                color: "#5c5f62",
+              }}
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
+          <div style={{ padding: "24px", textAlign: "center" }}>
+            <p style={{ margin: "0 0 16px", fontSize: "15px", color: "var(--p-color-text-primary, #202223)" }}>
+              Your trial has ended. Subscribe to continue creating videos.
+            </p>
+            <Link
+              to="/app/subscription"
+              style={{
+                display: "inline-block",
+                padding: "10px 20px",
+                borderRadius: "8px",
+                background: "var(--p-color-bg-fill-critical, #d72c0d)",
+                color: "#fff",
+                fontWeight: 600,
+                fontSize: "14px",
+                textDecoration: "none",
+              }}
+            >
+              Choose a plan
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
