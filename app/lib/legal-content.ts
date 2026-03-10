@@ -74,8 +74,11 @@ To use the App, you must:
 • Prices are subject to change with 30 days notice
 • Plans: Starter ($49/mo or $470/year, 10 videos/month), Professional ($99/mo or $950/year, 30 videos/month), Business ($199/mo or $1,910/year, 75 videos/month)
 • One-time add-ons: Extra 10/25/50 credits. Premium add-ons: Premium Music ($9/mo), Premium Voices ($15/mo)
-4.2 Free Credits
-• New users receive 3 free credits (one-time) to create 3 complete videos
+4.2 Free Trial
+• New users receive a 7-day free trial with 1 credit (1 credit = 1 complete video)
+• The trial credit expires after 7 days. We will notify you before your trial ends
+• After the trial, you must choose a subscription plan or your account access will be restricted
+• If you uninstall and reinstall the app, you will not receive a new free trial
 • 1 credit = 1 complete video (all scenes, voice-over, music, export)
 4.3 Refund Policy
 No Refunds: All payments are non-refundable. Due to the nature of our service (video generation consumes resources immediately), we cannot offer refunds for completed video generations. You may cancel your subscription at any time to prevent future charges.

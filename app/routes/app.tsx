@@ -6,25 +6,41 @@ import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
 import { authenticate } from "../shopify.server";
 import { getLegalStatus } from "../lib/legal.server";
+import { getCredits } from "../lib/credits.server";
 import { LegalModal } from "../components/LegalModal";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
-  const legalStatus = await getLegalStatus(session.shop);
+  const shop = session.shop;
+  const [legalStatus, credits] = await Promise.all([
+    getLegalStatus(shop),
+    getCredits(shop),
+  ]);
   const needsLegalAgreement = !legalStatus.agreed;
   const isUpdatedTerms = legalStatus.isUpdatedTerms;
 
-  // eslint-disable-next-line no-undef
   return {
     apiKey: process.env.SHOPIFY_API_KEY || "",
-    shop: session.shop,
+    shop,
     needsLegalAgreement,
     isUpdatedTerms,
+    trialEndsAt: credits.trialEndsAt,
+    trialEndingSoon: credits.trialEndingSoon,
+    trialEnded: credits.trialEnded,
+    hasActiveSubscription: credits.hasActiveSubscription,
   };
 };
 
 export default function App() {
-  const { apiKey, needsLegalAgreement, isUpdatedTerms } = useLoaderData<typeof loader>();
+  const {
+    apiKey,
+    needsLegalAgreement,
+    isUpdatedTerms,
+    trialEndsAt,
+    trialEndingSoon,
+    trialEnded,
+    hasActiveSubscription,
+  } = useLoaderData<typeof loader>();
   const revalidator = useRevalidator();
   const [showLegalModal, setShowLegalModal] = useState(false);
 
@@ -37,8 +53,59 @@ export default function App() {
     revalidator.revalidate();
   };
 
+  const showTrialEndingBanner = trialEndingSoon && !hasActiveSubscription;
+  const showTrialEndedBanner = trialEnded && !hasActiveSubscription;
+  const trialEndDate = trialEndsAt
+    ? new Date(trialEndsAt).toLocaleDateString(undefined, { dateStyle: "medium" })
+    : "";
+
   return (
     <AppProvider embedded apiKey={apiKey}>
+      {showTrialEndingBanner && (
+        <div
+          style={{
+            padding: "12px 16px",
+            background: "var(--p-color-bg-fill-caution-secondary, #fef3e2)",
+            borderBottom: "1px solid var(--p-color-border-caution, #e4a853)",
+            fontSize: "14px",
+          }}
+        >
+          <strong>Your free trial ends on {trialEndDate}.</strong>{" "}
+          <a href="/app/subscription" style={{ fontWeight: 600, textDecoration: "underline" }}>
+            Choose a plan
+          </a>{" "}
+          to keep creating videos.
+        </div>
+      )}
+      {showTrialEndedBanner && (
+        <div
+          style={{
+            padding: "16px",
+            background: "var(--p-color-bg-fill-critical-secondary, #fbeae5)",
+            borderBottom: "1px solid var(--p-color-border-critical, #d72c0d)",
+            fontSize: "14px",
+          }}
+        >
+          <strong>Your trial has ended.</strong> Subscribe now to continue using the app. If you
+          don&apos;t, your account access will be restricted. If you reinstall the app later, you
+          won&apos;t get a free trial again.{" "}
+          <a
+            href="/app/subscription"
+            style={{
+              display: "inline-block",
+              marginTop: "8px",
+              padding: "8px 16px",
+              background: "var(--p-color-bg-fill-critical, #d72c0d)",
+              color: "#fff",
+              borderRadius: "8px",
+              fontWeight: 600,
+              textDecoration: "none",
+            }}
+          >
+            Choose a plan
+          </a>
+        </div>
+      )}
       <s-app-nav>
         <s-link href="/app">Dashboard</s-link>
         <s-link href="/app/videos">My Videos</s-link>

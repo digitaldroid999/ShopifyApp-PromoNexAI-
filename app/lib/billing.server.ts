@@ -11,6 +11,9 @@ export type BillingStatus = {
   used: number;
   remaining: number;
   planId: string | null;
+  trialEndsAt: Date | null;
+  trialEndingSoon: boolean;
+  trialEnded: boolean;
 };
 
 /**
@@ -19,10 +22,13 @@ export type BillingStatus = {
 export async function getBillingStatus(shop: string): Promise<BillingStatus> {
   const credits = await getCredits(shop);
   return {
-    hasActiveSubscription: credits.planId != null,
+    hasActiveSubscription: credits.hasActiveSubscription,
     allowed: credits.allowed,
     used: credits.used,
     remaining: credits.remaining,
     planId: credits.planId,
+    trialEndsAt: credits.trialEndsAt,
+    trialEndingSoon: credits.trialEndingSoon,
+    trialEnded: credits.trialEnded,
   };
 }

@@ -158,6 +158,8 @@ model BillingState {
   periodEnd                   DateTime? @map("period_end")
   addonCreditsBalance         Int       @default(0) @map("addon_credits_balance")
   freeCreditsGranted          Boolean   @default(false) @map("free_credits_granted")
+  trialEndsAt                 DateTime? @map("trial_ends_at")
+  trialCreditsBalance         Int       @default(0) @map("trial_credits_balance")
   premiumMusic                Boolean   @default(false) @map("premium_music")
   premiumVoices               Boolean   @default(false) @map("premium_voices")
   createdAt                   DateTime  @default(now()) @map("created_at")
