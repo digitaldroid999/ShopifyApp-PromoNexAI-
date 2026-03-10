@@ -248,7 +248,10 @@ async function applySubscriptionsToBillingState(shop: string, subs: unknown[]): 
   let premiumMusic = false;
   let premiumVoices = false;
 
-  for (const sub of subs as Array<{ id: string; currentPeriodEnd?: string; lineItems?: Array<{ plan?: { pricingDetails?: { price?: { amount: string }; interval?: string } }> }>) {
+  type SubLineItem = { plan?: { pricingDetails?: { price?: { amount: string }; interval?: string } } };
+  type SubRecord = { id: string; currentPeriodEnd?: string; lineItems?: SubLineItem[] };
+  const typedSubs = subs as SubRecord[];
+  for (const sub of typedSubs) {
     const subId = sub.id;
     const end = sub.currentPeriodEnd;
     const periodEndDate = end ? new Date(end) : null;
@@ -271,8 +274,8 @@ async function applySubscriptionsToBillingState(shop: string, subs: unknown[]): 
     }
   }
 
-  if (!primarySubscriptionId && subs.length > 0) {
-    const first = subs[0] as { id: string; currentPeriodEnd?: string };
+  if (!primarySubscriptionId && typedSubs.length > 0) {
+    const first = typedSubs[0];
     primarySubscriptionId = first.id;
     periodEnd = first.currentPeriodEnd ? new Date(first.currentPeriodEnd) : null;
   }
