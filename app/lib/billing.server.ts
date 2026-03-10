@@ -1,6 +1,6 @@
 /**
  * Billing status for PromoNexAI (Stripe-based).
- * For subscription UI and credit logic, use getCredits and stripe-billing.server.
+ * For subscription UI and credit logic, use getCredits and shopify-billing.server.
  */
 
 import { getCredits } from "./credits.server";

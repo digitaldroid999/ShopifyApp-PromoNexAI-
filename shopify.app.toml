@@ -8,6 +8,12 @@ embedded = true
 [webhooks]
 api_version = "2026-01"
 
+# App billing: sync BillingState on subscription changes; grant addon credits on one-time purchase.
+# Subscribe to app_subscriptions/update, app_subscriptions/delete, app_purchases_one_time/update in Partner Dashboard if needed.
+[[webhooks.subscriptions]]
+uri = "https://shopify.promonexai.com/webhooks/app/subscriptions"
+topics = ["app_subscriptions/update", "app_subscriptions/delete"]
+
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = ""

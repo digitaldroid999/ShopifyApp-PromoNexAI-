@@ -68,7 +68,7 @@ To use the App, you must:
 
 4. Subscription and Billing
 4.1 Payment Terms
-• All payments are processed through Stripe
+• All payments are processed through Shopify
 • Subscriptions are billed monthly or yearly in advance
 • All prices are in USD unless otherwise specified
 • Prices are subject to change with 30 days notice
@@ -80,7 +80,7 @@ To use the App, you must:
 4.3 Refund Policy
 No Refunds: All payments are non-refundable. Due to the nature of our service (video generation consumes resources immediately), we cannot offer refunds for completed video generations. You may cancel your subscription at any time to prevent future charges.
 4.4 Cancellation
-• You may cancel your subscription at any time via the subscription management link or Stripe Customer Portal
+• You may cancel your subscription at any time via the in-app subscription page or cancel button
 • Cancellation takes effect at the end of the current billing period
 • You retain access to the service until the end of the paid period
 • Unused video credits do not carry over and are not refundable
@@ -199,7 +199,7 @@ We use the following trusted third-party services to operate our app:`,
           ["Runway ML", "AI video processing", "US"],
           ["Remove.bg/PhotoRoom", "Background removal", "EU, US"],
           ["Pixabay/Pexels/Coverr", "Stock media", "Various"],
-          ["Stripe", "Payment processing", "US, EU"],
+          ["Shopify", "Payment processing", "US, EU"],
           ["Google Analytics", "Usage analytics", "US"],
         ],
       },
@@ -360,7 +360,7 @@ The Controller authorizes the Processor to engage the following Sub-processors:`
           ["Amazon Web Services", "Cloud hosting", "EU, US"],
           ["Google Cloud Platform", "Data processing", "EU, US"],
           ["Shopify", "E-commerce platform", "CA, US, EU"],
-          ["Stripe", "Payment processing", "US, EU"],
+          ["Shopify", "Payment processing", "US, EU"],
           ["Storyblocks", "Stock media", "US"],
           ["Runway ML", "AI processing", "US"],
           ["Remove.bg/PhotoRoom", "Image processing", "EU, US"],

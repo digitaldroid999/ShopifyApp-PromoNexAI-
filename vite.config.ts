@@ -68,12 +68,12 @@ export default defineConfig({
   build: {
     assetsInlineLimit: 0,
     rollupOptions: {
-      external: ["stripe", "sharp"],
+      external: ["sharp"],
     },
   },
   ssr: {
-    // sharp is a native addon; stripe is Node-only — load at runtime, do not bundle
-    external: ["sharp", "stripe"],
+    // sharp is a native addon — load at runtime, do not bundle
+    external: ["sharp"],
   },
   resolve: {
     // Prevent duplicate React instances so Router context is shared (fixes useContext null)

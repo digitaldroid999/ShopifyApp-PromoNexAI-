@@ -152,6 +152,7 @@ model BillingState {
   id                          String    @id @default(cuid())
   shop                        String    @unique
   stripeSubscriptionId        String?   @map("stripe_subscription_id")
+  shopifySubscriptionId       String?   @map("shopify_subscription_id")
   planId                      String?   @map("plan_id")
   subscriptionCreditsPerPeriod Int      @default(0) @map("subscription_credits_per_period")
   periodEnd                   DateTime? @map("period_end")

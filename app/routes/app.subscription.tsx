@@ -3,8 +3,14 @@ import { Form, useActionData, useLoaderData } from "react-router";
 import { useEffect, useRef } from "react";
 import { authenticate } from "../shopify.server";
 import { getCredits } from "../lib/credits.server";
-import { createCheckoutSession, createPortalSession, getSubscriptionDetails, STRIPE_PRICES } from "../lib/stripe-billing.server";
-import prisma from "../db.server";
+import {
+  createSubscription,
+  createOneTimePurchase,
+  cancelSubscription,
+  getSubscriptionDetails,
+  syncBillingStateFromShopify,
+  addAddonCredits,
+} from "../lib/shopify-billing.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 
 const PLAN_LABELS: Record<string, string> = {
@@ -17,16 +23,17 @@ const PLAN_LABELS: Record<string, string> = {
 };
 
 /**
- * Build return URLs for Stripe so redirects open the app inside Shopify Admin (with session).
+ * Build return URLs for Shopify billing so redirects open the app inside Shopify Admin (with session).
  * Set SHOPIFY_APP_HANDLE in .env to your app's handle (see Admin URL when opening the app: .../apps/{handle}).
  */
-function getSubscriptionReturnUrls(shop: string, fallbackOrigin: string): { successUrl: string; cancelUrl: string } {
+function getSubscriptionReturnUrls(shop: string, fallbackOrigin: string, addonKey?: string): { successUrl: string; cancelUrl: string } {
   const appHandle = process.env.SHOPIFY_APP_HANDLE?.trim();
+  const approved = addonKey ? `approved=1&addon=${encodeURIComponent(addonKey)}` : "approved=1";
   if (appHandle) {
     const storeHandle = shop.replace(/\.myshopify\.com$/i, "");
     const base = `https://admin.shopify.com/store/${encodeURIComponent(storeHandle)}/apps/${encodeURIComponent(appHandle)}`;
     return {
-      successUrl: `${base}/app/subscription?approved=1`,
+      successUrl: `${base}/app/subscription?${approved}`,
       cancelUrl: `${base}/app/subscription`,
     };
   }
@@ -34,7 +41,7 @@ function getSubscriptionReturnUrls(shop: string, fallbackOrigin: string): { succ
   const origin = fallbackOrigin || (appUrl ? (appUrl.startsWith("http") ? appUrl : `https://${appUrl}`).replace(/\/$/, "") : "");
   if (origin) {
     return {
-      successUrl: `${origin}/app/subscription?approved=1`,
+      successUrl: `${origin}/app/subscription?${approved}`,
       cancelUrl: `${origin}/app/subscription`,
     };
   }
@@ -42,104 +49,114 @@ function getSubscriptionReturnUrls(shop: string, fallbackOrigin: string): { succ
 }
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const shop = (session as { shop?: string }).shop ?? "";
+  const url = new URL(request.url);
+  const approved = url.searchParams.get("approved") === "1";
+  const addonKey = url.searchParams.get("addon") ?? null;
+
+  if (shop && approved && admin) {
+    await syncBillingStateFromShopify(admin, shop);
+    if (addonKey && ["addon_10", "addon_25", "addon_50"].includes(addonKey)) {
+      await addAddonCredits(shop, addonKey);
+    }
+  }
+
   const [credits, subscriptionDetails] = shop
     ? await Promise.all([getCredits(shop), getSubscriptionDetails(shop)])
     : [null, null];
-  const hasStripeCustomer = shop
-    ? !!(await prisma.stripeCustomer.findUnique({ where: { shop }, select: { id: true } }))
-    : false;
-  const url = new URL(request.url);
-  const approved = url.searchParams.get("approved") === "1";
+  const activeSubscriptionId = subscriptionDetails?.shopifySubscriptionId ?? null;
+
   return {
     shop,
     credits,
     subscriptionDetails,
-    hasStripeCustomer,
+    hasActiveSubscription: !!subscriptionDetails?.hasActiveSubscription,
+    activeSubscriptionId,
     approved,
   };
 };
 
+const isTest = process.env.SHOPIFY_BILLING_TEST === "true";
+
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { session } = await authenticate.admin(request);
+  const { admin, session } = await authenticate.admin(request);
   const shop = (session as { shop?: string }).shop ?? "";
   if (!shop) return { error: "Session missing shop" };
 
   const formData = await request.formData();
   const intent = formData.get("intent") as string | null;
-  const { successUrl, cancelUrl } = getSubscriptionReturnUrls(shop, new URL(request.url).origin);
+  const origin = new URL(request.url).origin;
 
-  // Return redirectUrl for client-side top-level redirect (embedded app iframe cannot load Stripe).
-  if (intent === "portal") {
-    const result = await createPortalSession(shop, successUrl);
-    if ("error" in result && result.error) return { error: result.error };
-    if ("url" in result && result.url) return { redirectUrl: result.url };
-    return { error: "Could not create portal session" };
+  if (intent === "cancel") {
+    const subscriptionId = formData.get("subscriptionId") as string | null;
+    if (!subscriptionId) return { error: "No subscription to cancel" };
+    const result = await cancelSubscription(admin, subscriptionId);
+    if (result.error) return { error: result.error };
+    return { cancelled: true };
   }
+
+  const { successUrl } = getSubscriptionReturnUrls(shop, origin);
 
   if (intent === "checkout_subscription") {
     const planKey = formData.get("planKey") as string | null;
-    if (!planKey || !STRIPE_PRICES[planKey]) return { error: "Invalid plan" };
-    const priceId = STRIPE_PRICES[planKey];
-    const result = await createCheckoutSession({
+    if (!planKey) return { error: "Invalid plan" };
+    const result = await createSubscription({
+      admin,
       shop,
-      mode: "subscription",
-      priceIds: [priceId],
-      successUrl,
-      cancelUrl,
+      planKey,
+      returnUrl: successUrl,
+      test: isTest,
     });
     if ("error" in result && result.error) return { error: result.error };
     if ("url" in result && result.url) return { redirectUrl: result.url };
-    return { error: "Could not create checkout" };
+    return { error: "Could not create subscription" };
   }
 
   if (intent === "checkout_addon") {
     const addonKey = formData.get("addonKey") as string | null;
-    if (!addonKey || !STRIPE_PRICES[addonKey]) return { error: "Invalid addon" };
-    const priceId = STRIPE_PRICES[addonKey];
-    const result = await createCheckoutSession({
-      shop,
-      mode: "one_time",
-      priceIds: [priceId],
-      successUrl,
-      cancelUrl,
+    if (!addonKey) return { error: "Invalid addon" };
+    const { successUrl: addonReturnUrl } = getSubscriptionReturnUrls(shop, origin, addonKey);
+    const result = await createOneTimePurchase({
+      admin,
+      addonKey,
+      returnUrl: addonReturnUrl,
+      test: isTest,
     });
     if ("error" in result && result.error) return { error: result.error };
     if ("url" in result && result.url) return { redirectUrl: result.url };
-    return { error: "Could not create checkout" };
+    return { error: "Could not create purchase" };
   }
 
   if (intent === "checkout_premium") {
     const premiumKey = formData.get("premiumKey") as string | null;
-    if (!premiumKey || !STRIPE_PRICES[premiumKey]) return { error: "Invalid premium add-on" };
-    const priceId = STRIPE_PRICES[premiumKey];
-    const result = await createCheckoutSession({
+    if (!premiumKey || (premiumKey !== "premium_music" && premiumKey !== "premium_voices")) return { error: "Invalid premium add-on" };
+    const result = await createSubscription({
+      admin,
       shop,
-      mode: "subscription",
-      priceIds: [priceId],
-      successUrl,
-      cancelUrl,
+      planKey: premiumKey,
+      returnUrl: successUrl,
+      test: isTest,
     });
     if ("error" in result && result.error) return { error: result.error };
     if ("url" in result && result.url) return { redirectUrl: result.url };
-    return { error: "Could not create checkout" };
+    return { error: "Could not create premium subscription" };
   }
 
   return { error: "Invalid action" };
 };
 
 export default function SubscriptionPage() {
-  const { shop, credits, subscriptionDetails, hasStripeCustomer, approved } = useLoaderData<typeof loader>();
+  const { shop, credits, subscriptionDetails, hasActiveSubscription, activeSubscriptionId, approved } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const error = actionData?.error;
   const redirectUrl = actionData && "redirectUrl" in actionData ? actionData.redirectUrl : undefined;
   const didRedirect = useRef(false);
 
-  // Auto-redirect to Stripe (top window). Use sessionStorage to avoid redirect loop if iframe reloads.
+  // Auto-redirect to Shopify billing (top window). Use sessionStorage to avoid redirect loop if iframe reloads.
   useEffect(() => {
     if (!redirectUrl || didRedirect.current) return;
-    const key = "stripe_redirect_ts";
+    const key = "billing_redirect_ts";
     const now = Date.now();
     const last = parseInt(sessionStorage.getItem(key) ?? "0", 10);
     if (now - last < 5000) return; // Already redirected in last 5s (e.g. iframe reloaded)
@@ -165,10 +182,23 @@ export default function SubscriptionPage() {
             borderRadius: "8px",
           }}
         >
-          <s-text>Continue to checkout:</s-text>{" "}
+          <s-text>Continue to billing:</s-text>{" "}
           <a href={redirectUrl} target="_top" rel="noopener noreferrer" style={{ marginLeft: "4px", fontWeight: 600 }}>
             Click here if you’re not redirected
           </a>
+        </div>
+      )}
+      {actionData && "cancelled" in actionData && actionData.cancelled && (
+        <div
+          style={{
+            marginBottom: "16px",
+            padding: "12px 16px",
+            background: "var(--p-color-bg-fill-success-secondary, #d3f0d9)",
+            borderRadius: "8px",
+            color: "var(--p-color-text-success, #008060)",
+          }}
+        >
+          <s-text type="strong">Subscription cancelled.</s-text> Your plan has been cancelled.
         </div>
       )}
       {approved && (
@@ -307,11 +337,12 @@ export default function SubscriptionPage() {
         </s-section>
       )}
 
-      {hasStripeCustomer && (
+      {hasActiveSubscription && activeSubscriptionId && (
         <s-section heading="Manage billing">
           <Form method="post" action="/app/subscription">
-            <input type="hidden" name="intent" value="portal" />
-            <s-button type="submit" variant="secondary">Manage subscription & payment method</s-button>
+            <input type="hidden" name="intent" value="cancel" />
+            <input type="hidden" name="subscriptionId" value={activeSubscriptionId} />
+            <s-button type="submit" variant="secondary">Cancel plan</s-button>
           </Form>
         </s-section>
       )}
@@ -367,7 +398,7 @@ export default function SubscriptionPage() {
 
       <s-section slot="aside" heading="Billing">
         <s-paragraph color="subdued">
-          Billing is handled securely by Stripe. You can cancel or change your plan at any time via the manage link above.
+          Billing is handled securely by Shopify. You can cancel your plan at any time via the button above.
         </s-paragraph>
       </s-section>
     </s-page>

@@ -22,7 +22,7 @@ function startOfCurrentMonthUTC(): Date {
 
 /**
  * For yearly plans, credits reset each calendar month until the subscription ends.
- * For monthly plans (or addon-only), the period is the Stripe billing period (single periodEnd).
+ * For monthly plans (or addon-only), the period is the billing period (single periodEnd).
  */
 function getEffectivePeriodEnd(state: { planId: string | null; periodEnd: Date | null }): Date {
   if (state.planId?.endsWith("_yearly") && state.periodEnd) {
