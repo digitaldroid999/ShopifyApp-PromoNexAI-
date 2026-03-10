@@ -6,6 +6,8 @@
 
 import { getBillingState } from "./billing-state.server";
 
+const LOG = "[billing]";
+
 /** Credits per period for subscription plan IDs */
 export const PLAN_CREDITS: Record<string, number> = {
   starter_monthly: 10,
@@ -112,9 +114,13 @@ export async function createSubscription(params: {
   returnUrl: string;
   test?: boolean;
 }): Promise<{ url: string } | { error: string }> {
-  const { admin, planKey, premiumKeys = [], returnUrl, test = false } = params;
+  const { admin, shop, planKey, premiumKeys = [], returnUrl, test = false } = params;
+  console.log(`${LOG} createSubscription step=start shop=${shop} planKey=${planKey} test=${test} returnUrl=${returnUrl?.slice(0, 60)}...`);
   const planPricing = PLAN_PRICING[planKey];
-  if (!planPricing) return { error: "Invalid plan" };
+  if (!planPricing) {
+    console.warn(`${LOG} createSubscription step=invalid_plan shop=${shop} planKey=${planKey}`);
+    return { error: "Invalid plan" };
+  }
 
   const lineItems: Array<{ plan: { appRecurringPricingDetails: { price: { amount: number; currencyCode: string }; interval: string } } }> = [
     {
@@ -151,11 +157,23 @@ export async function createSubscription(params: {
   });
   const json = await res.json();
   const payload = json?.data?.appSubscriptionCreate;
+  const userErrors = payload?.userErrors ?? [];
+  const confirmationUrl = payload?.confirmationUrl;
+  console.log(`${LOG} createSubscription step=shopify_response shop=${shop} planKey=${planKey} userErrors=${JSON.stringify(userErrors)} confirmationUrl=${confirmationUrl ? "present" : "missing"}`);
+  if (json?.errors?.length) {
+    console.warn(`${LOG} createSubscription step=graphql_errors shop=${shop} errors=${JSON.stringify(json.errors)}`);
+  }
   const err = payload?.userErrors?.[0];
-  if (err) return { error: err.message || "Subscription create failed" };
-  const url = payload?.confirmationUrl;
-  if (!url) return { error: "No confirmation URL returned" };
-  return { url };
+  if (err) {
+    console.warn(`${LOG} createSubscription step=failed shop=${shop} planKey=${planKey} reason=${err.message} field=${err.field ?? ""}`);
+    return { error: err.message || "Subscription create failed" };
+  }
+  if (!confirmationUrl) {
+    console.warn(`${LOG} createSubscription step=no_url shop=${shop} planKey=${planKey} payloadKeys=${payload ? Object.keys(payload).join(",") : "null"}`);
+    return { error: "No confirmation URL returned" };
+  }
+  console.log(`${LOG} createSubscription step=success shop=${shop} planKey=${planKey} url=${confirmationUrl.slice(0, 80)}...`);
+  return { url: confirmationUrl };
 }
 
 function keyToLabel(key: string): string {
@@ -182,8 +200,12 @@ export async function createOneTimePurchase(params: {
   test?: boolean;
 }): Promise<{ url: string } | { error: string }> {
   const { admin, addonKey, returnUrl, test = false } = params;
+  console.log(`${LOG} createOneTimePurchase step=start addonKey=${addonKey} test=${test} returnUrl=${returnUrl?.slice(0, 60)}...`);
   const pricing = ADDON_PRICING[addonKey];
-  if (!pricing) return { error: "Invalid addon" };
+  if (!pricing) {
+    console.warn(`${LOG} createOneTimePurchase step=invalid_addon addonKey=${addonKey}`);
+    return { error: "Invalid addon" };
+  }
 
   const res = await admin.graphql(APP_PURCHASE_ONE_TIME_CREATE, {
     variables: {
@@ -195,11 +217,23 @@ export async function createOneTimePurchase(params: {
   });
   const json = await res.json();
   const payload = json?.data?.appPurchaseOneTimeCreate;
+  const userErrors = payload?.userErrors ?? [];
+  const confirmationUrl = payload?.confirmationUrl;
+  console.log(`${LOG} createOneTimePurchase step=shopify_response addonKey=${addonKey} userErrors=${JSON.stringify(userErrors)} confirmationUrl=${confirmationUrl ? "present" : "missing"}`);
+  if (json?.errors?.length) {
+    console.warn(`${LOG} createOneTimePurchase step=graphql_errors addonKey=${addonKey} errors=${JSON.stringify(json.errors)}`);
+  }
   const err = payload?.userErrors?.[0];
-  if (err) return { error: err.message || "One-time purchase failed" };
-  const url = payload?.confirmationUrl;
-  if (!url) return { error: "No confirmation URL returned" };
-  return { url };
+  if (err) {
+    console.warn(`${LOG} createOneTimePurchase step=failed addonKey=${addonKey} reason=${err.message} field=${err.field ?? ""}`);
+    return { error: err.message || "One-time purchase failed" };
+  }
+  if (!confirmationUrl) {
+    console.warn(`${LOG} createOneTimePurchase step=no_url addonKey=${addonKey} payloadKeys=${payload ? Object.keys(payload).join(",") : "null"}`);
+    return { error: "No confirmation URL returned" };
+  }
+  console.log(`${LOG} createOneTimePurchase step=success addonKey=${addonKey} url=${confirmationUrl.slice(0, 80)}...`);
+  return { url: confirmationUrl };
 }
 
 const SHOPIFY_API_VERSION = "2024-10";
@@ -221,25 +255,36 @@ async function graphqlWithToken(shop: string, accessToken: string, query: string
 
 /** Sync BillingState from Shopify using shop + accessToken (for webhooks). */
 export async function syncBillingStateFromShopifyWithToken(shop: string, accessToken: string): Promise<void> {
+  console.log(`${LOG} syncBillingStateFromShopifyWithToken step=start shop=${shop}`);
   const data = await graphqlWithToken(shop, accessToken, CURRENT_APP_INSTALLATION) as { currentAppInstallation?: { activeSubscriptions?: unknown[] } };
   const subs = data?.currentAppInstallation?.activeSubscriptions ?? [];
+  console.log(`${LOG} syncBillingStateFromShopifyWithToken step=shopify_response shop=${shop} activeSubscriptionsCount=${subs.length}`);
   await applySubscriptionsToBillingState(shop, subs);
+  console.log(`${LOG} syncBillingStateFromShopifyWithToken step=done shop=${shop}`);
 }
 
 /** Sync BillingState from Shopify currentAppInstallation.activeSubscriptions */
 export async function syncBillingStateFromShopify(admin: GraphQLAdmin, shop: string): Promise<void> {
+  console.log(`${LOG} syncBillingStateFromShopify step=start shop=${shop}`);
   const res = await admin.graphql(CURRENT_APP_INSTALLATION);
   const json = await res.json();
+  if (json?.errors?.length) {
+    console.warn(`${LOG} syncBillingStateFromShopify step=graphql_errors shop=${shop} errors=${JSON.stringify(json.errors)}`);
+  }
   const installation = json?.data?.currentAppInstallation;
   const subs = installation?.activeSubscriptions ?? [];
+  console.log(`${LOG} syncBillingStateFromShopify step=shopify_response shop=${shop} activeSubscriptionsCount=${subs.length} raw=${JSON.stringify(subs.map((s: { id?: string; currentPeriodEnd?: string }) => ({ id: s?.id, currentPeriodEnd: s?.currentPeriodEnd })))}`);
   await applySubscriptionsToBillingState(shop, subs);
+  console.log(`${LOG} syncBillingStateFromShopify step=done shop=${shop}`);
 }
 
 async function applySubscriptionsToBillingState(shop: string, subs: unknown[]): Promise<void> {
   if (subs.length === 0) {
+    console.log(`${LOG} applySubscriptionsToBillingState step=no_subs shop=${shop} clearing state`);
     await clearSubscriptionState(shop);
     return;
   }
+  console.log(`${LOG} applySubscriptionsToBillingState step=apply shop=${shop} subsCount=${subs.length}`);
 
   let planId: string | null = null;
   let subscriptionCreditsPerPeriod = 0;
@@ -280,6 +325,7 @@ async function applySubscriptionsToBillingState(shop: string, subs: unknown[]): 
     periodEnd = first.currentPeriodEnd ? new Date(first.currentPeriodEnd) : null;
   }
 
+  console.log(`${LOG} applySubscriptionsToBillingState step=upsert shop=${shop} planId=${planId} periodEnd=${periodEnd?.toISOString() ?? "null"} premiumMusic=${premiumMusic} premiumVoices=${premiumVoices} shopifySubscriptionId=${primarySubscriptionId}`);
   await getBillingState().upsert({
     where: { shop },
     create: {
@@ -304,6 +350,7 @@ async function applySubscriptionsToBillingState(shop: string, subs: unknown[]): 
 
 /** Clear subscription fields when subscription is cancelled/deleted */
 export async function clearSubscriptionState(shop: string): Promise<void> {
+  console.log(`${LOG} clearSubscriptionState step=start shop=${shop}`);
   await getBillingState().updateMany({
     where: { shop },
     data: {
@@ -316,6 +363,7 @@ export async function clearSubscriptionState(shop: string): Promise<void> {
       premiumVoices: false,
     },
   });
+  console.log(`${LOG} clearSubscriptionState step=done shop=${shop}`);
 }
 
 /** Get current subscription and credits summary for the subscription page */
@@ -359,23 +407,37 @@ export async function getSubscriptionDetails(shop: string): Promise<{
 /** Add one-time credits to addonCreditsBalance (for addon_10, addon_25, addon_50). */
 export async function addAddonCredits(shop: string, addonKey: string, amount?: number): Promise<void> {
   const credits = amount ?? ADDON_CREDITS[addonKey] ?? 0;
-  if (credits <= 0) return;
-
+  console.log(`${LOG} addAddonCredits step=start shop=${shop} addonKey=${addonKey} credits=${credits}`);
+  if (credits <= 0) {
+    console.log(`${LOG} addAddonCredits step=skip shop=${shop} addonKey=${addonKey} credits<=0`);
+    return;
+  }
   await getBillingState().upsert({
     where: { shop },
     create: { shop, addonCreditsBalance: credits },
     update: { addonCreditsBalance: { increment: credits } },
   });
+  console.log(`${LOG} addAddonCredits step=done shop=${shop} addonKey=${addonKey} added=${credits}`);
 }
 
 /** Cancel Shopify app subscription by GID */
 export async function cancelSubscription(admin: GraphQLAdmin, subscriptionId: string): Promise<{ error?: string }> {
+  console.log(`${LOG} cancelSubscription step=start subscriptionId=${subscriptionId}`);
   const res = await admin.graphql(APP_SUBSCRIPTION_CANCEL, {
     variables: { id: subscriptionId },
   });
   const json = await res.json();
   const payload = json?.data?.appSubscriptionCancel;
+  const userErrors = payload?.userErrors ?? [];
+  console.log(`${LOG} cancelSubscription step=shopify_response subscriptionId=${subscriptionId} userErrors=${JSON.stringify(userErrors)} appSubscription=${payload?.appSubscription ? "present" : "missing"}`);
+  if (json?.errors?.length) {
+    console.warn(`${LOG} cancelSubscription step=graphql_errors subscriptionId=${subscriptionId} errors=${JSON.stringify(json.errors)}`);
+  }
   const err = payload?.userErrors?.[0];
-  if (err) return { error: err.message ?? "Cancel failed" };
+  if (err) {
+    console.warn(`${LOG} cancelSubscription step=failed subscriptionId=${subscriptionId} reason=${err.message} field=${err.field ?? ""}`);
+    return { error: err.message ?? "Cancel failed" };
+  }
+  console.log(`${LOG} cancelSubscription step=success subscriptionId=${subscriptionId}`);
   return {};
 }

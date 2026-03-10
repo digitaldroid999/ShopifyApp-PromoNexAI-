@@ -1,5 +1,6 @@
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { Form, useActionData, useLoaderData } from "react-router";
+import { useEffect, useRef } from "react";
 import { authenticate } from "../shopify.server";
 import { getCredits } from "../lib/credits.server";
 import {
@@ -11,6 +12,8 @@ import {
   addAddonCredits,
 } from "../lib/shopify-billing.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
+
+const BILLING_LOG = "[billing-subscription]";
 
 const PLAN_LABELS: Record<string, string> = {
   starter_monthly: "Starter Monthly",
@@ -53,12 +56,16 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const approved = url.searchParams.get("approved") === "1";
   const addonKey = url.searchParams.get("addon") ?? null;
+  console.log(`${BILLING_LOG} loader step=start shop=${shop} approved=${approved} addonKey=${addonKey ?? "none"}`);
 
   if (shop && approved && admin) {
+    console.log(`${BILLING_LOG} loader step=post_approval shop=${shop} syncing billing from Shopify`);
     await syncBillingStateFromShopify(admin, shop);
     if (addonKey && ["addon_10", "addon_25", "addon_50"].includes(addonKey)) {
+      console.log(`${BILLING_LOG} loader step=addon_credits shop=${shop} addonKey=${addonKey}`);
       await addAddonCredits(shop, addonKey);
     }
+    console.log(`${BILLING_LOG} loader step=post_approval_done shop=${shop}`);
   }
 
   const [credits, subscriptionDetails] = shop
@@ -84,16 +91,24 @@ const isTest =
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   const shop = (session as { shop?: string }).shop ?? "";
-  if (!shop) return { error: "Session missing shop" };
+  if (!shop) {
+    console.warn(`${BILLING_LOG} action step=no_shop`);
+    return { error: "Session missing shop" };
+  }
 
   const formData = await request.formData();
   const intent = formData.get("intent") as string | null;
   const origin = new URL(request.url).origin;
+  console.log(`${BILLING_LOG} action step=start shop=${shop} intent=${intent ?? "none"} isTest=${isTest}`);
 
   if (intent === "cancel") {
     const subscriptionId = formData.get("subscriptionId") as string | null;
-    if (!subscriptionId) return { error: "No subscription to cancel" };
+    if (!subscriptionId) {
+      console.warn(`${BILLING_LOG} action step=cancel_no_id shop=${shop}`);
+      return { error: "No subscription to cancel" };
+    }
     const result = await cancelSubscription(admin, subscriptionId);
+    console.log(`${BILLING_LOG} action step=cancel_result shop=${shop} subscriptionId=${subscriptionId} error=${result.error ?? "none"}`);
     if (result.error) return { error: result.error };
     return { cancelled: true };
   }
@@ -102,7 +117,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (intent === "checkout_subscription") {
     const planKey = formData.get("planKey") as string | null;
-    if (!planKey) return { error: "Invalid plan" };
+    if (!planKey) {
+      console.warn(`${BILLING_LOG} action step=checkout_subscription_no_plan shop=${shop}`);
+      return { error: "Invalid plan" };
+    }
     const result = await createSubscription({
       admin,
       shop,
@@ -110,6 +128,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       returnUrl: successUrl,
       test: isTest,
     });
+    const status = "error" in result ? `error=${result.error}` : "url=present";
+    console.log(`${BILLING_LOG} action step=checkout_subscription_result shop=${shop} planKey=${planKey} ${status}`);
     if ("error" in result && result.error) return { error: result.error };
     if ("url" in result && result.url) return { redirectUrl: result.url };
     return { error: "Could not create subscription" };
@@ -117,7 +137,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (intent === "checkout_addon") {
     const addonKey = formData.get("addonKey") as string | null;
-    if (!addonKey) return { error: "Invalid addon" };
+    if (!addonKey) {
+      console.warn(`${BILLING_LOG} action step=checkout_addon_no_key shop=${shop}`);
+      return { error: "Invalid addon" };
+    }
     const { successUrl: addonReturnUrl } = getSubscriptionReturnUrls(shop, origin, addonKey);
     const result = await createOneTimePurchase({
       admin,
@@ -125,6 +148,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       returnUrl: addonReturnUrl,
       test: isTest,
     });
+    const status = "error" in result ? `error=${result.error}` : "url=present";
+    console.log(`${BILLING_LOG} action step=checkout_addon_result shop=${shop} addonKey=${addonKey} ${status}`);
     if ("error" in result && result.error) return { error: result.error };
     if ("url" in result && result.url) return { redirectUrl: result.url };
     return { error: "Could not create purchase" };
@@ -132,7 +157,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
   if (intent === "checkout_premium") {
     const premiumKey = formData.get("premiumKey") as string | null;
-    if (!premiumKey || (premiumKey !== "premium_music" && premiumKey !== "premium_voices")) return { error: "Invalid premium add-on" };
+    if (!premiumKey || (premiumKey !== "premium_music" && premiumKey !== "premium_voices")) {
+      console.warn(`${BILLING_LOG} action step=checkout_premium_invalid shop=${shop} premiumKey=${premiumKey ?? "null"}`);
+      return { error: "Invalid premium add-on" };
+    }
     const result = await createSubscription({
       admin,
       shop,
@@ -140,11 +168,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       returnUrl: successUrl,
       test: isTest,
     });
+    const status = "error" in result ? `error=${result.error}` : "url=present";
+    console.log(`${BILLING_LOG} action step=checkout_premium_result shop=${shop} premiumKey=${premiumKey} ${status}`);
     if ("error" in result && result.error) return { error: result.error };
     if ("url" in result && result.url) return { redirectUrl: result.url };
     return { error: "Could not create premium subscription" };
   }
 
+  console.warn(`${BILLING_LOG} action step=invalid_intent shop=${shop} intent=${intent ?? "null"}`);
   return { error: "Invalid action" };
 };
 
@@ -168,38 +199,40 @@ export default function SubscriptionPage() {
   const actionData = useActionData<typeof action>();
   const error = actionData?.error;
   const redirectUrl = actionData && "redirectUrl" in actionData ? actionData.redirectUrl : undefined;
+  const didRedirect = useRef(false);
+
+  // Auto-redirect to Shopify billing (top window). Use sessionStorage to avoid redirect loop if iframe reloads.
+  useEffect(() => {
+    if (!redirectUrl || didRedirect.current) return;
+    const key = "billing_redirect_ts";
+    const now = Date.now();
+    const last = parseInt(sessionStorage.getItem(key) ?? "0", 10);
+    if (now - last < 5000) return; // Already redirected in last 5s (e.g. iframe reloaded)
+    didRedirect.current = true;
+    sessionStorage.setItem(key, String(now));
+    try {
+      if (typeof window !== "undefined" && window.top) {
+        window.top.location.href = redirectUrl;
+      }
+    } catch {
+      // If blocked (e.g. cross-origin), user can use the fallback link.
+    }
+  }, [redirectUrl]);
+
   return (
     <s-page heading="Subscription">
       {redirectUrl && (
         <div
           style={{
             marginBottom: "16px",
-            padding: "16px 20px",
+            padding: "12px 16px",
             background: "var(--p-color-bg-fill-info-secondary, #e3f1ff)",
             borderRadius: "8px",
-            border: "1px solid var(--p-color-border-info, #2c6ecb)",
           }}
         >
-          <s-text type="strong">Continue to billing</s-text>
-          <p style={{ margin: "8px 0 12px", fontSize: "14px", color: "var(--p-color-text-secondary, #6d7175)" }}>
-            Click the button below to complete your subscription on Shopify. Do not refresh the billing page—if you see &quot;This feature isn&apos;t currently available,&quot; return here and choose your plan again to get a new link.
-          </p>
-          <a
-            href={redirectUrl}
-            target="_top"
-            rel="noopener noreferrer"
-            style={{
-              display: "inline-block",
-              padding: "10px 20px",
-              borderRadius: "8px",
-              background: "var(--p-color-bg-fill-info, #2c6ecb)",
-              color: "#fff",
-              fontWeight: 600,
-              fontSize: "14px",
-              textDecoration: "none",
-            }}
-          >
-            Go to Shopify billing
+          <s-text>Continue to billing:</s-text>{" "}
+          <a href={redirectUrl} target="_top" rel="noopener noreferrer" style={{ marginLeft: "4px", fontWeight: 600 }}>
+            Click here if you’re not redirected
           </a>
         </div>
       )}
