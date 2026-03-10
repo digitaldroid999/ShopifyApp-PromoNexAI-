@@ -5,6 +5,7 @@
  */
 
 import { getBillingState } from "./billing-state.server";
+import { getEffectivePeriodEnd } from "./credits.server";
 
 const LOG = "[billing]";
 
@@ -293,6 +294,10 @@ async function applySubscriptionsToBillingState(shop: string, subs: unknown[]): 
   let premiumMusic = false;
   let premiumVoices = false;
 
+  // Addon credits are cleared on upgrade/downgrade and when subscription sync runs (e.g. new period).
+  const addonCreditsBalance = 0;
+  const addonCreditsValidForPeriodEnd: Date | null = null;
+
   type SubLineItem = { plan?: { pricingDetails?: { price?: { amount: string }; interval?: string } } };
   type SubRecord = { id: string; currentPeriodEnd?: string; lineItems?: SubLineItem[] };
   const typedSubs = subs as SubRecord[];
@@ -336,6 +341,8 @@ async function applySubscriptionsToBillingState(shop: string, subs: unknown[]): 
       periodEnd,
       premiumMusic,
       premiumVoices,
+      addonCreditsBalance,
+      addonCreditsValidForPeriodEnd,
     },
     update: {
       shopifySubscriptionId: primarySubscriptionId,
@@ -344,11 +351,13 @@ async function applySubscriptionsToBillingState(shop: string, subs: unknown[]): 
       periodEnd,
       premiumMusic,
       premiumVoices,
+      addonCreditsBalance,
+      addonCreditsValidForPeriodEnd,
     },
   });
 }
 
-/** Clear subscription fields when subscription is cancelled/deleted */
+/** Clear subscription fields when subscription is cancelled/deleted. Addon credits are also cleared. */
 export async function clearSubscriptionState(shop: string): Promise<void> {
   console.log(`${LOG} clearSubscriptionState step=start shop=${shop}`);
   await getBillingState().updateMany({
@@ -361,6 +370,8 @@ export async function clearSubscriptionState(shop: string): Promise<void> {
       periodEnd: null,
       premiumMusic: false,
       premiumVoices: false,
+      addonCreditsBalance: 0,
+      addonCreditsValidForPeriodEnd: null,
     },
   });
   console.log(`${LOG} clearSubscriptionState step=done shop=${shop}`);
@@ -404,7 +415,7 @@ export async function getSubscriptionDetails(shop: string): Promise<{
   };
 }
 
-/** Add one-time credits to addonCreditsBalance (for addon_10, addon_25, addon_50). */
+/** Add one-time credits to addonCreditsBalance (for addon_10, addon_25, addon_50). Valid only until end of current billing period. */
 export async function addAddonCredits(shop: string, addonKey: string, amount?: number): Promise<void> {
   const credits = amount ?? ADDON_CREDITS[addonKey] ?? 0;
   console.log(`${LOG} addAddonCredits step=start shop=${shop} addonKey=${addonKey} credits=${credits}`);
@@ -412,10 +423,21 @@ export async function addAddonCredits(shop: string, addonKey: string, amount?: n
     console.log(`${LOG} addAddonCredits step=skip shop=${shop} addonKey=${addonKey} credits<=0`);
     return;
   }
+  const state = await getBillingState().findUnique({ where: { shop } });
+  const addonCreditsValidForPeriodEnd = state
+    ? getEffectivePeriodEnd({
+        planId: state.planId,
+        periodEnd: state.periodEnd,
+        trialEndsAt: state.trialEndsAt,
+      })
+    : null;
   await getBillingState().upsert({
     where: { shop },
-    create: { shop, addonCreditsBalance: credits },
-    update: { addonCreditsBalance: { increment: credits } },
+    create: { shop, addonCreditsBalance: credits, addonCreditsValidForPeriodEnd: null },
+    update: {
+      addonCreditsBalance: { increment: credits },
+      addonCreditsValidForPeriodEnd,
+    },
   });
   console.log(`${LOG} addAddonCredits step=done shop=${shop} addonKey=${addonKey} added=${credits}`);
 }

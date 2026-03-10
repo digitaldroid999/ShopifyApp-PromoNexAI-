@@ -34,7 +34,7 @@ function addDays(date: Date, days: number): Date {
  * For monthly plans (or addon-only), the period is the billing period (single periodEnd).
  * For trial, the period end is trialEndsAt.
  */
-function getEffectivePeriodEnd(state: {
+export function getEffectivePeriodEnd(state: {
   planId: string | null;
   periodEnd: Date | null;
   trialEndsAt: Date | null;
@@ -131,6 +131,15 @@ export async function getCredits(shop: string): Promise<CreditsResult> {
     state = await billingState.update({
       where: { shop },
       data: { trialEndsAt: now },
+    });
+  }
+
+  // Addon credits are valid only until the end of the current billing period. Clear when new period has started.
+  const validFor = state.addonCreditsValidForPeriodEnd ? new Date(state.addonCreditsValidForPeriodEnd) : null;
+  if (state.addonCreditsBalance > 0 && validFor && now > validFor) {
+    state = await billingState.update({
+      where: { shop },
+      data: { addonCreditsBalance: 0, addonCreditsValidForPeriodEnd: null },
     });
   }
 
