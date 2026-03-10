@@ -1,6 +1,5 @@
 import type { ActionFunctionArgs, HeadersFunction, LoaderFunctionArgs } from "react-router";
 import { Form, useActionData, useLoaderData } from "react-router";
-import { useEffect, useRef } from "react";
 import { authenticate } from "../shopify.server";
 import { getCredits } from "../lib/credits.server";
 import {
@@ -169,40 +168,38 @@ export default function SubscriptionPage() {
   const actionData = useActionData<typeof action>();
   const error = actionData?.error;
   const redirectUrl = actionData && "redirectUrl" in actionData ? actionData.redirectUrl : undefined;
-  const didRedirect = useRef(false);
-
-  // Auto-redirect to Shopify billing (top window). Use sessionStorage to avoid redirect loop if iframe reloads.
-  useEffect(() => {
-    if (!redirectUrl || didRedirect.current) return;
-    const key = "billing_redirect_ts";
-    const now = Date.now();
-    const last = parseInt(sessionStorage.getItem(key) ?? "0", 10);
-    if (now - last < 5000) return; // Already redirected in last 5s (e.g. iframe reloaded)
-    didRedirect.current = true;
-    sessionStorage.setItem(key, String(now));
-    try {
-      if (typeof window !== "undefined" && window.top) {
-        window.top.location.href = redirectUrl;
-      }
-    } catch {
-      // If blocked (e.g. cross-origin), user can use the fallback link.
-    }
-  }, [redirectUrl]);
-
   return (
     <s-page heading="Subscription">
       {redirectUrl && (
         <div
           style={{
             marginBottom: "16px",
-            padding: "12px 16px",
+            padding: "16px 20px",
             background: "var(--p-color-bg-fill-info-secondary, #e3f1ff)",
             borderRadius: "8px",
+            border: "1px solid var(--p-color-border-info, #2c6ecb)",
           }}
         >
-          <s-text>Continue to billing:</s-text>{" "}
-          <a href={redirectUrl} target="_top" rel="noopener noreferrer" style={{ marginLeft: "4px", fontWeight: 600 }}>
-            Click here if you’re not redirected
+          <s-text type="strong">Continue to billing</s-text>
+          <p style={{ margin: "8px 0 12px", fontSize: "14px", color: "var(--p-color-text-secondary, #6d7175)" }}>
+            Click the button below to complete your subscription on Shopify. Do not refresh the billing page—if you see &quot;This feature isn&apos;t currently available,&quot; return here and choose your plan again to get a new link.
+          </p>
+          <a
+            href={redirectUrl}
+            target="_top"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-block",
+              padding: "10px 20px",
+              borderRadius: "8px",
+              background: "var(--p-color-bg-fill-info, #2c6ecb)",
+              color: "#fff",
+              fontWeight: 600,
+              fontSize: "14px",
+              textDecoration: "none",
+            }}
+          >
+            Go to Shopify billing
           </a>
         </div>
       )}
