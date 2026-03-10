@@ -77,7 +77,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   };
 };
 
-const isTest = process.env.SHOPIFY_BILLING_TEST === "true";
+// Test mode: use for dev stores when app has no public distribution. No real charges; flow works for testing.
+const isTest =
+  process.env.SHOPIFY_BILLING_TEST === "true" ||
+  (process.env.NODE_ENV !== "production" && process.env.SHOPIFY_BILLING_TEST !== "false");
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
