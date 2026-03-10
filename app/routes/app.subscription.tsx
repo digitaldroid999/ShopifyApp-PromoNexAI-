@@ -77,7 +77,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   };
 };
 
-// Test mode: use for dev stores when app has no public distribution. No real charges; flow works for testing.
+// Test mode: use for dev stores. No real charges. Requires Partner Dashboard → App → Distribution = "Shopify Store" (not "No distribution").
 const isTest =
   process.env.SHOPIFY_BILLING_TEST === "true" ||
   (process.env.NODE_ENV !== "production" && process.env.SHOPIFY_BILLING_TEST !== "false");

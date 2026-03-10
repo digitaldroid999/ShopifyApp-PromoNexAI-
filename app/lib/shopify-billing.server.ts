@@ -146,7 +146,7 @@ export async function createSubscription(params: {
       name,
       returnUrl,
       lineItems,
-      test: test || undefined,
+      ...(test ? { test: true } : {}),
     },
   });
   const json = await res.json();
@@ -190,7 +190,7 @@ export async function createOneTimePurchase(params: {
       name: pricing.name,
       price: { amount: pricing.amount, currencyCode: "USD" },
       returnUrl,
-      test: test || undefined,
+      ...(test ? { test: true } : {}),
     },
   });
   const json = await res.json();
