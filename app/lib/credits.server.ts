@@ -160,14 +160,11 @@ export async function getCredits(shop: string): Promise<CreditsResult> {
   const allowedFinal =
     subscriptionCreditsThisPeriod + trialCreditsAllowed + state.addonCreditsBalance;
 
-  let usage = await creditUsage.findUnique({
+  const usage = await creditUsage.upsert({
     where: { shop_periodEnd: { shop, periodEnd } },
+    create: { shop, periodEnd, creditsUsed: 0 },
+    update: {},
   });
-  if (!usage) {
-    usage = await creditUsage.create({
-      data: { shop, periodEnd, creditsUsed: 0 },
-    });
-  }
 
   const used = usage.creditsUsed;
   const remaining = Math.max(0, allowedFinal - used);
