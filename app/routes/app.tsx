@@ -31,6 +31,21 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   };
 };
 
+/**
+ * Skip revalidation when URL is unchanged (e.g. focus in embedded iframe).
+ * Stops repeated GET /app/subscription.data and auth logs.
+ */
+export function shouldRevalidate(args: {
+  currentUrl: URL;
+  nextUrl: URL;
+  formMethod?: string;
+  defaultShouldRevalidate: boolean;
+}): boolean {
+  if (args.formMethod) return true;
+  if (args.currentUrl.pathname === args.nextUrl.pathname && args.currentUrl.search === args.nextUrl.search) return false;
+  return args.defaultShouldRevalidate;
+}
+
 export default function App() {
   const {
     apiKey,

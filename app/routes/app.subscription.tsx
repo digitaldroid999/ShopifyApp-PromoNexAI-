@@ -149,6 +149,21 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   return { error: "Invalid action" };
 };
 
+/**
+ * Skip revalidation when URL is unchanged (e.g. focus in embedded iframe).
+ * Stops repeated GET /app/subscription.data and "Authenticating admin request" logs.
+ */
+export function shouldRevalidate(args: {
+  currentUrl: URL;
+  nextUrl: URL;
+  formMethod?: string;
+  defaultShouldRevalidate: boolean;
+}): boolean {
+  if (args.formMethod) return true;
+  if (args.currentUrl.pathname === args.nextUrl.pathname && args.currentUrl.search === args.nextUrl.search) return false;
+  return args.defaultShouldRevalidate;
+}
+
 export default function SubscriptionPage() {
   const { shop, credits, subscriptionDetails, hasActiveSubscription, activeSubscriptionId, approved } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();

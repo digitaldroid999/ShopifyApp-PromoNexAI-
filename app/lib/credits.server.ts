@@ -111,19 +111,22 @@ export async function getCredits(shop: string): Promise<CreditsResult> {
   const billingState = getBillingState();
   const creditUsage = getCreditUsage();
   const now = new Date();
-  // Get or create BillingState (upsert avoids unique constraint when two requests run concurrently)
-  let state = await billingState.upsert({
-    where: { shop },
-    create: {
-      shop,
-      trialCreditsBalance: TRIAL_CREDITS,
-      freeCreditsGranted: true,
-      trialEndsAt: addDays(now, TRIAL_DAYS),
-    },
-    update: {},
-  });
+  // Existing shop: one findUnique. New install: upsert to avoid unique constraint on concurrent create.
+  let state = await billingState.findUnique({ where: { shop } });
+  if (!state) {
+    state = await billingState.upsert({
+      where: { shop },
+      create: {
+        shop,
+        trialCreditsBalance: TRIAL_CREDITS,
+        freeCreditsGranted: true,
+        trialEndsAt: addDays(now, TRIAL_DAYS),
+      },
+      update: {},
+    });
+  }
 
-  // Legacy: had old "3 free credits" (freeCreditsGranted true, trialEndsAt null) → mark trial as ended so they must subscribe
+  // Legacy: had old "3 free credits" (freeCreditsGranted true, trialEndsAt null) → mark trial as ended once
   if (state.freeCreditsGranted && state.trialEndsAt == null) {
     state = await billingState.update({
       where: { shop },
