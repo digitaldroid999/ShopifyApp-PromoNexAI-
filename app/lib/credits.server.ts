@@ -111,30 +111,24 @@ export async function getCredits(shop: string): Promise<CreditsResult> {
   const billingState = getBillingState();
   const creditUsage = getCreditUsage();
   const now = new Date();
-  let state = await billingState.findUnique({
+  // Get or create BillingState (upsert avoids unique constraint when two requests run concurrently)
+  let state = await billingState.upsert({
     where: { shop },
+    create: {
+      shop,
+      trialCreditsBalance: TRIAL_CREDITS,
+      freeCreditsGranted: true,
+      trialEndsAt: addDays(now, TRIAL_DAYS),
+    },
+    update: {},
   });
 
-  // New install: create with 7-day trial, 1 credit (in trialCreditsBalance, not addon)
-  if (!state) {
-    const trialEndsAt = addDays(now, TRIAL_DAYS);
-    state = await billingState.create({
-      data: {
-        shop,
-        trialCreditsBalance: TRIAL_CREDITS,
-        freeCreditsGranted: true,
-        trialEndsAt,
-      },
+  // Legacy: had old "3 free credits" (freeCreditsGranted true, trialEndsAt null) → mark trial as ended so they must subscribe
+  if (state.freeCreditsGranted && state.trialEndsAt == null) {
+    state = await billingState.update({
+      where: { shop },
+      data: { trialEndsAt: now },
     });
-  } else {
-    // Reinstall: state exists and trial was already set → do not grant new trial (leave trialEndsAt as-is)
-    // Legacy: had old "3 free credits" (freeCreditsGranted true, trialEndsAt null) → mark trial as ended so they must subscribe
-    if (state.freeCreditsGranted && state.trialEndsAt == null) {
-      state = await billingState.update({
-        where: { shop },
-        data: { trialEndsAt: now },
-      });
-    }
   }
 
   const trialEndsAt = state.trialEndsAt ? new Date(state.trialEndsAt) : null;
