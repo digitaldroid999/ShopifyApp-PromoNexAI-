@@ -41,6 +41,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     return Response.json({ error: "Short has no user_id; cannot finalize" }, { status: 400 });
   }
   const credits = await getCredits(userId);
+  if (credits.trialEnded && !credits.hasActiveSubscription) {
+    return Response.json(
+      { error: "Your trial has ended. Subscribe to continue creating videos." },
+      { status: 402 }
+    );
+  }
   if (credits.remaining <= 0) {
     return Response.json(
       { error: "No credits left. Upgrade or buy addon credits to create more videos." },

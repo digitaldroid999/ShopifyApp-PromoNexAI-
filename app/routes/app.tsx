@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { HeadersFunction, LoaderFunctionArgs } from "react-router";
-import { Outlet, useLoaderData, useRouteError, useRevalidator } from "react-router";
+import { Link, Outlet, useLoaderData, useRouteError, useRevalidator } from "react-router";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 import { AppProvider } from "@shopify/shopify-app-react-router/react";
 
@@ -86,9 +86,9 @@ export default function App() {
           }}
         >
           <strong>Your free trial ends on {trialEndDate}.</strong>{" "}
-          <a href="/app/subscription" style={{ fontWeight: 600, textDecoration: "underline" }}>
+          <Link to="/app/subscription" style={{ fontWeight: 600, textDecoration: "underline" }}>
             Choose a plan
-          </a>{" "}
+          </Link>{" "}
           to keep creating videos.
         </div>
       )}
@@ -104,8 +104,8 @@ export default function App() {
           <strong>Your trial has ended.</strong> Subscribe now to continue using the app. If you
           don&apos;t, your account access will be restricted. If you reinstall the app later, you
           won&apos;t get a free trial again.{" "}
-          <a
-            href="/app/subscription"
+          <Link
+            to="/app/subscription"
             style={{
               display: "inline-block",
               marginTop: "8px",
@@ -118,7 +118,7 @@ export default function App() {
             }}
           >
             Choose a plan
-          </a>
+          </Link>
         </div>
       )}
       <s-app-nav>

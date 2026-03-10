@@ -1,7 +1,7 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import prisma from "../db.server";
-import { consumeCredit } from "../lib/credits.server";
+import { consumeCredit, getCredits } from "../lib/credits.server";
 
 /** POST — save final video URL to Short.finalVideoUrl. Consumes 1 credit when a final video is saved. */
 export const action = async ({ request }: ActionFunctionArgs) => {
@@ -39,6 +39,13 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     });
 
     if (finalVideoUrl && short.userId) {
+      const credits = await getCredits(short.userId);
+      if (credits.trialEnded && !credits.hasActiveSubscription) {
+        return Response.json(
+          { error: "Your trial has ended. Subscribe to continue creating videos." },
+          { status: 402 }
+        );
+      }
       const consumed = await consumeCredit(short.userId);
       if (!consumed.ok) {
         console.warn("[app.api.shorts.save-final-video] consumeCredit failed:", consumed.error);

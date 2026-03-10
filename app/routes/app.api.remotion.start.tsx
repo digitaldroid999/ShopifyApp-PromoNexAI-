@@ -17,6 +17,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   const shop = (session as { shop?: string }).shop ?? "";
   if (shop) {
     const credits = await getCredits(shop);
+    if (credits.trialEnded && !credits.hasActiveSubscription) {
+      return Response.json(
+        { error: "Your trial has ended. Subscribe to continue creating videos." },
+        { status: 402 }
+      );
+    }
     if (credits.remaining <= 0) {
       return Response.json(
         { error: "No credits left. Upgrade or buy addon credits to create more videos." },
