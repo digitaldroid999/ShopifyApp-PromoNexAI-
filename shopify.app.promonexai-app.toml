@@ -2,7 +2,7 @@
 
 client_id = "8fc98a55cd37bbf33edfbda31d8234d6"
 name = "PromoNexAI_App"
-application_url = "https://shopify.promonexai.com/"
+application_url = "https://sa.promonexai.com/"
 embedded = true
 
 [webhooks]
@@ -16,6 +16,6 @@ use_legacy_install_flow = false
 
 [auth]
 redirect_urls = [
-  "https://shopify.promonexai.com/auth/callback",
-  "https://shopify.promonexai.com/auth/shopify/callback"
+  "https://sa.promonexai.com/auth/callback",
+  "https://sa.promonexai.com/auth/sa/callback"
 ]
