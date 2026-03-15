@@ -122,10 +122,10 @@ export default function App() {
         </div>
       )}
       <s-app-nav>
-        <s-link href="/app">Dashboard</s-link>
-        <s-link href="/app/videos">My Videos</s-link>
-        <s-link href="/app/additional">Resources</s-link>
-        <s-link href="/app/subscription">Subscription</s-link>
+        <Link to="/app">Dashboard</Link>
+        <Link to="/app/videos">My Videos</Link>
+        <Link to="/app/additional">Resources</Link>
+        <Link to="/app/subscription">Subscription</Link>
       </s-app-nav>
       <Outlet />
       <LegalModal
@@ -145,11 +145,11 @@ export default function App() {
         <s-stack direction="inline" gap="base">
           <s-text>PromoNexAI</s-text>
           <span style={{ margin: "0 4px", color: "var(--p-color-text-subdued, #6d7175)" }}>·</span>
-          <s-link href="/legal/terms">Terms of Service</s-link>
+          <Link to="/legal/terms">Terms of Service</Link>
           <span style={{ margin: "0 4px", color: "var(--p-color-text-subdued, #6d7175)" }}>·</span>
-          <s-link href="/legal/privacy">Privacy Policy</s-link>
+          <Link to="/legal/privacy">Privacy Policy</Link>
           <span style={{ margin: "0 4px", color: "var(--p-color-text-subdued, #6d7175)" }}>·</span>
-          <s-link href="/legal/data-processing">Data Processing Agreement</s-link>
+          <Link to="/legal/data-processing">Data Processing Agreement</Link>
         </s-stack>
       </footer>
     </AppProvider>

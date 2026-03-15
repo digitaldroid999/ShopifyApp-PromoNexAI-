@@ -2,26 +2,25 @@
 
 client_id = "8fc98a55cd37bbf33edfbda31d8234d6"
 name = "PromoNexAI_App"
-application_url = "https://shopify.promonexai.com/"
+application_url = "https://sa.promonexai.com/"
 embedded = true
 
 [webhooks]
 api_version = "2026-01"
 
-# App billing: sync BillingState on subscription changes; grant addon credits on one-time purchase.
-# Subscribe to app_subscriptions/update, app_subscriptions/delete, app_purchases_one_time/update in Partner Dashboard if needed.
+# Mandatory compliance webhooks (required for App Store)
 [[webhooks.subscriptions]]
-uri = "https://shopify.promonexai.com/webhooks/app/subscriptions"
-topics = ["app_subscriptions/update", "app_subscriptions/delete"]
+compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
+uri = "https://sa.promonexai.com/webhooks/compliance"
 
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
-scopes = ""
+scopes = "read_products,write_products"
 optional_scopes = [ ]
 use_legacy_install_flow = false
 
 [auth]
 redirect_urls = [
-  "https://shopify.promonexai.com/auth/callback",
-  "https://shopify.promonexai.com/auth/shopify/callback"
+  "https://sa.promonexai.com/auth/callback",
+  "https://sa.promonexai.com/auth/sa/callback"
 ]
