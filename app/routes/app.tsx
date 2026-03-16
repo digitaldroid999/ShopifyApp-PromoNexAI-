@@ -7,19 +7,23 @@ import { AppProvider } from "@shopify/shopify-app-react-router/react";
 import { authenticate } from "../shopify.server";
 import { getLegalStatus } from "../lib/legal.server";
 import { getCredits } from "../lib/credits.server";
+import { attributeReferralIfNeeded } from "../lib/referral.server";
 import { LegalModal } from "../components/LegalModal";
+
+const REFERRAL_CLEAR_COOKIE_HEADER = "promonex_ref=; Max-Age=0; Path=/";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const shop = session.shop;
-  const [legalStatus, credits] = await Promise.all([
+  const [legalStatus, credits, attributionResult] = await Promise.all([
     getLegalStatus(shop),
     getCredits(shop),
+    attributeReferralIfNeeded(shop, request),
   ]);
   const needsLegalAgreement = !legalStatus.agreed;
   const isUpdatedTerms = legalStatus.isUpdatedTerms;
 
-  return {
+  const data = {
     apiKey: process.env.SHOPIFY_API_KEY || "",
     shop,
     needsLegalAgreement,
@@ -29,6 +33,17 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     trialEnded: credits.trialEnded,
     hasActiveSubscription: credits.hasActiveSubscription,
   };
+
+  if (attributionResult.clearReferralCookie) {
+    return new Response(JSON.stringify(data), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Set-Cookie": REFERRAL_CLEAR_COOKIE_HEADER,
+      },
+    });
+  }
+  return data;
 };
 
 /**
@@ -125,6 +140,7 @@ export default function App() {
         <Link to="/app">Dashboard</Link>
         <Link to="/app/videos">My Videos</Link>
         <Link to="/app/additional">Resources</Link>
+        <Link to="/app/referral">Referral</Link>
         <Link to="/app/subscription">Subscription</Link>
       </s-app-nav>
       <Outlet />

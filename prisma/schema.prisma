@@ -181,3 +181,13 @@ model CreditUsage {
   @@unique([shop, periodEnd])
   @@map("credit_usage")
 }
+
+// App referral: merchant who installed the app (referrer) refers another merchant (referred); one row per referred shop
+model Referral {
+  id            String   @id @default(cuid())
+  referrerShop  String   @map("referrer_shop")
+  referredShop  String   @unique @map("referred_shop")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@map("referrals")
+}
