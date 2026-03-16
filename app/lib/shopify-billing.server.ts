@@ -45,10 +45,37 @@ export const ADDON_PRICING: Record<string, { amount: number; name: string }> = {
   addon_50: { amount: 149, name: "Extra 50 video credits" },
 };
 
-/** Map (amount, interval) from Shopify response to our planId */
+/** Subscription plan keys (exclude premium add-ons) for discount-aware mapping and referral discount. */
+export const SUBSCRIPTION_PLAN_KEYS = [
+  "starter_monthly",
+  "starter_yearly",
+  "pro_monthly",
+  "pro_yearly",
+  "business_monthly",
+  "business_yearly",
+] as const;
+
+/** Map (amount, interval) from Shopify response to our planId (exact match only). */
 function pricingToPlanId(amount: number, interval: string): string | null {
   for (const [key, p] of Object.entries(PLAN_PRICING)) {
     if (p.amount === amount && p.interval === interval) return key;
+  }
+  return null;
+}
+
+/**
+ * Map (amount, interval) to planId with discount-aware fallback: if exact match fails,
+ * treat amount as 90% of a subscription plan (within 1% tolerance) and return that plan.
+ */
+function pricingToPlanIdWithDiscount(amount: number, interval: string): string | null {
+  const exact = pricingToPlanId(amount, interval);
+  if (exact) return exact;
+  for (const key of SUBSCRIPTION_PLAN_KEYS) {
+    const p = PLAN_PRICING[key];
+    if (!p || p.interval !== interval) continue;
+    const discountedAmount = Math.round(p.amount * 0.9 * 100) / 100;
+    const tolerance = Math.max(0.01, discountedAmount * 0.01);
+    if (Math.abs(amount - discountedAmount) <= tolerance) return key;
   }
   return null;
 }
@@ -114,20 +141,27 @@ export async function createSubscription(params: {
   premiumKeys?: string[];
   returnUrl: string;
   test?: boolean;
+  isReferred?: boolean;
 }): Promise<{ url: string } | { error: string }> {
-  const { admin, shop, planKey, premiumKeys = [], returnUrl, test = false } = params;
-  console.log(`${LOG} createSubscription step=start shop=${shop} planKey=${planKey} test=${test} returnUrl=${returnUrl?.slice(0, 60)}...`);
+  const { admin, shop, planKey, premiumKeys = [], returnUrl, test = false, isReferred = false } = params;
+  console.log(`${LOG} createSubscription step=start shop=${shop} planKey=${planKey} test=${test} isReferred=${isReferred} returnUrl=${returnUrl?.slice(0, 60)}...`);
   const planPricing = PLAN_PRICING[planKey];
   if (!planPricing) {
     console.warn(`${LOG} createSubscription step=invalid_plan shop=${shop} planKey=${planKey}`);
     return { error: "Invalid plan" };
   }
 
+  const isSubscriptionPlan = SUBSCRIPTION_PLAN_KEYS.includes(planKey as (typeof SUBSCRIPTION_PLAN_KEYS)[number]);
+  const mainPlanAmount =
+    isReferred && isSubscriptionPlan
+      ? Math.round(planPricing.amount * 0.9 * 100) / 100
+      : planPricing.amount;
+
   const lineItems: Array<{ plan: { appRecurringPricingDetails: { price: { amount: number; currencyCode: string }; interval: string } } }> = [
     {
       plan: {
         appRecurringPricingDetails: {
-          price: { amount: planPricing.amount, currencyCode: "USD" },
+          price: { amount: mainPlanAmount, currencyCode: "USD" },
           interval: planPricing.interval,
         },
       },
@@ -313,7 +347,7 @@ async function applySubscriptionsToBillingState(shop: string, subs: unknown[]): 
       if (!details?.price?.amount) continue;
       const amount = parseFloat(String(details.price.amount));
       const interval = details.interval ?? "EVERY_30_DAYS";
-      const key = pricingToPlanId(amount, interval);
+      const key = pricingToPlanIdWithDiscount(amount, interval);
       if (!key) continue;
       if (PLAN_CREDITS[key] !== undefined) {
         planId = key;

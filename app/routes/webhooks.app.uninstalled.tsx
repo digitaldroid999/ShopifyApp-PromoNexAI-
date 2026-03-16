@@ -12,7 +12,8 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   if (session) {
     await db.session.deleteMany({ where: { shop } });
   }
-  // Delete referral data for this shop (referrer or referred) within 24h of uninstall.
+  // Delete referral data for this shop (referrer or referred) and their payout records.
+  await db.referralPayout.deleteMany({ where: { referrerShop: shop } });
   await db.referral.deleteMany({
     where: { OR: [{ referrerShop: shop }, { referredShop: shop }] },
   });

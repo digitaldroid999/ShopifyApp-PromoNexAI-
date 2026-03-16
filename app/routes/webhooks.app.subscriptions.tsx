@@ -5,7 +5,11 @@ import {
   addAddonCredits,
   ADDON_CREDITS,
   ADDON_PRICING,
+  SUBSCRIPTION_PLAN_KEYS,
 } from "../lib/shopify-billing.server";
+import prisma from "../db.server";
+import { getBillingState } from "../lib/billing-state.server";
+import { recordReferredFirstPayment } from "../lib/referral.server";
 
 const LOG = "[webhooks.app.subscriptions]";
 
@@ -43,6 +47,16 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     ) {
       console.log(`${LOG} webhook step=sync_subscriptions shop=${shop} topic=${topic} payload=${JSON.stringify(payload)}`);
       await syncBillingStateFromShopifyWithToken(shop, accessToken);
+      // If this shop was referred and just got an active subscription, record first payment and referrer reward eligibility.
+      const referral = await prisma.referral.findUnique({ where: { referredShop: shop } });
+      if (referral && referral.referredFirstPaymentAt == null) {
+        const billingState = getBillingState();
+        const state = await billingState.findUnique({ where: { shop } });
+        const planId = state?.planId ?? null;
+        if (planId && SUBSCRIPTION_PLAN_KEYS.includes(planId as (typeof SUBSCRIPTION_PLAN_KEYS)[number])) {
+          await recordReferredFirstPayment(shop, planId);
+        }
+      }
       console.log(`${LOG} webhook step=sync_done shop=${shop} topic=${topic}`);
     }
 

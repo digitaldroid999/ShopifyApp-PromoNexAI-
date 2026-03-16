@@ -10,7 +10,10 @@ import {
   getSubscriptionDetails,
   syncBillingStateFromShopify,
   addAddonCredits,
+  PLAN_PRICING,
+  SUBSCRIPTION_PLAN_KEYS,
 } from "../lib/shopify-billing.server";
+import { isShopReferred, ensureReferredFirstPaymentRecorded } from "../lib/referral.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
 
 const BILLING_LOG = "[billing-subscription]";
@@ -68,9 +71,25 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     console.log(`${BILLING_LOG} loader step=post_approval_done shop=${shop}`);
   }
 
-  const [credits, subscriptionDetails] = shop
-    ? await Promise.all([getCredits(shop), getSubscriptionDetails(shop)])
-    : [null, null];
+  const [credits, subscriptionDetails, isReferred] = shop
+    ? await Promise.all([getCredits(shop), getSubscriptionDetails(shop), isShopReferred(shop)])
+    : [null, null, false];
+
+  if (shop && subscriptionDetails?.planId) {
+    await ensureReferredFirstPaymentRecorded(shop, subscriptionDetails.planId);
+  }
+
+  const planPrices: Record<string, { original: number; discounted: number }> = {};
+  for (const key of SUBSCRIPTION_PLAN_KEYS) {
+    const p = PLAN_PRICING[key];
+    if (p) {
+      planPrices[key] = {
+        original: p.amount,
+        discounted: Math.round(p.amount * 0.9 * 100) / 100,
+      };
+    }
+  }
+
   const activeSubscriptionId = subscriptionDetails?.shopifySubscriptionId ?? null;
 
   return {
@@ -80,6 +99,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     hasActiveSubscription: !!subscriptionDetails?.hasActiveSubscription,
     activeSubscriptionId,
     approved,
+    isReferred: !!isReferred,
+    planPrices,
   };
 };
 
@@ -121,12 +142,14 @@ export const action = async ({ request }: ActionFunctionArgs) => {
       console.warn(`${BILLING_LOG} action step=checkout_subscription_no_plan shop=${shop}`);
       return { error: "Invalid plan" };
     }
+    const isReferred = await isShopReferred(shop);
     const result = await createSubscription({
       admin,
       shop,
       planKey,
       returnUrl: successUrl,
       test: isTest,
+      isReferred,
     });
     const status = "error" in result ? `error=${result.error}` : "url=present";
     console.log(`${BILLING_LOG} action step=checkout_subscription_result shop=${shop} planKey=${planKey} ${status}`);
@@ -194,8 +217,12 @@ export function shouldRevalidate(args: {
   return args.defaultShouldRevalidate;
 }
 
+function formatPlanPrice(amount: number): string {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(amount);
+}
+
 export default function SubscriptionPage() {
-  const { shop, credits, subscriptionDetails, hasActiveSubscription, activeSubscriptionId, approved } = useLoaderData<typeof loader>();
+  const { shop, credits, subscriptionDetails, hasActiveSubscription, activeSubscriptionId, approved, isReferred, planPrices } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const error = actionData?.error;
   const redirectUrl = actionData && "redirectUrl" in actionData ? actionData.redirectUrl : undefined;
@@ -418,12 +445,55 @@ export default function SubscriptionPage() {
         )}
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: "16px" }}>
-          <PlanCard planKey="starter_monthly" price="$49" period="/month" videos="10 videos" currentPlanId={subscriptionDetails?.planId ?? null} />
-          <PlanCard planKey="starter_yearly" price="$470" period="/year" videos="10 videos/month (save $118)" currentPlanId={subscriptionDetails?.planId ?? null} />
-          <PlanCard planKey="pro_monthly" price="$99" period="/month" videos="30 videos" highlighted currentPlanId={subscriptionDetails?.planId ?? null} />
-          <PlanCard planKey="pro_yearly" price="$950" period="/year" videos="30 videos/month (save $238)" currentPlanId={subscriptionDetails?.planId ?? null} />
-          <PlanCard planKey="business_monthly" price="$199" period="/month" videos="75 videos" currentPlanId={subscriptionDetails?.planId ?? null} />
-          <PlanCard planKey="business_yearly" price="$1,910" period="/year" videos="75 videos/month (save $478)" currentPlanId={subscriptionDetails?.planId ?? null} />
+          <PlanCard
+            planKey="starter_monthly"
+            price={planPrices?.starter_monthly ? (isReferred ? formatPlanPrice(planPrices.starter_monthly.discounted) : formatPlanPrice(planPrices.starter_monthly.original)) : "$49"}
+            period="/month"
+            videos="10 videos"
+            currentPlanId={subscriptionDetails?.planId ?? null}
+            originalPrice={isReferred && planPrices?.starter_monthly ? formatPlanPrice(planPrices.starter_monthly.original) : undefined}
+          />
+          <PlanCard
+            planKey="starter_yearly"
+            price={planPrices?.starter_yearly ? (isReferred ? formatPlanPrice(planPrices.starter_yearly.discounted) : formatPlanPrice(planPrices.starter_yearly.original)) : "$470"}
+            period="/year"
+            videos="10 videos/month (save $118)"
+            currentPlanId={subscriptionDetails?.planId ?? null}
+            originalPrice={isReferred && planPrices?.starter_yearly ? formatPlanPrice(planPrices.starter_yearly.original) : undefined}
+          />
+          <PlanCard
+            planKey="pro_monthly"
+            price={planPrices?.pro_monthly ? (isReferred ? formatPlanPrice(planPrices.pro_monthly.discounted) : formatPlanPrice(planPrices.pro_monthly.original)) : "$99"}
+            period="/month"
+            videos="30 videos"
+            highlighted
+            currentPlanId={subscriptionDetails?.planId ?? null}
+            originalPrice={isReferred && planPrices?.pro_monthly ? formatPlanPrice(planPrices.pro_monthly.original) : undefined}
+          />
+          <PlanCard
+            planKey="pro_yearly"
+            price={planPrices?.pro_yearly ? (isReferred ? formatPlanPrice(planPrices.pro_yearly.discounted) : formatPlanPrice(planPrices.pro_yearly.original)) : "$950"}
+            period="/year"
+            videos="30 videos/month (save $238)"
+            currentPlanId={subscriptionDetails?.planId ?? null}
+            originalPrice={isReferred && planPrices?.pro_yearly ? formatPlanPrice(planPrices.pro_yearly.original) : undefined}
+          />
+          <PlanCard
+            planKey="business_monthly"
+            price={planPrices?.business_monthly ? (isReferred ? formatPlanPrice(planPrices.business_monthly.discounted) : formatPlanPrice(planPrices.business_monthly.original)) : "$199"}
+            period="/month"
+            videos="75 videos"
+            currentPlanId={subscriptionDetails?.planId ?? null}
+            originalPrice={isReferred && planPrices?.business_monthly ? formatPlanPrice(planPrices.business_monthly.original) : undefined}
+          />
+          <PlanCard
+            planKey="business_yearly"
+            price={planPrices?.business_yearly ? (isReferred ? formatPlanPrice(planPrices.business_yearly.discounted) : formatPlanPrice(planPrices.business_yearly.original)) : "$1,910"}
+            period="/year"
+            videos="75 videos/month (save $478)"
+            currentPlanId={subscriptionDetails?.planId ?? null}
+            originalPrice={isReferred && planPrices?.business_yearly ? formatPlanPrice(planPrices.business_yearly.original) : undefined}
+          />
         </div>
       </s-section>
 
@@ -460,6 +530,7 @@ function PlanCard({
   videos,
   highlighted,
   currentPlanId,
+  originalPrice,
 }: {
   planKey: string;
   price: string;
@@ -467,6 +538,7 @@ function PlanCard({
   videos: string;
   highlighted?: boolean;
   currentPlanId?: string | null;
+  originalPrice?: string;
 }) {
   const name = PLAN_LABELS[planKey] ?? planKey;
   const isCurrentPlan = !!currentPlanId && currentPlanId === planKey;
@@ -518,6 +590,11 @@ function PlanCard({
       <div style={{ marginTop: "8px", marginBottom: "12px" }}>
         <span style={{ fontSize: "24px", fontWeight: 700 }}>{price}</span>
         <s-text color="subdued">{period}</s-text>
+        {originalPrice && (
+          <div style={{ marginTop: "4px" }}>
+            <s-text color="subdued">10% off first payment – was {originalPrice}</s-text>
+          </div>
+        )}
       </div>
       <s-paragraph color="subdued">{videos}</s-paragraph>
       <div style={{ marginTop: "16px" }}>

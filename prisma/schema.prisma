@@ -184,10 +184,30 @@ model CreditUsage {
 
 // App referral: merchant who installed the app (referrer) refers another merchant (referred); one row per referred shop
 model Referral {
-  id            String   @id @default(cuid())
-  referrerShop  String   @map("referrer_shop")
-  referredShop  String   @unique @map("referred_shop")
-  createdAt     DateTime @default(now()) @map("created_at")
+  id                      String    @id @default(cuid())
+  referrerShop            String    @map("referrer_shop")
+  referredShop            String    @unique @map("referred_shop")
+  createdAt               DateTime  @default(now()) @map("created_at")
+  referredFirstPaymentAt  DateTime?  @map("referred_first_payment_at")
+  referredPlanId          String?   @map("referred_plan_id")
+  referrerRewardAmount    Decimal?  @db.Decimal(10, 2) @map("referrer_reward_amount") // USD
+  referrerRewardEligibleAt DateTime? @map("referrer_reward_eligible_at") // first payment + 30 days
+  referrerRewardPaidAt    DateTime?  @map("referrer_reward_paid_at")
 
   @@map("referrals")
+}
+
+// Payout to referrer (PayPal/Stripe). Minimum $20. Created when referrer requests payout.
+model ReferralPayout {
+  id           String    @id @default(cuid())
+  referrerShop String    @map("referrer_shop")
+  amount       Decimal   @db.Decimal(10, 2)
+  currency     String    @default("USD")
+  status       String    @default("pending") // pending | paid
+  paidAt       DateTime? @map("paid_at")
+  method       String?   // e.g. paypal, stripe
+  reference    String?   // external ref
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  @@map("referral_payouts")
 }

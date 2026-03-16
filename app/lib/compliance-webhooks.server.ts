@@ -110,6 +110,7 @@ async function handleShopRedact(payload: ShopRedactPayload, shopDomain: string):
     await tx.legalAgreement.deleteMany({ where: { shop: normalized } });
     await tx.stripeCustomer.deleteMany({ where: { shop: normalized } });
     await tx.promoWorkflowTemp.deleteMany({ where: { shop: normalized } });
+    await tx.referralPayout.deleteMany({ where: { referrerShop: normalized } });
     await tx.referral.deleteMany({
       where: { OR: [{ referrerShop: normalized }, { referredShop: normalized }] },
     });
