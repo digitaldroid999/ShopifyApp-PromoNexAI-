@@ -64,6 +64,8 @@ export async function attributeReferralIfNeeded(
   const ref = match?.[1] ? decodeURIComponent(match[1].trim()) : null;
   const referrerShop = normalizeRefToReferrerShop(ref);
 
+  console.log(`${LOG} attributeReferralIfNeeded referredShop=${referredShop} hasCookie=${!!match} ref=${ref ?? "null"} referrerShop=${referrerShop ?? "null"}`);
+
   if (!referrerShop) {
     if (ref !== null) {
       return { clearReferralCookie: true };

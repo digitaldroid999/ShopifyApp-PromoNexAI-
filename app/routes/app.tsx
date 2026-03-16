@@ -34,13 +34,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     hasActiveSubscription: credits.hasActiveSubscription,
   };
 
+  // Clear cookie via redirect so the response stays HTML; use SameSite=None so it clears in iframe
   if (attributionResult.clearReferralCookie) {
-    return new Response(JSON.stringify(data), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Set-Cookie": REFERRAL_CLEAR_COOKIE_HEADER,
-      },
+    const url = new URL(request.url);
+    const location = url.pathname + url.search;
+    const clearCookieHeader = `${REFERRAL_CLEAR_COOKIE_HEADER}; SameSite=None; Secure`;
+    return new Response(null, {
+      status: 302,
+      headers: { Location: location, "Set-Cookie": clearCookieHeader },
     });
   }
   return data;

@@ -19,8 +19,9 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     process.env.SHOPIFY_APP_URL ||
     "https://apps.shopify.com";
 
+  // SameSite=None; Secure so the cookie is sent when the app loads in the Shopify Admin iframe (cross-site)
   const cookieValue = ref
-    ? `${REFERRAL_COOKIE_NAME}=${encodeURIComponent(ref)}; Path=/; Max-Age=${REFERRAL_COOKIE_MAX_AGE_SECONDS}; SameSite=Lax; HttpOnly`
+    ? `${REFERRAL_COOKIE_NAME}=${encodeURIComponent(ref)}; Path=/; Max-Age=${REFERRAL_COOKIE_MAX_AGE_SECONDS}; SameSite=None; Secure; HttpOnly`
     : "";
 
   const headers = new Headers();
