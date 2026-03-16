@@ -3,13 +3,15 @@ import { REFERRAL_COOKIE_NAME, REFERRAL_COOKIE_MAX_AGE_SECONDS } from "../lib/re
 
 /**
  * Public invite route: ?ref=referrer-shop.myshopify.com
- * Sets referral cookie and redirects to Shopify App Store so the user can install the app.
+ * Sets referral cookie and redirects to Shopify App Store (or REFERRAL_INVITE_REDIRECT_URL for testing).
  */
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const url = new URL(request.url);
   const ref = url.searchParams.get("ref")?.trim();
 
-  const appStoreUrl =
+  // For testing without App Store: set REFERRAL_INVITE_REDIRECT_URL to your app URL (e.g. https://sa.promonexai.com)
+  const redirectUrl =
+    process.env.REFERRAL_INVITE_REDIRECT_URL?.trim() ||
     process.env.SHOPIFY_APP_STORE_URL ||
     (process.env.SHOPIFY_APP_HANDLE
       ? `https://apps.shopify.com/${process.env.SHOPIFY_APP_HANDLE}`
@@ -22,7 +24,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
     : "";
 
   const headers = new Headers();
-  headers.set("Location", appStoreUrl);
+  headers.set("Location", redirectUrl);
   if (cookieValue) headers.append("Set-Cookie", cookieValue);
 
   return new Response(null, { status: 302, headers });
