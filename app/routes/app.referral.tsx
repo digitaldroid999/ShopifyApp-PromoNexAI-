@@ -10,12 +10,21 @@ import {
   REFERRER_ELIGIBILITY_DAYS,
 } from "../lib/referral.server";
 
+/** Ensure URL uses https (referral link must be https for sharing). */
+function ensureHttps(url: string): string {
+  const trimmed = url.replace(/\/$/, "").trim();
+  if (trimmed.toLowerCase().startsWith("http://")) return "https://" + trimmed.slice(7);
+  if (!trimmed.toLowerCase().startsWith("https://")) return "https://" + trimmed;
+  return trimmed;
+}
+
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
   const shop = session.shop;
   const origin = new URL(request.url).origin;
   const appUrl = process.env.SHOPIFY_APP_URL?.trim();
-  const base = origin || (appUrl?.startsWith("http") ? appUrl : `https://${appUrl}`) || "";
+  const baseRaw = origin || (appUrl?.startsWith("http") ? appUrl : appUrl ? `https://${appUrl}` : "") || "";
+  const base = ensureHttps(baseRaw);
   const referralLink = `${base.replace(/\/$/, "")}/invite?ref=${encodeURIComponent(shop)}`;
 
   const [referrals, eligibleBalance] = shop
