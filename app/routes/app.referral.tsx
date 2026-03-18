@@ -94,7 +94,7 @@ export default function ReferralPage() {
     <s-page heading="Referral">
       <s-section heading="Your referral link">
         <s-paragraph>
-          Share this link with other merchants. When they install and subscribe, you earn 20% of their first payment as a one-time cash reward. Payout is available about {eligibilityDays} days after their first payment, with a ${minPayoutUsd} minimum balance to request, via PayPal or Stripe.
+          Share this link with other merchants. When they install and subscribe, you earn a one-time cash reward: Starter $5 (monthly) / $15 (yearly), Professional $15 / $40, Business $30 / $75. Payout is available about {eligibilityDays} days after their first payment, with a ${minPayoutUsd} minimum balance to request, via PayPal or Stripe.
         </s-paragraph>
         <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", marginTop: "12px" }}>
           <input

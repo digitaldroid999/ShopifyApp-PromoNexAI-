@@ -1,13 +1,12 @@
 /**
  * App referral: attribute installs via cookie (ref = referrer shop), save Referral row, grant referrer credits.
- * Referrer reward = 20% of referred user's first payment (first payment is 90% of plan price for referred users). Eligible 30 days later; min $20 to request payout.
+ * Referrer reward = fixed USD per plan when referred shop first subscribes. Eligible 30 days later; min $20 to request payout.
  */
 
 import { Decimal } from "@prisma/client/runtime/library";
 import prisma from "../db.server";
 import { getBillingState } from "./billing-state.server";
 import { getEffectivePeriodEnd } from "./credits.server";
-import { PLAN_PRICING } from "./shopify-billing.server";
 
 const LOG = "[referral]";
 
@@ -18,8 +17,15 @@ export const REFERRAL_COOKIE_MAX_AGE_SECONDS = 7 * 24 * 60 * 60;
 /** Credits granted to the referrer when a referred merchant installs. */
 export const REFERRAL_CREDITS_GRANTED = 2;
 
-/** Referrer reward = this fraction of the referred user's first payment (referred user pays 90% of plan price, referrer gets 20% of that). */
-export const REFERRER_REWARD_PERCENT_OF_FIRST_PAYMENT = 0.2;
+/** Referrer reward in USD by plan (one-time per referred shop when they first subscribe). */
+export const REFERRER_REWARD_USD_BY_PLAN: Record<string, number> = {
+  starter_monthly: 5,
+  starter_yearly: 15,
+  pro_monthly: 15,
+  pro_yearly: 40,
+  business_monthly: 30,
+  business_yearly: 75,
+};
 
 /** Minimum balance (USD) to request a payout. */
 export const REFERRER_MIN_PAYOUT_USD = 20;
@@ -89,18 +95,15 @@ export async function ensureReferredFirstPaymentRecorded(referredShop: string, p
 }
 
 /**
- * Record referred shop's first subscription payment and set referrer reward (USD) and eligibility date (first payment + 30 days).
+ * Record referred shop's first subscription payment and set referrer reward (fixed USD by plan) and eligibility date (first payment + 30 days).
  * Call when the referred shop has an active subscription and we haven't recorded yet.
  */
 export async function recordReferredFirstPayment(referredShop: string, planId: string): Promise<void> {
   const referral = await prisma.referral.findUnique({ where: { referredShop } });
   if (!referral || referral.referredFirstPaymentAt != null) return;
 
-  const planPricing = PLAN_PRICING[planId];
-  if (!planPricing) return;
-  const firstPaymentAmount = Math.round(planPricing.amount * 0.9 * 100) / 100;
-  const rewardUsd = Math.round(firstPaymentAmount * REFERRER_REWARD_PERCENT_OF_FIRST_PAYMENT * 100) / 100;
-  if (rewardUsd <= 0) return;
+  const rewardUsd = REFERRER_REWARD_USD_BY_PLAN[planId];
+  if (rewardUsd == null || rewardUsd <= 0) return;
 
   const now = new Date();
   const eligibleAt = new Date(now);
@@ -115,7 +118,7 @@ export async function recordReferredFirstPayment(referredShop: string, planId: s
       referrerRewardEligibleAt: eligibleAt,
     },
   });
-  console.log(`${LOG} recordReferredFirstPayment referredShop=${referredShop} planId=${planId} firstPayment=${firstPaymentAmount} rewardUsd=${rewardUsd} eligibleAt=${eligibleAt.toISOString()}`);
+  console.log(`${LOG} recordReferredFirstPayment referredShop=${referredShop} planId=${planId} rewardUsd=${rewardUsd} eligibleAt=${eligibleAt.toISOString()}`);
 }
 
 /** List all referrals where this shop is the referrer (for referral page). */
