@@ -449,7 +449,7 @@ export default function SubscriptionPage() {
             planKey="starter_monthly"
             price={planPrices?.starter_monthly ? (isReferred ? formatPlanPrice(planPrices.starter_monthly.discounted) : formatPlanPrice(planPrices.starter_monthly.original)) : "$49"}
             period="/month"
-            videos="10 videos"
+            videos="5 videos"
             currentPlanId={subscriptionDetails?.planId ?? null}
             originalPrice={isReferred && planPrices?.starter_monthly ? formatPlanPrice(planPrices.starter_monthly.original) : undefined}
           />
@@ -457,7 +457,7 @@ export default function SubscriptionPage() {
             planKey="starter_yearly"
             price={planPrices?.starter_yearly ? (isReferred ? formatPlanPrice(planPrices.starter_yearly.discounted) : formatPlanPrice(planPrices.starter_yearly.original)) : "$470"}
             period="/year"
-            videos="10 videos/month (save $118)"
+            videos="5 videos/month (save $118)"
             currentPlanId={subscriptionDetails?.planId ?? null}
             originalPrice={isReferred && planPrices?.starter_yearly ? formatPlanPrice(planPrices.starter_yearly.original) : undefined}
           />
@@ -465,7 +465,7 @@ export default function SubscriptionPage() {
             planKey="pro_monthly"
             price={planPrices?.pro_monthly ? (isReferred ? formatPlanPrice(planPrices.pro_monthly.discounted) : formatPlanPrice(planPrices.pro_monthly.original)) : "$99"}
             period="/month"
-            videos="30 videos"
+            videos="15 videos"
             highlighted
             currentPlanId={subscriptionDetails?.planId ?? null}
             originalPrice={isReferred && planPrices?.pro_monthly ? formatPlanPrice(planPrices.pro_monthly.original) : undefined}
@@ -474,7 +474,7 @@ export default function SubscriptionPage() {
             planKey="pro_yearly"
             price={planPrices?.pro_yearly ? (isReferred ? formatPlanPrice(planPrices.pro_yearly.discounted) : formatPlanPrice(planPrices.pro_yearly.original)) : "$950"}
             period="/year"
-            videos="30 videos/month (save $238)"
+            videos="15 videos/month (save $238)"
             currentPlanId={subscriptionDetails?.planId ?? null}
             originalPrice={isReferred && planPrices?.pro_yearly ? formatPlanPrice(planPrices.pro_yearly.original) : undefined}
           />
@@ -482,7 +482,7 @@ export default function SubscriptionPage() {
             planKey="business_monthly"
             price={planPrices?.business_monthly ? (isReferred ? formatPlanPrice(planPrices.business_monthly.discounted) : formatPlanPrice(planPrices.business_monthly.original)) : "$199"}
             period="/month"
-            videos="75 videos"
+            videos="40 videos"
             currentPlanId={subscriptionDetails?.planId ?? null}
             originalPrice={isReferred && planPrices?.business_monthly ? formatPlanPrice(planPrices.business_monthly.original) : undefined}
           />
@@ -490,7 +490,7 @@ export default function SubscriptionPage() {
             planKey="business_yearly"
             price={planPrices?.business_yearly ? (isReferred ? formatPlanPrice(planPrices.business_yearly.discounted) : formatPlanPrice(planPrices.business_yearly.original)) : "$1,910"}
             period="/year"
-            videos="75 videos/month (save $478)"
+            videos="40 videos/month (save $478)"
             currentPlanId={subscriptionDetails?.planId ?? null}
             originalPrice={isReferred && planPrices?.business_yearly ? formatPlanPrice(planPrices.business_yearly.original) : undefined}
           />

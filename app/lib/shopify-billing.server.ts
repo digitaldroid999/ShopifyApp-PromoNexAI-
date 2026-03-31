@@ -11,12 +11,12 @@ const LOG = "[billing]";
 
 /** Credits per period for subscription plan IDs */
 export const PLAN_CREDITS: Record<string, number> = {
-  starter_monthly: 10,
-  starter_yearly: 10,
-  pro_monthly: 30,
-  pro_yearly: 30,
-  business_monthly: 75,
-  business_yearly: 75,
+  starter_monthly: 5,
+  starter_yearly: 5,
+  pro_monthly: 15,
+  pro_yearly: 15,
+  business_monthly: 40,
+  business_yearly: 40,
 };
 
 /** One-time addon key -> credits to add */

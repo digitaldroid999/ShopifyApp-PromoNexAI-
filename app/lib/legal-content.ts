@@ -72,7 +72,7 @@ To use the App, you must:
 • Subscriptions are billed monthly or yearly in advance
 • All prices are in USD unless otherwise specified
 • Prices are subject to change with 30 days notice
-• Plans: Starter ($49/mo or $470/year, 10 videos/month), Professional ($99/mo or $950/year, 30 videos/month), Business ($199/mo or $1,910/year, 75 videos/month)
+• Plans: Starter ($49/mo or $470/year, 5 videos/month), Professional ($99/mo or $950/year, 15 videos/month), Business ($199/mo or $1,910/year, 40 videos/month)
 • One-time add-ons: Extra 10/25/50 credits. Premium add-ons: Premium Music ($9/mo), Premium Voices ($15/mo)
 4.2 Free Trial
 • New users receive a 7-day free trial with 1 credit (1 credit = 1 complete video)
