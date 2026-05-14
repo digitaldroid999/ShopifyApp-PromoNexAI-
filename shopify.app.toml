@@ -13,6 +13,21 @@ api_version = "2026-01"
 compliance_topics = ["customers/data_request", "customers/redact", "shop/redact"]
 uri = "https://sa.promonexai.com/webhooks/compliance"
 
+# Handled by: app/routes/webhooks.app.uninstalled.tsx
+[[webhooks.subscriptions]]
+topics = ["app/uninstalled"]
+uri = "https://sa.promonexai.com/webhooks/app/uninstalled"
+
+# Handled by: app/routes/webhooks.app.scopes_update.tsx
+[[webhooks.subscriptions]]
+topics = ["app/scopes_update"]
+uri = "https://sa.promonexai.com/webhooks/app/scopes_update"
+
+# Billing lifecycle (accept / decline / cancel / reinstall). Handled by: app/routes/webhooks.app.subscriptions.tsx
+[[webhooks.subscriptions]]
+topics = ["app_subscriptions/update", "app_purchases_one_time/update"]
+uri = "https://sa.promonexai.com/webhooks/app/subscriptions"
+
 [access_scopes]
 # Learn more at https://shopify.dev/docs/apps/tools/cli/configuration#access_scopes
 scopes = "read_products,write_products"

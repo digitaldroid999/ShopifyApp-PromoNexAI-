@@ -1,6 +1,7 @@
 import type { ActionFunctionArgs } from "react-router";
 import { authenticate } from "../shopify.server";
 import db from "../db.server";
+import { clearSubscriptionState } from "../lib/shopify-billing.server";
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { shop, session, topic } = await authenticate.webhook(request);
@@ -11,6 +12,10 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   // If this webhook already ran, the session may have been deleted previously.
   if (session) {
     await db.session.deleteMany({ where: { shop } });
+  }
+  // Drop Shopify billing mirror so reinstall can accept a new charge without stale plan/subscription IDs.
+  if (shop) {
+    await clearSubscriptionState(shop);
   }
   // Delete referral data for this shop (referrer or referred) and their payout records.
   await db.referralPayout.deleteMany({ where: { referrerShop: shop } });
