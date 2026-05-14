@@ -324,16 +324,20 @@ async function applySubscriptionsToBillingState(shop: string, subs: unknown[]): 
   }
   console.log(`${LOG} applySubscriptionsToBillingState step=apply shop=${shop} subsCount=${subs.length}`);
 
+  const existing = await getBillingState().findUnique({
+    where: { shop },
+    select: { addonCreditsBalance: true, addonCreditsValidForPeriodEnd: true },
+  });
+  // One-time add-on credits are not in activeSubscriptions; preserve them when syncing recurring state.
+  const addonCreditsBalance = existing?.addonCreditsBalance ?? 0;
+  const addonCreditsValidForPeriodEnd = existing?.addonCreditsValidForPeriodEnd ?? null;
+
   let planId: string | null = null;
   let subscriptionCreditsPerPeriod = 0;
   let periodEnd: Date | null = null;
   let primarySubscriptionId: string | null = null;
   let premiumMusic = false;
   let premiumVoices = false;
-
-  // Addon credits are cleared on upgrade/downgrade and when subscription sync runs (e.g. new period).
-  const addonCreditsBalance = 0;
-  const addonCreditsValidForPeriodEnd: Date | null = null;
 
   type SubLineItem = { plan?: { pricingDetails?: { price?: { amount: string }; interval?: string } } };
   type SubRecord = { id: string; currentPeriodEnd?: string; lineItems?: SubLineItem[] };

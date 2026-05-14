@@ -1,5 +1,5 @@
 /**
- * Billing status for PromoNexAI (Stripe-based).
+ * Billing status for PromoNexAI (Shopify Billing API + local credits).
  * For subscription UI and credit logic, use getCredits and shopify-billing.server.
  */
 

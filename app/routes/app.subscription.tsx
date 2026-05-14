@@ -61,9 +61,14 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   const addonKey = url.searchParams.get("addon") ?? null;
   console.log(`${BILLING_LOG} loader step=start shop=${shop} approved=${approved} addonKey=${addonKey ?? "none"}`);
 
-  if (shop && approved && admin) {
-    console.log(`${BILLING_LOG} loader step=post_approval shop=${shop} syncing billing from Shopify`);
+  // Keep DB aligned with Shopify after approve, decline (cancel URL), cancel, webhook delay, or reinstall — without relying only on ?approved=1.
+  if (shop && admin) {
+    console.log(`${BILLING_LOG} loader step=sync_from_shopify shop=${shop}`);
     await syncBillingStateFromShopify(admin, shop);
+  }
+
+  if (shop && approved && admin) {
+    console.log(`${BILLING_LOG} loader step=post_approval shop=${shop} addon or referral follow-up`);
     if (addonKey && ["addon_10", "addon_25", "addon_50"].includes(addonKey)) {
       console.log(`${BILLING_LOG} loader step=addon_credits shop=${shop} addonKey=${addonKey}`);
       await addAddonCredits(shop, addonKey);
@@ -131,6 +136,7 @@ export const action = async ({ request }: ActionFunctionArgs) => {
     const result = await cancelSubscription(admin, subscriptionId);
     console.log(`${BILLING_LOG} action step=cancel_result shop=${shop} subscriptionId=${subscriptionId} error=${result.error ?? "none"}`);
     if (result.error) return { error: result.error };
+    await syncBillingStateFromShopify(admin, shop);
     return { cancelled: true };
   }
 
